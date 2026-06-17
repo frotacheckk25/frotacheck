@@ -1,17 +1,17 @@
 [build]
-  command = "flutter build web"
+  command = "bash netlify-build.sh"
   publish = "build/web"
 
 [context.production]
-  command = "flutter build web"
+  command = "bash netlify-build.sh"
   publish = "build/web"
 
 [context.deploy-preview]
-  command = "flutter build web"
+  command = "bash netlify-build.sh"
   publish = "build/web"
 
 [context.branch-deploy]
-  command = "flutter build web"
+  command = "bash netlify-build.sh"
   publish = "build/web"
 
 [[redirects]]
