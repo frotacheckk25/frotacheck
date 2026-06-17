@@ -13,8 +13,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const _backgroundImageUrl =
-      'https://chatgpt.com/backend-api/estuary/content?id=file_0000000098e8720ea944cbe61c12caab&ts=494925&p=fs&cid=1&sig=c4bd105010acdeed6d1b5acf98d1b7371d41581339151715eb74a5d59ce724ea&v=0';
+  static const _backgroundAsset = 'assets/images/login_bg.jpg';
 
   final _formKey = GlobalKey<FormState>();
   final emailController = TextEditingController();
@@ -126,9 +125,12 @@ class _LoginPageState extends State<LoginPage> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.network(
-              _backgroundImageUrl,
+            child: Image.asset(
+              _backgroundAsset,
               fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              alignment: Alignment.center,
               color: const Color(0xFF06182E).withOpacity(0.70),
               colorBlendMode: BlendMode.darken,
               errorBuilder: (context, error, stackTrace) =>
