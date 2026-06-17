@@ -13,10 +13,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const _fleetImageUrl =
-      'https://images.pexels.com/photos/1320594/pexels-photo-1320594.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1200';
   static const _backgroundImageUrl =
-      'https://images.pexels.com/photos/1320594/pexels-photo-1320594.jpeg?auto=compress&cs=tinysrgb&dpr=2&w=1200';
+      'https://chatgpt.com/backend-api/estuary/content?id=file_0000000098e8720ea944cbe61c12caab&ts=494925&p=fs&cid=1&sig=c4bd105010acdeed6d1b5acf98d1b7371d41581339151715eb74a5d59ce724ea&v=0';
 
   final _formKey = GlobalKey<FormState>();
   final emailController = TextEditingController();
@@ -223,42 +221,10 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ],
                             ),
-                            child: isWide
-                                ? Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        flex: 5,
-                                        child: _buildImagePanel(
-                                          constraints.maxWidth,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 24),
-                                      Expanded(
-                                        flex: 4,
-                                        child: _buildLoginPanel(),
-                                      ),
-                                      if (constraints.maxWidth > 1200) ...[
-                                        const SizedBox(width: 24),
-                                        SizedBox(
-                                          width: 360,
-                                          child: _buildRightPanel(
-                                            constraints.maxWidth,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  )
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      _buildImagePanel(constraints.maxWidth),
-                                      const SizedBox(height: 18),
-                                      _buildLoginPanel(),
-                                    ],
-                                  ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [_buildLoginPanel()],
+                            ),
                           ),
                         ],
                       ),
@@ -273,149 +239,21 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildImagePanel(double width) {
-    return Container(
-      height: width > 900 ? 560 : 360,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.secondary.withOpacity(0.18)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.30),
-            blurRadius: 42,
-            offset: const Offset(0, 22),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.network(
-                _fleetImageUrl,
-                fit: BoxFit.cover,
-                color: Colors.black.withOpacity(0.28),
-                colorBlendMode: BlendMode.darken,
-                errorBuilder: (context, error, stackTrace) =>
-                    Container(color: AppColors.backgroundSoft),
-              ),
-            ),
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withOpacity(0.72),
-                      Colors.transparent,
-                    ],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 28,
-              left: 28,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.40),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: AppColors.secondary.withOpacity(0.25),
-                  ),
-                ),
-                child: const Text(
-                  'FROTA CHECK',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 110,
-              left: 28,
-              right: 28,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Gestão completa da sua frota',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      height: 1.1,
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'na palma da sua mão.',
-                    style: TextStyle(
-                      color: AppColors.secondary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: 28,
-              left: 24,
-              right: 24,
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildBadgeItem('Seguro'),
-                  _buildBadgeItem('Inteligente'),
-                  _buildBadgeItem('Conectado'),
-                  _buildBadgeItem('Eficiente'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBadgeItem(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.32),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.secondary.withOpacity(0.2)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
   Widget _buildLoginPanel() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0C1B2D).withOpacity(0.96),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: const Color(0xFF39A6FF).withOpacity(0.65),
           width: 1.7,
+        ),
+        image: DecorationImage(
+          image: NetworkImage(_backgroundImageUrl),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(
+            Colors.black.withOpacity(0.64),
+            BlendMode.darken,
+          ),
         ),
         boxShadow: [
           BoxShadow(
@@ -757,239 +595,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRightPanel(double width) {
-    return Column(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.secondary.withOpacity(0.24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.22),
-                blurRadius: 42,
-                offset: const Offset(0, 20),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: width > 900 ? 560 : 420,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF08131F), Color(0xFF0C1B2E)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildDeviceBadge(
-                              Icons.desktop_windows,
-                              'LOGIN WEB',
-                            ),
-                            _buildDeviceBadge(Icons.android, 'LOGIN ANDROID'),
-                            _buildDeviceBadge(Icons.phone_iphone, 'LOGIN IOS'),
-                          ],
-                        ),
-                        const SizedBox(height: 28),
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceVariant,
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const Text(
-                                  'FrotaCheck',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  'Gestão de frota unificada em Web, Android e iOS.',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      _buildFeaturePreviewTile(
-                                        Icons.directions_car,
-                                        'Veículos',
-                                        'Rastreie a frota em tempo real.',
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildFeaturePreviewTile(
-                                        Icons.local_gas_station,
-                                        'Abastecimentos',
-                                        'Controle gastos e consumo.',
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildFeaturePreviewTile(
-                                        Icons.warning,
-                                        'Ocorrências',
-                                        'Registre incidentes com facilidade.',
-                                      ),
-                                      const Spacer(),
-                                      const Text(
-                                        'A plataforma foi feita para gestores e motoristas.',
-                                        style: TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 24,
-                  left: 24,
-                  child: _buildDeviceBadge(Icons.desktop_windows, 'LOGIN WEB'),
-                ),
-                Positioned(
-                  top: 24,
-                  right: 24,
-                  child: _buildDeviceBadge(Icons.android, 'LOGIN ANDROID'),
-                ),
-                Positioned(
-                  bottom: 24,
-                  right: 24,
-                  child: _buildDeviceBadge(Icons.phone_iphone, 'LOGIN IOS'),
-                ),
-                Positioned(
-                  bottom: 24,
-                  left: 24,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.45),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Text(
-                      'Painel unificado de gestão de frota',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDeviceBadge(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.secondary.withOpacity(0.16)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.secondary, size: 18),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturePreviewTile(
-    IconData icon,
-    String title,
-    String subtitle,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(0.16),
-              shape: BoxShape.circle,
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Icon(icon, size: 20, color: AppColors.secondary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
                 ),
               ],
             ),
