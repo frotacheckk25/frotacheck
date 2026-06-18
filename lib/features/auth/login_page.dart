@@ -125,126 +125,92 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isMobile = constraints.maxWidth < 900;
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              _backgroundAsset,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: AppColors.background),
+            ),
+          ),
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.background.withOpacity(0.28),
+                    AppColors.background.withOpacity(0.92),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 900;
 
-          if (isMobile) {
-            // Mobile: imagem como fundo + formulário em primeiro plano
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    _backgroundAsset,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Container(color: AppColors.background),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.background.withOpacity(0.85),
-                          AppColors.background.withOpacity(0.90),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ),
-                SafeArea(
-                  child: SingleChildScrollView(
+                if (isMobile) {
+                  return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 24,
+                      horizontal: 18,
+                      vertical: 28,
                     ),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 500),
+                        constraints: const BoxConstraints(maxWidth: 540),
                         child: _buildFormPanel(),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          } else {
-            // Desktop: layout lado a lado
-            return Row(
-              children: [
-                // Lado esquerdo: Imagem com logo e descrição
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Image.asset(
-                          _backgroundAsset,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(color: AppColors.background),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.black.withOpacity(0.35),
-                                Colors.black.withOpacity(0.45),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildLeftPanel(),
-                              _buildFeaturesSection(),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Lado direito: Formulário de login
-                Expanded(
-                  child: Container(
-                    color: AppColors.background,
-                    child: SafeArea(
-                      child: SingleChildScrollView(
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 30,
+                          horizontal: 48,
+                          vertical: 40,
                         ),
-                        child: Center(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLeftPanel(),
+                            const Spacer(),
+                            _buildFeaturesSection(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 4,
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 40,
+                          ),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 500),
+                            constraints: const BoxConstraints(maxWidth: 520),
                             child: _buildFormPanel(),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          }
-        },
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -256,8 +222,8 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Row(
           children: const [
-            AppLogo(compact: false, iconSize: 40),
-            SizedBox(width: 16),
+            AppLogo(compact: false, iconSize: 44),
+            SizedBox(width: 18),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -265,7 +231,7 @@ class _LoginPageState extends State<LoginPage> {
                   'FROTA',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
                   ),
@@ -274,7 +240,7 @@ class _LoginPageState extends State<LoginPage> {
                   'CHECK',
                   style: TextStyle(
                     color: AppColors.secondary,
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
                   ),
@@ -283,14 +249,24 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 26),
         const Text(
           'Gestão completa da sua frota\nna palma da sua mão.',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w300,
-            height: 1.4,
+            fontSize: 32,
+            fontWeight: FontWeight.w400,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Monitore seus veículos, mantenha a operação conectada e\n'
+          'otimize sua frota com dashboards inteligentes.',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 15,
+            height: 1.7,
           ),
         ),
       ],
@@ -337,25 +313,25 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildFormPanel() {
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(34),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B172D).withOpacity(0.95),
-        borderRadius: BorderRadius.circular(28),
+        color: const Color(0xFF0B172D).withOpacity(0.96),
+        borderRadius: BorderRadius.circular(32),
         border: Border.all(
           color: AppColors.secondary.withOpacity(0.22),
-          width: 1.2,
+          width: 1.4,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.secondary.withOpacity(0.16),
-            blurRadius: 48,
-            spreadRadius: 1,
-            offset: const Offset(0, 20),
+            color: Colors.black.withOpacity(0.32),
+            blurRadius: 36,
+            offset: const Offset(0, 18),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.30),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
+            color: AppColors.secondary.withOpacity(0.14),
+            blurRadius: 48,
+            spreadRadius: 1,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -364,7 +340,7 @@ class _LoginPageState extends State<LoginPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
               color: AppColors.secondary.withOpacity(0.14),
               borderRadius: BorderRadius.circular(18),
@@ -384,12 +360,12 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 26),
           const Text(
             'Bem-vindo de volta!',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 32,
+              fontSize: 34,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -399,10 +375,10 @@ class _LoginPageState extends State<LoginPage> {
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 15,
-              height: 1.5,
+              height: 1.6,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 30),
           _buildLoginForm(),
         ],
       ),
@@ -422,10 +398,10 @@ class _LoginPageState extends State<LoginPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFF10233B),
-              labelText: 'E-mail',
+              hintText: 'E-mail',
+              hintStyle: const TextStyle(color: AppColors.textSecondary),
               prefixIcon: const Icon(Icons.email, color: AppColors.secondary),
-              labelStyle: const TextStyle(color: AppColors.textSecondary),
-              floatingLabelBehavior: FloatingLabelBehavior.always,
+              floatingLabelBehavior: FloatingLabelBehavior.never,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 18,
                 vertical: 18,
@@ -468,10 +444,10 @@ class _LoginPageState extends State<LoginPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFF10233B),
-              labelText: 'Senha',
+              hintText: 'Senha',
+              hintStyle: const TextStyle(color: AppColors.textSecondary),
               prefixIcon: const Icon(Icons.lock, color: AppColors.secondary),
-              labelStyle: const TextStyle(color: AppColors.textSecondary),
-              floatingLabelBehavior: FloatingLabelBehavior.always,
+              floatingLabelBehavior: FloatingLabelBehavior.never,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 18,
                 vertical: 18,
