@@ -1,3 +1,4 @@
+// Build v2.1 - Layout improvements applied
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../home_page.dart';
