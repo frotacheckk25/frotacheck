@@ -314,7 +314,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildFormPanel() {
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(50),
       decoration: BoxDecoration(
         color: const Color(0xFF0B172D).withOpacity(0.96),
         borderRadius: BorderRadius.circular(32),
@@ -341,7 +341,7 @@ class _LoginPageState extends State<LoginPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
               color: AppColors.secondary.withOpacity(0.14),
               borderRadius: BorderRadius.circular(18),
@@ -357,29 +357,30 @@ class _LoginPageState extends State<LoginPage> {
                 color: AppColors.secondary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.6,
-                fontSize: 13,
+                fontSize: 14,
               ),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 48),
           const Text(
             'Bem-vindo de volta!',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 34,
+              fontSize: 40,
               fontWeight: FontWeight.bold,
+              height: 1.2,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           const Text(
             'Faça login para acessar sua conta',
             style: TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 15,
-              height: 1.6,
+              fontSize: 16,
+              height: 1.8,
             ),
           ),
-          const SizedBox(height: 36),
+          const SizedBox(height: 48),
           _buildLoginForm(),
         ],
       ),
@@ -395,17 +396,20 @@ class _LoginPageState extends State<LoginPage> {
           TextFormField(
             controller: emailController,
             keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFF10233B),
               hintText: 'E-mail',
-              hintStyle: const TextStyle(color: AppColors.textSecondary),
+              hintStyle: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 15,
+              ),
               prefixIcon: const Icon(Icons.email, color: AppColors.secondary),
               floatingLabelBehavior: FloatingLabelBehavior.never,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 20,
+                horizontal: 20,
+                vertical: 24,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -437,21 +441,24 @@ class _LoginPageState extends State<LoginPage> {
               return null;
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           TextFormField(
             controller: passwordController,
             obscureText: true,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFF10233B),
               hintText: 'Senha',
-              hintStyle: const TextStyle(color: AppColors.textSecondary),
+              hintStyle: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 15,
+              ),
               prefixIcon: const Icon(Icons.lock, color: AppColors.secondary),
               floatingLabelBehavior: FloatingLabelBehavior.never,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 20,
+                horizontal: 20,
+                vertical: 24,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -483,19 +490,22 @@ class _LoginPageState extends State<LoginPage> {
               return null;
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _showForgotPasswordDialog,
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.secondary,
-                textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
               ),
               child: const Text('Esqueceu sua senha?'),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 36),
           Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -526,23 +536,23 @@ class _LoginPageState extends State<LoginPage> {
               ),
               child: isLoading
                   ? const SizedBox(
-                      height: 18,
-                      width: 18,
+                      height: 20,
+                      width: 20,
                       child: CircularProgressIndicator(
                         color: Colors.white,
-                        strokeWidth: 2,
+                        strokeWidth: 2.5,
                       ),
                     )
                   : const Text(
                       'Entrar na conta',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 36),
           Row(
             children: [
               Expanded(
@@ -554,7 +564,10 @@ class _LoginPageState extends State<LoginPage> {
                 padding: EdgeInsets.symmetric(horizontal: 14),
                 child: Text(
                   'ou continue com',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
                 ),
               ),
               Expanded(
@@ -564,14 +577,18 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 36),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.g_mobiledata, color: Colors.white),
-                  label: const Text('Google'),
+                  icon: const Icon(
+                    Icons.g_mobiledata,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  label: const Text('Google', style: TextStyle(fontSize: 15)),
                   style:
                       OutlinedButton.styleFrom(
                         backgroundColor: Colors.transparent,
@@ -583,7 +600,7 @@ class _LoginPageState extends State<LoginPage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
                       ).copyWith(
                         overlayColor: MaterialStateProperty.all(
                           AppColors.secondary.withOpacity(0.12),
@@ -591,12 +608,15 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.window, color: Colors.white),
-                  label: const Text('Microsoft'),
+                  icon: const Icon(Icons.window, color: Colors.white, size: 22),
+                  label: const Text(
+                    'Microsoft',
+                    style: TextStyle(fontSize: 15),
+                  ),
                   style:
                       OutlinedButton.styleFrom(
                         backgroundColor: Colors.transparent,
@@ -608,7 +628,7 @@ class _LoginPageState extends State<LoginPage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
                       ).copyWith(
                         overlayColor: MaterialStateProperty.all(
                           AppColors.secondary.withOpacity(0.12),
@@ -618,13 +638,13 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 40),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
                 'Não tem uma conta? ',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
               ),
               GestureDetector(
                 onTap: () {
