@@ -313,7 +313,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildFormPanel() {
     return Container(
-      padding: const EdgeInsets.all(34),
+      padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: const Color(0xFF0B172D).withOpacity(0.96),
         borderRadius: BorderRadius.circular(32),
@@ -360,7 +360,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 32),
           const Text(
             'Bem-vindo de volta!',
             style: TextStyle(
@@ -369,7 +369,7 @@ class _LoginPageState extends State<LoginPage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           const Text(
             'Faça login para acessar sua conta',
             style: TextStyle(
@@ -378,7 +378,7 @@ class _LoginPageState extends State<LoginPage> {
               height: 1.6,
             ),
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 36),
           _buildLoginForm(),
         ],
       ),
@@ -404,7 +404,7 @@ class _LoginPageState extends State<LoginPage> {
               floatingLabelBehavior: FloatingLabelBehavior.never,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 18,
-                vertical: 18,
+                vertical: 20,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -436,7 +436,7 @@ class _LoginPageState extends State<LoginPage> {
               return null;
             },
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
           TextFormField(
             controller: passwordController,
             obscureText: true,
@@ -450,7 +450,7 @@ class _LoginPageState extends State<LoginPage> {
               floatingLabelBehavior: FloatingLabelBehavior.never,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 18,
-                vertical: 18,
+                vertical: 20,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -482,7 +482,7 @@ class _LoginPageState extends State<LoginPage> {
               return null;
             },
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -494,7 +494,7 @@ class _LoginPageState extends State<LoginPage> {
               child: const Text('Esqueceu sua senha?'),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 28),
           Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -541,7 +541,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 28),
           Row(
             children: [
               Expanded(
@@ -563,7 +563,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 28),
           Row(
             children: [
               Expanded(
@@ -617,7 +617,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
