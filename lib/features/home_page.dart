@@ -16,7 +16,6 @@ import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/frota_logo.dart';
-import '../../shared/widgets/dashboard_card.dart';
 import '../../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
 import '../../core/services/auth_service.dart';
@@ -210,6 +209,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> topCostVehicles = [];
   List<Map<String, dynamic>> rankingMotoristas = [];
   List<Map<String, String>> alertasImportantes = [];
+  List<String> monthlyFuelLabels = [];
   Map<String, double> custosPorCategoria = {};
 
   static const List<Color> _dashboardPieColors = [
@@ -227,222 +227,241 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> carregarDashboard() async {
-    setState(() {
-      carregando = true;
-    });
+    setState(() => carregando = true);
 
     try {
-      final veiculos = await supabase.from('vehicles').select();
-      final motoristas = await supabase.from('drivers').select();
-      final abastecimentos = await supabase.from('fuelings').select();
-      final manutencoes = await supabase.from('manutencoes').select();
-      final multas = await supabase.from('multas').select();
-      final pneus = await supabase.from('pneus').select();
-      final ocorrencias = await supabase.from('ocorrencias').select();
-      final recents = await supabase
+      final veiculos = await _safeSelect('vehicles');
+      final motoristas = await _safeSelect('drivers');
+
+      final abastecimentosResponse = await supabase
+          .from('fuelings')
+          .select('*, vehicles (plate), drivers (name)');
+      final abastecimentos = (abastecimentosResponse as List)
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
+
+      final manutencoes = await _safeSelect('manutencoes');
+      final multas = await _safeSelect('multas');
+      final pneus = await _safeSelect('pneus');
+      final occurrences = await _safeSelect('occurrences');
+      final ocorrencias = await _safeSelect('ocorrencias');
+
+      final recentsResponse = await supabase
           .from('fuelings')
           .select(
             'id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)',
           )
           .order('created_at', ascending: false)
           .limit(3);
+      final recents = (recentsResponse as List)
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
 
-      final documentos = await supabase.from('documentos').select();
+      final documentos = await _safeSelect('documentos');
+      final allOcorrencias = [...occurrences, ...ocorrencias];
 
-      double gasto = 0;
-      for (var item in abastecimentos) {
-        if (item['total_value'] != null) {
-          gasto += (item['total_value'] as num).toDouble();
-        }
-      }
+      final dashboardTotalGasto = _calculateTotalCost(
+        abastecimentos,
+        manutencoes,
+        pneus,
+        multas,
+      );
 
-      // Add maintenance costs
-      for (var item in manutencoes) {
-        if (item['cost'] != null) {
-          gasto += (item['cost'] as num).toDouble();
-        }
-        if (item['valor'] != null) {
-          gasto += (item['valor'] as num).toDouble();
-        }
-        if (item['total_value'] != null) {
-          gasto += (item['total_value'] as num).toDouble();
-        }
-      }
-
-      // Add multa costs
-      for (var item in multas) {
-        if (item['amount'] != null) {
-          gasto += (item['amount'] as num).toDouble();
-        }
-        if (item['valor'] != null) {
-          gasto += (item['valor'] as num).toDouble();
-        }
-        if (item['fine_value'] != null) {
-          gasto += (item['fine_value'] as num).toDouble();
-        }
-      }
-
-      // Add pneus costs
-      for (var item in pneus) {
-        if (item['cost'] != null) {
-          gasto += (item['cost'] as num).toDouble();
-        }
-        if (item['valor'] != null) {
-          gasto += (item['valor'] as num).toDouble();
-        }
-      }
-
-      final ocorrenciasAbertas = ocorrencias.where((item) {
-        final status = (item['status'] ?? '').toString().toLowerCase();
-        return status == 'aberto' || status == 'open';
-      }).length;
-
-      final categorias = _formatOcorrenciaCategorias(ocorrencias);
-      final ranking = _formatRankingMotoristas(motoristas);
+      final dashboardMonthlyFuelSpots = _buildMonthlyFuelSpots(abastecimentos);
+      final categorias = _formatOcorrenciaCategorias(allOcorrencias);
+      final ranking = _formatRankingMotoristas(motoristas, abastecimentos);
       final topVehicles = _buildTopCostVehicles(abastecimentos);
-      final monthlySpots = _buildMonthlyFuelSpots(abastecimentos);
       final costByCategory = _buildCostByCategory(
         abastecimentos,
         manutencoes,
         pneus,
         multas,
       );
-      // Tentar buscar alertas diretos da tabela 'alertas'
-      List<Map<String, String>> alerts = [];
-      try {
-        final supAlerts = await supabase
-            .from('alertas')
-            .select()
-            .order('created_at', ascending: false)
-            .limit(8);
-        if (supAlerts.isNotEmpty) {
-          alerts = List<Map<String, String>>.from(
-            supAlerts.map(
-              (a) => {
-                'title': (a['title'] ?? a['titulo'] ?? '').toString(),
-                'subtitle':
-                    (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '')
-                        .toString(),
-              },
-            ),
-          );
-        }
-      } catch (_) {}
+      final openOcorrenciasCount = allOcorrencias.where(_isOpenStatus).length;
+      final activeMaintenanceCount = _countActiveMaintenance(manutencoes);
+      final alerts = await _loadAlertas(
+        occurrences: occurrences,
+        ocorrencias: ocorrencias,
+        documentos: documentos,
+        motoristas: motoristas,
+      );
 
-      // Se não houver alertas diretos, montar a partir de dados existentes
-      if (alerts.isEmpty) {
-        final List<Map<String, String>> built = [];
-
-        // Ocorrências abertas
-        final openOc = ocorrencias
-            .where((item) {
-              final status = (item['status'] ?? '').toString().toLowerCase();
-              return status == 'aberto' ||
-                  status == 'open' ||
-                  status == 'pending';
-            })
-            .take(5);
-        for (final o in openOc) {
-          final tipo =
-              o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
-          built.add({
-            'title': 'Ocorrência: ${tipo.toString()}',
-            'subtitle':
-                '${o['vehicles']?['plate'] ?? ''} • ${o['status'] ?? ''}',
-          });
-        }
-
-        // Documentos vencendo (30 dias)
-        final now = DateTime.now();
-        for (final doc in documentos) {
-          final raw =
-              doc['data_vencimento']?.toString() ??
-              doc['vencimento']?.toString() ??
-              '';
-          final dt = _parseDate(raw) ?? DateTime.tryParse(raw);
-          if (dt != null) {
-            final diff = dt.difference(now).inDays;
-            if (diff <= 30 && diff >= 0) {
-              built.add({
-                'title':
-                    'Documento vencendo: ${doc['tipo'] ?? doc['name'] ?? 'Documento'}',
-                'subtitle':
-                    'Vence em $diff dias • ${doc['vehicles']?['plate'] ?? ''}',
-              });
-            }
-          }
-        }
-
-        // CNH dos motoristas vencendo
-        for (final m in motoristas) {
-          final raw =
-              m['cnh_vencimento'] ??
-              m['cnh_expiration'] ??
-              m['cnh_due'] ??
-              m['cnh_validade'];
-          final dt = raw != null
-              ? _parseDate(raw.toString()) ?? DateTime.tryParse(raw.toString())
-              : null;
-          if (dt != null) {
-            final diff = dt.difference(now).inDays;
-            if (diff <= 30 && diff >= 0) {
-              built.add({
-                'title':
-                    'CNH vencendo: ${m['name'] ?? m['nome'] ?? 'Motorista'}',
-                'subtitle': 'Vence em $diff dias',
-              });
-            }
-          }
-        }
-
-        // Caso ainda vazio, fornecer exemplos genéricos
-        if (built.isEmpty) {
-          built.addAll([
-            {
-              'title': 'Troca de óleo vencida',
-              'subtitle': 'Verificar 3 veículos',
-            },
-            {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
-          ]);
-        }
-
-        alerts = built.take(6).toList();
-      }
-
-setState(() {
-         totalVeiculos = veiculos.length;
-         totalMotoristas = motoristas.length;
-         totalAbastecimentos = abastecimentos.length;
-         totalEmManutencao = manutencoes.length;
-         totalOcorrenciasAbertas = ocorrenciasAbertas;
-         totalGasto = gasto;
-         recentFuelings = List<Map<String, dynamic>>.from(recents);
-         monthlyFuelSpots = monthlySpots;
-         ocorrenciasPorCategoria = categorias;
-         rankingMotoristas = ranking;
-         topCostVehicles = topVehicles;
-         alertasImportantes = alerts;
-         custosPorCategoria = costByCategory;
-       });
+      setState(() {
+        totalVeiculos = veiculos.length;
+        totalMotoristas = motoristas.length;
+        totalAbastecimentos = abastecimentos.length;
+        totalEmManutencao = activeMaintenanceCount;
+        totalOcorrenciasAbertas = openOcorrenciasCount;
+        totalGasto = dashboardTotalGasto;
+        recentFuelings = recents;
+        monthlyFuelSpots = dashboardMonthlyFuelSpots;
+        ocorrenciasPorCategoria = categorias;
+        rankingMotoristas = ranking;
+        topCostVehicles = topVehicles;
+        alertasImportantes = alerts;
+        custosPorCategoria = costByCategory;
+      });
     } catch (e) {
       debugPrint('Erro ao carregar dashboard: ${e.toString()}');
     } finally {
-      setState(() {
-        carregando = false;
+      setState(() => carregando = false);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _safeSelect(String table) async {
+    try {
+      final response = await supabase.from(table).select() as List;
+      return response
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Falha ao carregar $table: $e');
+    }
+    return [];
+  }
+
+  double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  bool _isOpenStatus(dynamic item) {
+    final status = (item['status'] ?? item['estado'] ?? '')
+        .toString()
+        .toLowerCase();
+    return status == 'aberto' ||
+        status == 'open' ||
+        status == 'em andamento' ||
+        status == 'pendente';
+  }
+
+  int _countActiveMaintenance(List<Map<String, dynamic>> manutencoes) {
+    final active = manutencoes.where((item) {
+      final status = (item['status'] ?? item['estado'] ?? '')
+          .toString()
+          .toLowerCase();
+      return status == 'aberto' ||
+          status == 'em andamento' ||
+          status == 'pendente' ||
+          status == 'ativo';
+    }).length;
+    return active > 0 ? active : manutencoes.length;
+  }
+
+  double _calculateTotalCost(
+    List<Map<String, dynamic>> abastecimentos,
+    List<Map<String, dynamic>> manutencoes,
+    List<Map<String, dynamic>> pneus,
+    List<Map<String, dynamic>> multas,
+  ) {
+    final categoryCosts = _buildCostByCategory(
+      abastecimentos,
+      manutencoes,
+      pneus,
+      multas,
+    );
+    return categoryCosts.values.fold(0.0, (sum, value) => sum + value);
+  }
+
+  Future<List<Map<String, String>>> _loadAlertas({
+    required List<Map<String, dynamic>> occurrences,
+    required List<Map<String, dynamic>> ocorrencias,
+    required List<Map<String, dynamic>> documentos,
+    required List<Map<String, dynamic>> motoristas,
+  }) async {
+    try {
+      final supAlerts = await supabase
+          .from('alertas')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(8);
+      final supAlertsList = supAlerts as List;
+      if (supAlertsList.isNotEmpty) {
+        return supAlertsList.map<Map<String, String>>((a) {
+          return {
+            'title': (a['title'] ?? a['titulo'] ?? '').toString(),
+            'subtitle': (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '')
+                .toString(),
+          };
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Falha ao carregar alertas diretos: $e');
+    }
+
+    final built = <Map<String, String>>[];
+    final combinedOccurrences = [...occurrences, ...ocorrencias];
+
+    for (final o in combinedOccurrences.where(_isOpenStatus).take(5)) {
+      final tipo =
+          o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
+      built.add({
+        'title': 'Ocorrência: ${tipo.toString()}',
+        'subtitle': '${o['vehicles']?['plate'] ?? ''} • ${o['status'] ?? ''}',
       });
     }
+
+    final now = DateTime.now();
+    for (final doc in documentos) {
+      final raw =
+          doc['data_vencimento']?.toString() ??
+          doc['vencimento']?.toString() ??
+          '';
+      final dt = _parseDate(raw) ?? DateTime.tryParse(raw);
+      if (dt != null) {
+        final diff = dt.difference(now).inDays;
+        if (diff <= 30 && diff >= 0) {
+          built.add({
+            'title':
+                'Documento vencendo: ${doc['tipo'] ?? doc['name'] ?? 'Documento'}',
+            'subtitle': 'Vence em $diff dias',
+          });
+        }
+      }
+    }
+
+    for (final m in motoristas) {
+      final raw =
+          m['cnh_vencimento'] ??
+          m['cnh_expiration'] ??
+          m['cnh_due'] ??
+          m['cnh_validade'];
+      final dt = raw != null
+          ? _parseDate(raw.toString()) ?? DateTime.tryParse(raw.toString())
+          : null;
+      if (dt != null) {
+        final diff = dt.difference(now).inDays;
+        if (diff <= 30 && diff >= 0) {
+          built.add({
+            'title': 'CNH vencendo: ${m['name'] ?? m['nome'] ?? 'Motorista'}',
+            'subtitle': 'Vence em $diff dias',
+          });
+        }
+      }
+    }
+
+    if (built.isEmpty) {
+      built.addAll([
+        {'title': 'Troca de óleo vencida', 'subtitle': 'Verificar 3 veículos'},
+        {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
+      ]);
+    }
+
+    return built.take(6).toList();
   }
 
   List<FlSpot> _buildMonthlyFuelSpots(List<dynamic> abastecimentos) {
     final months = <int, double>{};
     final now = DateTime.now();
+    final labels = <String>[];
+
     for (var item in abastecimentos) {
       final rawDate = item['fuel_date']?.toString() ?? '';
       final date = _parseDate(rawDate);
       if (date == null) continue;
       final key = date.year * 100 + date.month;
-      months[key] =
-          (months[key] ?? 0) + (item['liters'] as num? ?? 0).toDouble();
+      months[key] = (months[key] ?? 0) + _toDouble(item['liters']);
     }
 
     final spots = <FlSpot>[];
@@ -455,7 +474,12 @@ setState(() {
       final key = adjustedDate.year * 100 + adjustedDate.month;
       final total = months[key] ?? 0;
       spots.add(FlSpot(i.toDouble(), total));
+      labels.add(
+        '${_shortMonth(adjustedDate.month)} ${adjustedDate.year.toString().substring(2)}',
+      );
     }
+
+    monthlyFuelLabels = labels;
     return spots;
   }
 
@@ -463,6 +487,25 @@ setState(() {
     if (rawDate.isEmpty) return null;
 
     return app_date_utils.DateUtils.parseDate(rawDate);
+  }
+
+  String _shortMonth(int month) {
+    const names = [
+      '',
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
+    ];
+    return names[month.clamp(1, 12)];
   }
 
   Map<String, double> _buildCostByCategory(
@@ -477,39 +520,24 @@ setState(() {
     double multaTotal = 0;
 
     for (var item in abastecimentos) {
-      if (item['total_value'] != null) {
-        abastecimentoTotal += (item['total_value'] as num).toDouble();
-      }
+      abastecimentoTotal += _toDouble(item['total_value']);
     }
 
     for (var item in manutencoes) {
-      if (item['cost'] != null) {
-        manutencaoTotal += (item['cost'] as num).toDouble();
-      }
-      if (item['valor'] != null) {
-        manutencaoTotal += (item['valor'] as num).toDouble();
-      }
-      if (item['total_value'] != null) {
-        manutencaoTotal += (item['total_value'] as num).toDouble();
-      }
+      manutencaoTotal += _toDouble(item['cost']);
+      manutencaoTotal += _toDouble(item['valor']);
+      manutencaoTotal += _toDouble(item['total_value']);
     }
 
     for (var item in pneus) {
-      if (item['cost'] != null) {
-        pneuTotal += (item['cost'] as num).toDouble();
-      }
-      if (item['valor'] != null) {
-        pneuTotal += (item['valor'] as num).toDouble();
-      }
+      pneuTotal += _toDouble(item['cost']);
+      pneuTotal += _toDouble(item['valor']);
     }
 
     for (var item in multas) {
-      if (item['amount'] != null) {
-        multaTotal += (item['amount'] as num).toDouble();
-      }
-      if (item['valor'] != null) {
-        multaTotal += (item['valor'] as num).toDouble();
-      }
+      multaTotal += _toDouble(item['amount']);
+      multaTotal += _toDouble(item['valor']);
+      multaTotal += _toDouble(item['fine_value']);
     }
 
     return {
@@ -546,16 +574,31 @@ setState(() {
 
   List<Map<String, dynamic>> _formatRankingMotoristas(
     List<dynamic> motoristas,
+    List<Map<String, dynamic>> fuelings,
   ) {
-    final ranking = motoristas
-        .map(
-          (item) => {
-            'name': item['name']?.toString() ?? 'Motorista',
-            'score': 70 + ((item['name']?.toString().length ?? 0) % 31),
-          },
-        )
-        .toList();
+    final countsByDriverId = <dynamic, int>{};
+    for (final item in fuelings) {
+      final driverId =
+          item['driver_id'] ?? item['drivers']?['id'] ?? item['drivers']?['id'];
+      if (driverId != null) {
+        countsByDriverId[driverId] = (countsByDriverId[driverId] ?? 0) + 1;
+      }
+    }
+
+    final ranking = motoristas.map((item) {
+      final name =
+          item['name']?.toString() ?? item['nome']?.toString() ?? 'Motorista';
+      final id = item['id'] ?? item['driver_id'];
+      final score = id != null ? (countsByDriverId[id] ?? 0) : 0;
+      return {'name': name, 'score': score};
+    }).toList();
+
     ranking.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+    if (ranking.length >= 5 &&
+        ranking.any((item) => item['score'] as int > 0)) {
+      return ranking.take(5).toList();
+    }
+
     final defaults = [
       {'name': 'Marcos Silva', 'score': 98},
       {'name': 'João Santos', 'score': 92},
@@ -563,9 +606,6 @@ setState(() {
       {'name': 'Pedro Oliveira', 'score': 75},
       {'name': 'Lucas Almeida', 'score': 70},
     ];
-    if (ranking.length >= 5) {
-      return ranking.take(5).toList();
-    }
     final combined = [...ranking, ...defaults]
       ..sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
     return combined.take(5).toList();
@@ -576,8 +616,11 @@ setState(() {
   ) {
     final costs = <String, double>{};
     for (final item in fuelings) {
-      final placa = item['vehicles']?['plate']?.toString() ?? 'Sem placa';
-      final valor = (item['total_value'] as num?)?.toDouble() ?? 0;
+      final placa =
+          item['vehicles']?['plate']?.toString() ??
+          item['vehicle_id']?.toString() ??
+          'Sem placa';
+      final valor = _toDouble(item['total_value']);
       costs[placa] = (costs[placa] ?? 0) + valor;
     }
     final sorted = costs.entries.toList()
@@ -595,7 +638,7 @@ setState(() {
     if (width <= 760) {
       return Scaffold(
         backgroundColor: AppColors.background,
-appBar: AppBar(
+        appBar: AppBar(
           title: const FrotaLogo(compact: false),
           actions: [
             IconButton(icon: const Icon(Icons.search), onPressed: () {}),
@@ -633,7 +676,7 @@ appBar: AppBar(
 
     return Scaffold(
       backgroundColor: AppColors.background,
-appBar: AppBar(
+      appBar: AppBar(
         title: const FrotaLogo(compact: false),
         actions: [
           IconButton(icon: const Icon(Icons.search), onPressed: () {}),
@@ -651,10 +694,7 @@ appBar: AppBar(
             },
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.filter_list), onPressed: () {}),
           const SizedBox(width: 8),
           ElevatedButton.icon(
             onPressed: () {},
@@ -911,14 +951,6 @@ appBar: AppBar(
                                 _buildChartsRow(width),
                                 const SizedBox(height: 24),
                                 _buildBottomPanels(width),
-                                const SizedBox(height: 24),
-                                _buildActionGrid(
-                                  width > 1100
-                                      ? 4
-                                      : width > 760
-                                      ? 3
-                                      : 2,
-                                ),
                               ],
                             ),
                           ),
@@ -1323,7 +1355,7 @@ appBar: AppBar(
     final supaUser = supabase.auth.currentUser;
     final metadata = (supaUser?.userMetadata ?? {}) as Map<String, dynamic>?;
 
-final name = getProfileDisplayName(
+    final name = getProfileDisplayName(
       authServiceUser: auth.currentUser as Map<String, dynamic>?,
       metadata: metadata,
       supaEmail: supaUser?.email,
@@ -1340,10 +1372,7 @@ final name = getProfileDisplayName(
         .join();
 
     Widget avatar = photoUrl != null && photoUrl.isNotEmpty
-        ? CircleAvatar(
-            radius: 28,
-            backgroundImage: NetworkImage(photoUrl),
-          )
+        ? CircleAvatar(radius: 28, backgroundImage: NetworkImage(photoUrl))
         : CircleAvatar(
             radius: 28,
             backgroundColor: AppColors.secondary,
@@ -1547,54 +1576,13 @@ final name = getProfileDisplayName(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 100,
-padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundSoft,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const RotatedBox(
-                      quarterTurns: 3,
-                      child: Text(
-                        'Dashboard',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.secondary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const RotatedBox(
-                      quarterTurns: 3,
-                      child: Text(
-                        'Visão geral da frota',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
+                  children: const [
+                    Text(
                       'Visão geral da frota',
                       style: TextStyle(
                         color: Colors.white,
@@ -1602,8 +1590,8 @@ padding: const EdgeInsets.symmetric(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
+                    SizedBox(height: 10),
+                    Text(
                       'Acompanhe o desempenho da frota, custos e alertas em um único painel.',
                       style: TextStyle(
                         color: AppColors.textSecondary,
@@ -1611,87 +1599,83 @@ padding: const EdgeInsets.symmetric(
                         height: 1.75,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 14,
-                      children: [
-                        _buildHeaderStat(
-                          'Gasto total',
-                          'R\$ ${totalGasto.toStringAsFixed(2)}',
-                          AppColors.danger,
-                        ),
-                        _buildHeaderStat(
-                          'Abastecimentos',
-                          '$totalAbastecimentos',
-                          AppColors.warning,
-                        ),
-                        _buildHeaderStat(
-                          'Ocorrências',
-                          '$totalOcorrenciasAbertas abertas',
-                          AppColors.secondary,
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 24),
-              Container(
-                width: 220,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundSoft,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-child: Column(
-                   crossAxisAlignment: CrossAxisAlignment.start,
-                   children: [
-                     Text(
-                       'Status geral',
-                       style: TextStyle(
-                         color: AppColors.textSecondary,
-                         fontSize: 13,
-                       ),
-                     ),
-                     SizedBox(height: 18),
-                     Text(
-                       'Operacional',
-                       style: TextStyle(
-                         color: Colors.white,
-                         fontSize: 20,
-                         fontWeight: FontWeight.bold,
-                       ),
-                     ),
-                     SizedBox(height: 10),
-                     Text(
-                       'Sem incidentes críticos nas últimas 24h',
-                       style: TextStyle(
-                         color: AppColors.textSecondary,
-                         fontSize: 13,
-                         height: 1.7,
-                       ),
-                     ),
-                     SizedBox(height: 18),
-                     Container(
-                       padding:
-                           EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                       decoration: BoxDecoration(
-                         color: AppColors.background,
-                         borderRadius: BorderRadius.circular(16),
-                         border: Border.all(color: AppColors.border),
-                       ),
-                       child: Text(
-                          'Atualizado agora',
-                          style: TextStyle(
-                            color: AppColors.success,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+              const SizedBox(width: 18),
+              Wrap(
+                spacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundSoft,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: AppColors.textSecondary,
                         ),
+                        SizedBox(width: 8),
+                        Text(
+                          '01/05/2024 - 31/05/2024',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.filter_alt, size: 18),
+                    label: const Text('Filtros'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: AppColors.secondary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                  ],
-                ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: const Text('+ Novo registro'),
+                  ),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.search, color: Colors.white),
+                  ),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.notifications, color: Colors.white),
+                  ),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.settings, color: Colors.white),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1700,385 +1684,52 @@ child: Column(
     );
   }
 
-  Widget _buildHeaderStat(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundSoft,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-),
-     );
-   }
-
-   Widget _buildRecentFuelings(double width) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Últimos abastecimentos',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: recentFuelings.isEmpty
-              ? Container(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'Nenhum abastecimento recente encontrado.',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                )
-              : Column(
-                  children: recentFuelings.map((item) {
-                    final placa = item['vehicles']?['plate'] ?? 'Sem placa';
-                    final motorista =
-                        item['drivers']?['name'] ?? 'Sem motorista';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: AppColors.backgroundSoft,
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.secondary.withOpacity(
-                                      0.16,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.local_gas_station,
-                                    color: AppColors.secondary,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'R\$ ${item['total_value'] ?? 0}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  item['fuel_date'] ?? '--/--/----',
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'Veículo: $placa',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Motorista: $motorista',
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                _infoTag('${item['liters'] ?? 0} L'),
-                                const SizedBox(width: 10),
-                                _infoTag(item['fuel_time'] ?? '--:--'),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _infoTag(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionGrid(int menuColumns) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Ações rápidas',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: menuColumns,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.5,
-          children: [
-            MenuCard(
-              icon: Icons.directions_car,
-              title: 'Veículos',
-              color: const Color(0xFF0D47A1),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const VeiculosPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.person,
-              title: 'Motoristas',
-              color: const Color(0xFF1AA251),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MotoristasPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.local_gas_station,
-              title: 'Abastecer',
-              color: const Color(0xFFF7B500),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AbastecimentosPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.build,
-              title: 'Manutenções',
-              color: const Color(0xFF7C3AED),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ManutencoesPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.bar_chart,
-              title: 'Relatórios',
-              color: const Color(0xFF0F766E),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RelatoriosPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.checklist,
-              title: 'Checklist',
-              color: const Color(0xFF059669),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SelecionarVeiculoChecklistPage(),
-                  ),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.receipt_long,
-              title: 'Multas',
-              color: const Color(0xFFDC2626),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MultasPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.tire_repair,
-              title: 'Pneus',
-              color: const Color(0xFF64748B),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PneusPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.notification_important,
-              title: 'Alertas',
-              color: const Color(0xFFF97316),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AlertasPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.description,
-              title: 'Documentos',
-              color: const Color(0xFF2563EB),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DocumentosPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-            MenuCard(
-              icon: Icons.directions,
-              title: 'Viagens',
-              color: const Color(0xFFF59E0B),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ViagensPage()),
-                );
-                carregarDashboard();
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildTopKpiRow(double width) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildKpiTile(
-            'Total de Veículos',
-            '$totalVeiculos',
-            Icons.directions_car,
-            AppColors.secondary,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildKpiTile(
-            'Veículos Ativos',
-            '${(totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos)}',
-            Icons.directions_bus,
-            AppColors.success,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildKpiTile(
-            'Em Manutenção',
-            '$totalEmManutencao',
-            Icons.build_circle,
-            AppColors.warning,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildKpiTile(
-            'Motoristas Ativos',
-            '$totalMotoristas',
-            Icons.person,
-            AppColors.secondary,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildKpiTile(
-            'Gasto Mensal',
-            'R\$ ${totalGasto.toStringAsFixed(2)}',
-            Icons.attach_money,
-            AppColors.danger,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildKpiTile(
-            'Ocorrências Abertas',
-            '$totalOcorrenciasAbertas',
-            Icons.warning,
-            AppColors.danger,
-          ),
-        ),
-      ],
-    );
+    final isMobile = width <= 600;
+    final children = [
+      _buildKpiTile(
+        'Total de Veículos',
+        '$totalVeiculos',
+        Icons.directions_car,
+        AppColors.secondary,
+      ),
+      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
+      _buildKpiTile(
+        'Veículos Ativos',
+        '${(totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos)}',
+        Icons.directions_bus,
+        AppColors.success,
+      ),
+      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
+      _buildKpiTile(
+        'Em Manutenção',
+        '$totalEmManutencao',
+        Icons.build_circle,
+        AppColors.warning,
+      ),
+      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
+      _buildKpiTile(
+        'Motoristas Ativos',
+        '$totalMotoristas',
+        Icons.person,
+        AppColors.secondary,
+      ),
+      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
+      _buildKpiTile(
+        'Gasto Mensal',
+        'R\$ ${totalGasto.toStringAsFixed(2)}',
+        Icons.attach_money,
+        AppColors.danger,
+      ),
+      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
+      _buildKpiTile(
+        'Ocorrências Abertas',
+        '$totalOcorrenciasAbertas',
+        Icons.warning,
+        AppColors.danger,
+      ),
+    ];
+    return Wrap(spacing: 12, runSpacing: 12, children: children);
   }
 
   Widget _buildKpiTile(String title, String value, IconData icon, Color color) {
@@ -2132,13 +1783,9 @@ child: Column(
   Widget _buildChartsRow(double width) {
     final showRow = width > 1000;
     final children = [
-      Expanded(
-        child: SizedBox(height: 320, child: _buildConsumptionChart()),
-      ),
+      Expanded(child: SizedBox(height: 320, child: _buildConsumptionChart())),
       const SizedBox(width: 16),
-      Expanded(
-        child: SizedBox(height: 320, child: _buildCostPieChart()),
-      ),
+      Expanded(child: SizedBox(height: 320, child: _buildCostPieChart())),
       const SizedBox(width: 16),
       Expanded(
         child: SizedBox(height: 320, child: _buildOccurrencesBarChart()),
@@ -2169,6 +1816,12 @@ child: Column(
             FlSpot(4, 3.3),
             FlSpot(5, 3.9),
           ];
+    final labels = monthlyFuelLabels.isNotEmpty
+        ? monthlyFuelLabels
+        : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+    final maxY = spots.isNotEmpty
+        ? spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.2
+        : 5.0;
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -2223,15 +1876,8 @@ child: Column(
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: 1,
+                      reservedSize: 32,
                       getTitlesWidget: (value, meta) {
-                        final labels = [
-                          'Jan',
-                          'Fev',
-                          'Mar',
-                          'Abr',
-                          'Mai',
-                          'Jun',
-                        ];
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
@@ -2252,9 +1898,15 @@ child: Column(
                     sideTitles: SideTitles(showTitles: false),
                   ),
                 ),
+                clipData: FlClipData.all(),
+                minX: 0,
+                maxX: spots.length > 1 ? spots.last.x : 5,
+                minY: 0,
+                maxY: maxY,
                 lineBarsData: [
                   LineChartBarData(
                     isCurved: true,
+                    isStrokeCapRound: true,
                     color: AppColors.secondary,
                     barWidth: 4,
                     dotData: FlDotData(show: true),
@@ -2314,15 +1966,22 @@ child: Column(
             final percent = totalCost > 0 ? (value / totalCost) * 100 : 0;
             return {
               'color': _dashboardPieColors[index % _dashboardPieColors.length],
-              'label': '${entry.value.key} — ${percent.toStringAsFixed(0)}%',
+              'label':
+                  '${entry.value.key} — ${percent.toStringAsFixed(0)}% • R\$ ${value.toStringAsFixed(2)}',
             };
           }).toList()
         : [
-            {'color': AppColors.secondary, 'label': 'Abastecimento 60%'},
-            {'color': AppColors.success, 'label': 'Manutenção 20%'},
-            {'color': AppColors.warning, 'label': 'Pneus 10%'},
-            {'color': AppColors.danger, 'label': 'Multas 6%'},
-            {'color': AppColors.primary, 'label': 'Outros 4%'},
+            {
+              'color': AppColors.secondary,
+              'label': 'Abastecimento — 60% • R\$ 0,00',
+            },
+            {
+              'color': AppColors.success,
+              'label': 'Manutenção — 20% • R\$ 0,00',
+            },
+            {'color': AppColors.warning, 'label': 'Pneus — 10% • R\$ 0,00'},
+            {'color': AppColors.danger, 'label': 'Multas — 6% • R\$ 0,00'},
+            {'color': AppColors.primary, 'label': 'Outros — 4% • R\$ 0,00'},
           ];
 
     return Container(
@@ -2385,11 +2044,11 @@ child: Column(
     );
   }
 
-Widget _buildOccurrencesBarChart() {
+  Widget _buildOccurrencesBarChart() {
     final categories = ocorrenciasPorCategoria.entries.toList();
     final maxValue = categories.isEmpty
-        ? 5.0
-        : (categories.map((e) => e.value).reduce((a, b) => a > b ? a : b).toDouble() + 2);
+        ? 5
+        : categories.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -2415,55 +2074,72 @@ Widget _buildOccurrencesBarChart() {
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 280,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceBetween,
-                maxY: maxValue,
-                barGroups: categories.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final data = entry.value;
-                  return BarChartGroupData(
-                    x: index,
-                    barRods: [
-                      BarChartRodData(
-                        toY: data.value.toDouble(),
-                        color: AppColors.secondary,
-                        width: 22,
-                        borderRadius: BorderRadius.circular(6),
+          if (categories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text(
+                'Nenhuma ocorrência registrada',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            )
+          else
+            Column(
+              children: categories.map((entry) {
+                final widthFraction = maxValue > 0
+                    ? (entry.value / maxValue).clamp(0.05, 1.0)
+                    : 0.05;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: Text(
+                          entry.key,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Container(
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSoft,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            FractionallySizedBox(
+                              widthFactor: widthFraction,
+                              child: Container(
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondary,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        entry.value.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
-                  );
-                }).toList(),
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        final labels = categories.map((e) => e.key).toList();
-                        final text =
-                            labels[value.toInt().clamp(0, labels.length - 1)];
-                        return SideTitleWidget(
-                          axisSide: meta.axisSide,
-                          space: 6,
-                          child: Text(
-                            text,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
                   ),
-                ),
-                gridData: FlGridData(show: true),
-                borderData: FlBorderData(show: false),
-              ),
+                );
+              }).toList(),
             ),
-          ),
         ],
       ),
     );
@@ -2548,46 +2224,46 @@ Widget _buildOccurrencesBarChart() {
             )
           else
             ...alertasImportantes.map(
-            (alerta) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundSoft,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning, color: AppColors.warning),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            alerta['title'] ?? '',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
+              (alerta) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSoft,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning, color: AppColors.warning),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              alerta['title'] ?? '',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            alerta['subtitle'] ?? '',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
+                            const SizedBox(height: 4),
+                            Text(
+                              alerta['subtitle'] ?? '',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -2624,37 +2300,40 @@ Widget _buildOccurrencesBarChart() {
             )
           else
             ...rankingMotoristas.map((driver) {
-            final rank = rankingMotoristas.indexOf(driver) + 1;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Text(
-                    '$rank',
-                    style: const TextStyle(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+              final rank = rankingMotoristas.indexOf(driver) + 1;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      '$rank',
+                      style: const TextStyle(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      driver['name']?.toString() ?? '',
-                      style: const TextStyle(color: Colors.white, fontSize: 15),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        driver['name']?.toString() ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
                     ),
-                  ),
-                  Text(
-                    '${driver['score']}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      '${driver['score']}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -2719,24 +2398,44 @@ Widget _buildOccurrencesBarChart() {
             )
           else
             ...topCostVehicles.map((vehicle) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      vehicle['plate']?.toString() ?? 'Sem placa',
-                      style: const TextStyle(color: Colors.white, fontSize: 15),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.directions_car,
+                        color: AppColors.secondary,
+                        size: 20,
+                      ),
                     ),
-                  ),
-                  Text(
-                    'R\$ ${vehicle['value']?.toStringAsFixed(2) ?? '0.00'}',
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            );
-          }),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        vehicle['plate']?.toString() ?? 'Sem placa',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'R\$ ${_toDouble(vehicle['value']).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );
