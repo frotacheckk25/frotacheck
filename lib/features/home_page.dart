@@ -210,6 +210,7 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> topCostVehicles = [];
   List<Map<String, dynamic>> rankingMotoristas = [];
   List<Map<String, String>> alertasImportantes = [];
+  Map<String, double> custosPorCategoria = {};
 
   static const List<Color> _dashboardPieColors = [
     AppColors.secondary,
@@ -235,6 +236,8 @@ class _HomePageState extends State<HomePage> {
       final motoristas = await supabase.from('drivers').select();
       final abastecimentos = await supabase.from('fuelings').select();
       final manutencoes = await supabase.from('manutencoes').select();
+      final multas = await supabase.from('multas').select();
+      final pneus = await supabase.from('pneus').select();
       final ocorrencias = await supabase.from('ocorrencias').select();
       final recents = await supabase
           .from('fuelings')
@@ -253,6 +256,42 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
+      // Add maintenance costs
+      for (var item in manutencoes) {
+        if (item['cost'] != null) {
+          gasto += (item['cost'] as num).toDouble();
+        }
+        if (item['valor'] != null) {
+          gasto += (item['valor'] as num).toDouble();
+        }
+        if (item['total_value'] != null) {
+          gasto += (item['total_value'] as num).toDouble();
+        }
+      }
+
+      // Add multa costs
+      for (var item in multas) {
+        if (item['amount'] != null) {
+          gasto += (item['amount'] as num).toDouble();
+        }
+        if (item['valor'] != null) {
+          gasto += (item['valor'] as num).toDouble();
+        }
+        if (item['fine_value'] != null) {
+          gasto += (item['fine_value'] as num).toDouble();
+        }
+      }
+
+      // Add pneus costs
+      for (var item in pneus) {
+        if (item['cost'] != null) {
+          gasto += (item['cost'] as num).toDouble();
+        }
+        if (item['valor'] != null) {
+          gasto += (item['valor'] as num).toDouble();
+        }
+      }
+
       final ocorrenciasAbertas = ocorrencias.where((item) {
         final status = (item['status'] ?? '').toString().toLowerCase();
         return status == 'aberto' || status == 'open';
@@ -262,6 +301,12 @@ class _HomePageState extends State<HomePage> {
       final ranking = _formatRankingMotoristas(motoristas);
       final topVehicles = _buildTopCostVehicles(abastecimentos);
       final monthlySpots = _buildMonthlyFuelSpots(abastecimentos);
+      final costByCategory = _buildCostByCategory(
+        abastecimentos,
+        manutencoes,
+        pneus,
+        multas,
+      );
       // Tentar buscar alertas diretos da tabela 'alertas'
       List<Map<String, String>> alerts = [];
       try {
@@ -364,20 +409,21 @@ class _HomePageState extends State<HomePage> {
         alerts = built.take(6).toList();
       }
 
-      setState(() {
-        totalVeiculos = veiculos.length;
-        totalMotoristas = motoristas.length;
-        totalAbastecimentos = abastecimentos.length;
-        totalEmManutencao = manutencoes.length;
-        totalOcorrenciasAbertas = ocorrenciasAbertas;
-        totalGasto = gasto;
-        recentFuelings = List<Map<String, dynamic>>.from(recents);
-        monthlyFuelSpots = monthlySpots;
-        ocorrenciasPorCategoria = categorias;
-        rankingMotoristas = ranking;
-        topCostVehicles = topVehicles;
-        alertasImportantes = alerts;
-      });
+setState(() {
+         totalVeiculos = veiculos.length;
+         totalMotoristas = motoristas.length;
+         totalAbastecimentos = abastecimentos.length;
+         totalEmManutencao = manutencoes.length;
+         totalOcorrenciasAbertas = ocorrenciasAbertas;
+         totalGasto = gasto;
+         recentFuelings = List<Map<String, dynamic>>.from(recents);
+         monthlyFuelSpots = monthlySpots;
+         ocorrenciasPorCategoria = categorias;
+         rankingMotoristas = ranking;
+         topCostVehicles = topVehicles;
+         alertasImportantes = alerts;
+         custosPorCategoria = costByCategory;
+       });
     } catch (e) {
       debugPrint('Erro ao carregar dashboard: ${e.toString()}');
     } finally {
@@ -417,6 +463,61 @@ class _HomePageState extends State<HomePage> {
     if (rawDate.isEmpty) return null;
 
     return app_date_utils.DateUtils.parseDate(rawDate);
+  }
+
+  Map<String, double> _buildCostByCategory(
+    List<dynamic> abastecimentos,
+    List<dynamic> manutencoes,
+    List<dynamic> pneus,
+    List<dynamic> multas,
+  ) {
+    double abastecimentoTotal = 0;
+    double manutencaoTotal = 0;
+    double pneuTotal = 0;
+    double multaTotal = 0;
+
+    for (var item in abastecimentos) {
+      if (item['total_value'] != null) {
+        abastecimentoTotal += (item['total_value'] as num).toDouble();
+      }
+    }
+
+    for (var item in manutencoes) {
+      if (item['cost'] != null) {
+        manutencaoTotal += (item['cost'] as num).toDouble();
+      }
+      if (item['valor'] != null) {
+        manutencaoTotal += (item['valor'] as num).toDouble();
+      }
+      if (item['total_value'] != null) {
+        manutencaoTotal += (item['total_value'] as num).toDouble();
+      }
+    }
+
+    for (var item in pneus) {
+      if (item['cost'] != null) {
+        pneuTotal += (item['cost'] as num).toDouble();
+      }
+      if (item['valor'] != null) {
+        pneuTotal += (item['valor'] as num).toDouble();
+      }
+    }
+
+    for (var item in multas) {
+      if (item['amount'] != null) {
+        multaTotal += (item['amount'] as num).toDouble();
+      }
+      if (item['valor'] != null) {
+        multaTotal += (item['valor'] as num).toDouble();
+      }
+    }
+
+    return {
+      'Abastecimento': abastecimentoTotal,
+      'Manutenção': manutencaoTotal,
+      'Pneus': pneuTotal,
+      'Multas': multaTotal,
+    };
   }
 
   Map<String, int> _formatOcorrenciaCategorias(List<dynamic> ocorrencias) {
@@ -2180,17 +2281,14 @@ child: Column(
   }
 
   Widget _buildCostPieChart() {
-    final costs = topCostVehicles;
-    final totalCost = costs.fold<double>(
-      0,
-      (sum, item) => sum + ((item['value'] as num?)?.toDouble() ?? 0),
-    );
+    final costs = custosPorCategoria;
+    final totalCost = costs.values.fold<double>(0, (sum, val) => sum + val);
 
-    final sections = costs.isNotEmpty
-        ? costs.asMap().entries.map((entry) {
+    final entries = costs.entries.toList();
+    final sections = entries.isNotEmpty
+        ? entries.asMap().entries.map((entry) {
             final index = entry.key;
-            final item = entry.value;
-            final value = (item['value'] as num?)?.toDouble() ?? 0;
+            final value = entry.value.value;
             return PieChartSectionData(
               value: value,
               color: _dashboardPieColors[index % _dashboardPieColors.length],
@@ -2209,13 +2307,23 @@ child: Column(
             ),
           ];
 
-    final legendItems = [
-      {'color': AppColors.secondary, 'label': 'Abastecimento 60%'},
-      {'color': AppColors.success, 'label': 'Manutenção 20%'},
-      {'color': AppColors.warning, 'label': 'Pneus 10%'},
-      {'color': AppColors.danger, 'label': 'Multas 6%'},
-      {'color': AppColors.primary, 'label': 'Outros 4%'},
-    ];
+    final legendItems = entries.isNotEmpty
+        ? entries.asMap().entries.map((entry) {
+            final index = entry.key;
+            final value = entry.value.value;
+            final percent = totalCost > 0 ? (value / totalCost) * 100 : 0;
+            return {
+              'color': _dashboardPieColors[index % _dashboardPieColors.length],
+              'label': '${entry.value.key} — ${percent.toStringAsFixed(0)}%',
+            };
+          }).toList()
+        : [
+            {'color': AppColors.secondary, 'label': 'Abastecimento 60%'},
+            {'color': AppColors.success, 'label': 'Manutenção 20%'},
+            {'color': AppColors.warning, 'label': 'Pneus 10%'},
+            {'color': AppColors.danger, 'label': 'Multas 6%'},
+            {'color': AppColors.primary, 'label': 'Outros 4%'},
+          ];
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -2277,8 +2385,12 @@ child: Column(
     );
   }
 
-  Widget _buildOccurrencesBarChart() {
+Widget _buildOccurrencesBarChart() {
     final categories = ocorrenciasPorCategoria.entries.toList();
+    final maxValue = categories.isEmpty
+        ? 5.0
+        : (categories.map((e) => e.value).reduce((a, b) => a > b ? a : b).toDouble() + 2);
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -2304,17 +2416,11 @@ child: Column(
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 320,
+            height: 280,
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceBetween,
-                maxY: categories.isEmpty
-                    ? 5
-                    : (categories
-                              .map((e) => e.value)
-                              .reduce((a, b) => a > b ? a : b)
-                              .toDouble() +
-                          2),
+                maxY: maxValue,
                 barGroups: categories.asMap().entries.map((entry) {
                   final index = entry.key;
                   final data = entry.value;
@@ -2324,7 +2430,8 @@ child: Column(
                       BarChartRodData(
                         toY: data.value.toDouble(),
                         color: AppColors.secondary,
-                        width: 18,
+                        width: 22,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                     ],
                   );
@@ -2339,7 +2446,7 @@ child: Column(
                             labels[value.toInt().clamp(0, labels.length - 1)];
                         return SideTitleWidget(
                           axisSide: meta.axisSide,
-                          space: 8,
+                          space: 6,
                           child: Text(
                             text,
                             style: const TextStyle(
@@ -2351,17 +2458,8 @@ child: Column(
                       },
                     ),
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
                 ),
-                gridData: FlGridData(show: false),
+                gridData: FlGridData(show: true),
                 borderData: FlBorderData(show: false),
               ),
             ),
