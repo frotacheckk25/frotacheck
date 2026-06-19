@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../home_page.dart';
 import 'register_page.dart';
 import '../../core/theme/app_theme.dart';
-import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/frota_logo.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -145,6 +145,7 @@ class _LoginPageState extends State<LoginPage> {
             child: Image.asset(
               _backgroundAsset,
               fit: BoxFit.cover,
+              alignment: const Alignment(0.88, -0.15),
               width: double.infinity,
               height: double.infinity,
               errorBuilder: (context, error, stackTrace) =>
@@ -156,8 +157,8 @@ class _LoginPageState extends State<LoginPage> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    AppColors.background.withOpacity(0.28),
-                    AppColors.background.withOpacity(0.92),
+                    AppColors.background.withOpacity(0.14),
+                    AppColors.background.withOpacity(0.80),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -176,11 +177,16 @@ class _LoginPageState extends State<LoginPage> {
                       horizontal: 18,
                       vertical: 28,
                     ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 540),
-                        child: _buildFormPanel(),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildHeroPanel(isMobile: true),
+                        const SizedBox(height: 28),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 540),
+                          child: _buildFormPanel(),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -194,14 +200,7 @@ class _LoginPageState extends State<LoginPage> {
                           horizontal: 48,
                           vertical: 40,
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLeftPanel(),
-                            const Spacer(),
-                            _buildFeaturesSection(),
-                          ],
-                        ),
+                        child: _buildHeroPanel(isMobile: false),
                       ),
                     ),
                     Expanded(
@@ -229,79 +228,37 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildLeftPanel() {
+  Widget _buildHeroPanel({required bool isMobile}) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
-        Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: const [
-              AppLogo(compact: false, iconSize: 56),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'FROTA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    'CHECK',
-                    style: TextStyle(
-                      color: AppColors.secondary,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 48),
-        RichText(
-          text: const TextSpan(
-            children: [
-              TextSpan(
-                text: 'Gestão completa da sua frota\nna ',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  height: 1.3,
-                ),
-              ),
-              TextSpan(
-                text: 'palma da sua mão.',
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w400,
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Monitore seus veículos, mantenha a operação conectada e\n'
-          'otimize sua frota com dashboards inteligentes.',
+        FrotaLogo(compact: true, iconSize: 72),
+        const SizedBox(height: 40),
+        Text(
+          'Gestão completa da sua frota',
+          textAlign: isMobile ? TextAlign.center : TextAlign.start,
           style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 14,
-            height: 1.7,
+            color: Colors.white,
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            height: 1.2,
           ),
         ),
+        Text(
+          'na palma da sua mão.',
+          textAlign: isMobile ? TextAlign.center : TextAlign.start,
+          style: TextStyle(
+            color: AppColors.secondary,
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 38),
+        _buildFeaturesSection(),
       ],
     );
   }
@@ -444,19 +401,19 @@ class _LoginPageState extends State<LoginPage> {
                 vertical: 24,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: AppColors.secondary.withOpacity(0.18),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: AppColors.secondary.withOpacity(0.18),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: AppColors.secondary.withOpacity(0.85),
                   width: 1.8,
@@ -493,19 +450,19 @@ class _LoginPageState extends State<LoginPage> {
                 vertical: 24,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: AppColors.secondary.withOpacity(0.18),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: AppColors.secondary.withOpacity(0.18),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
                   color: AppColors.secondary.withOpacity(0.85),
                   width: 1.8,

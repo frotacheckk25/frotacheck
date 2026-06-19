@@ -1,50 +1,8 @@
 [build]
-  command = "bash netlify-build.sh"
-  publish = "build/web"
-
-[context.production]
-  command = "bash netlify-build.sh"
-  publish = "build/web"
-
-[context.deploy-preview]
-  command = "bash netlify-build.sh"
-  publish = "build/web"
-
-[context.branch-deploy]
-  command = "bash netlify-build.sh"
+  command = "flutter build web --release --web-renderer auto"
   publish = "build/web"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-[[headers]]
-  for = "/flutter_service_worker.js"
-  [headers.values]
-    Cache-Control = "no-cache"
-
-[[headers]]
-  for = "/manifest.json"
-  [headers.values]
-    Cache-Control = "no-cache"
-
-[[headers]]
-  for = "/*.dart.js"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-[[headers]]
-  for = "/assets/**"
-  [headers.values]
-    Cache-Control = "max-age=3600, must-revalidate"
-
-[[headers]]
-  for = "/canvaskit/**"
-  [headers.values]
-    Cache-Control = "max-age=31536000, immutable"
-
-[[headers]]
-  for = "/icons/**"
-  [headers.values]
-    Cache-Control = "max-age=31536000, immutable"

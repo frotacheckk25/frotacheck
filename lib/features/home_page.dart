@@ -15,8 +15,175 @@ import '../home/relatorios/relatorios_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/dashboard_card.dart';
 import '../../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/utils/date_utils.dart' as app_date_utils;
+
+// Utilities extracted for testing and reuse
+String getProfileDisplayName({
+  Map<String, dynamic>? authServiceUser,
+  Map<String, dynamic>? metadata,
+  String? supaEmail,
+}) {
+  final candidates = <dynamic>[];
+
+  // Prioritize explicit auth service fields
+  if (authServiceUser != null) {
+    candidates.addAll([
+      authServiceUser['nome'],
+      authServiceUser['name'],
+      authServiceUser['fullName'],
+      authServiceUser['full_name'],
+      authServiceUser['displayName'],
+      authServiceUser['username'],
+    ]);
+  }
+
+  // Then metadata fields
+  if (metadata != null) {
+    candidates.addAll([
+      metadata['nome'],
+      metadata['name'],
+      metadata['fullName'],
+      metadata['full_name'],
+      metadata['displayName'],
+      metadata['username'],
+    ]);
+  }
+
+  // Finally email
+  candidates.add(supaEmail);
+
+  for (final c in candidates) {
+    if (c != null) {
+      final s = c.toString().trim();
+      if (s.isNotEmpty) return s;
+    }
+  }
+  return 'Usuário';
+}
+
+String? getProfilePhotoUrl(
+  Map<String, dynamic>? metadata, {
+  String? Function(String path)? resolveStoragePath,
+  dynamic supabaseClient,
+}) {
+  if (metadata == null) return null;
+  final keys = [
+    'avatar_url',
+    'avatar',
+    'photo',
+    'picture',
+    'foto_url',
+    'foto',
+    'photo_url',
+    'profile_picture',
+    'image',
+    'img',
+    'avatar_path',
+    'photo_path',
+  ];
+
+  for (final key in keys) {
+    final v = metadata[key];
+    if (v == null) continue;
+    final s = v.toString().trim();
+    if (s.isEmpty) continue;
+    // If seems like an HTTP URL, return directly
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    // If callback provided, let caller resolve storage path
+    if (resolveStoragePath != null) {
+      final resolved = resolveStoragePath(s);
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+    }
+
+    // Try to generate a public URL via Supabase Storage using common buckets
+    try {
+      final supa = supabaseClient ?? Supabase.instance.client;
+      final bucketCandidates = <String>[];
+      if (metadata.containsKey('avatar_bucket')) {
+        bucketCandidates.add(metadata['avatar_bucket'].toString());
+      }
+      if (metadata.containsKey('bucket')) {
+        bucketCandidates.add(metadata['bucket'].toString());
+      }
+      bucketCandidates.addAll([
+        'avatars',
+        'profile',
+        'profiles',
+        'public',
+        'users',
+        'user-avatars',
+      ]);
+
+      for (final bucket in bucketCandidates) {
+        if (bucket.isEmpty) continue;
+        try {
+          final pub = supa.storage.from(bucket).getPublicUrl(s);
+          if (pub != null) {
+            final url = pub is String
+                ? pub
+                : (pub is Map && pub['publicUrl'] != null)
+                ? pub['publicUrl'].toString()
+                : pub.toString();
+            if (url.isNotEmpty) return url;
+          }
+        } catch (_) {
+          // ignore and try next bucket
+        }
+      }
+
+      // If public URL not found, attempt to create a signed URL as fallback
+      for (final bucket in bucketCandidates) {
+        if (bucket.isEmpty) {
+          continue;
+        }
+        try {
+          final signedRaw = supa.storage
+              .from(bucket)
+              .createSignedUrl(s, 60 * 60);
+          final signed = signedRaw;
+          if (signed != null) {
+            String signedUrl = '';
+            if (signed is String) {
+              signedUrl = signed;
+            } else if (signed is Map) {
+              if (signed['signedURL'] != null) {
+                signedUrl = signed['signedURL'].toString();
+              } else if (signed['signedUrl'] != null) {
+                signedUrl = signed['signedUrl'].toString();
+              } else if (signed['signed_url'] != null) {
+                signedUrl = signed['signed_url'].toString();
+              } else if (signed['data'] != null && signed['data'] is Map) {
+                final d = signed['data'] as Map;
+                if (d['signedURL'] != null) {
+                  signedUrl = d['signedURL'].toString();
+                } else if (d['signedUrl'] != null) {
+                  signedUrl = d['signedUrl'].toString();
+                } else if (d['signed_url'] != null) {
+                  signedUrl = d['signed_url'].toString();
+                }
+              }
+            }
+            if (signedUrl.isNotEmpty) {
+              return signedUrl;
+            }
+          }
+        } catch (_) {
+          // ignore and try next bucket
+        }
+      }
+    } catch (_) {
+      // ignore any supabase/storage errors
+    }
+
+    // Otherwise return raw string (may be a public URL or path)
+    return s;
+  }
+  return null;
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -43,6 +210,14 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> rankingMotoristas = [];
   List<Map<String, String>> alertasImportantes = [];
 
+  static const List<Color> _dashboardPieColors = [
+    AppColors.secondary,
+    AppColors.success,
+    AppColors.warning,
+    AppColors.danger,
+    AppColors.primary,
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +243,8 @@ class _HomePageState extends State<HomePage> {
           .order('created_at', ascending: false)
           .limit(3);
 
+      final documentos = await supabase.from('documentos').select();
+
       double gasto = 0;
       for (var item in abastecimentos) {
         if (item['total_value'] != null) {
@@ -84,13 +261,107 @@ class _HomePageState extends State<HomePage> {
       final ranking = _formatRankingMotoristas(motoristas);
       final topVehicles = _buildTopCostVehicles(abastecimentos);
       final monthlySpots = _buildMonthlyFuelSpots(abastecimentos);
-      final alerts = [
-        {'title': 'Troca de óleo vencida', 'subtitle': '3 veículos'},
-        {'title': 'CNH vencendo em 30 dias', 'subtitle': '5 motoristas'},
-        {'title': 'Licenciamento vencendo', 'subtitle': '2 veículos'},
-        {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
-        {'title': 'Seguro vencendo em 15 dias', 'subtitle': '4 veículos'},
-      ];
+      // Tentar buscar alertas diretos da tabela 'alertas'
+      List<Map<String, String>> alerts = [];
+      try {
+        final supAlerts = await supabase
+            .from('alertas')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(8);
+        if (supAlerts.isNotEmpty) {
+          alerts = List<Map<String, String>>.from(
+            supAlerts.map(
+              (a) => {
+                'title': (a['title'] ?? a['titulo'] ?? '').toString(),
+                'subtitle':
+                    (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '')
+                        .toString(),
+              },
+            ),
+          );
+        }
+      } catch (_) {}
+
+      // Se não houver alertas diretos, montar a partir de dados existentes
+      if (alerts.isEmpty) {
+        final List<Map<String, String>> built = [];
+
+        // Ocorrências abertas
+        final openOc = ocorrencias
+            .where((item) {
+              final status = (item['status'] ?? '').toString().toLowerCase();
+              return status == 'aberto' ||
+                  status == 'open' ||
+                  status == 'pending';
+            })
+            .take(5);
+        for (final o in openOc) {
+          final tipo =
+              o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
+          built.add({
+            'title': 'Ocorrência: ${tipo.toString()}',
+            'subtitle':
+                '${o['vehicles']?['plate'] ?? ''} • ${o['status'] ?? ''}',
+          });
+        }
+
+        // Documentos vencendo (30 dias)
+        final now = DateTime.now();
+        for (final doc in documentos) {
+          final raw =
+              doc['data_vencimento']?.toString() ??
+              doc['vencimento']?.toString() ??
+              '';
+          final dt = _parseDate(raw) ?? DateTime.tryParse(raw);
+          if (dt != null) {
+            final diff = dt.difference(now).inDays;
+            if (diff <= 30 && diff >= 0) {
+              built.add({
+                'title':
+                    'Documento vencendo: ${doc['tipo'] ?? doc['name'] ?? 'Documento'}',
+                'subtitle':
+                    'Vence em $diff dias • ${doc['vehicles']?['plate'] ?? ''}',
+              });
+            }
+          }
+        }
+
+        // CNH dos motoristas vencendo
+        for (final m in motoristas) {
+          final raw =
+              m['cnh_vencimento'] ??
+              m['cnh_expiration'] ??
+              m['cnh_due'] ??
+              m['cnh_validade'];
+          final dt = raw != null
+              ? _parseDate(raw.toString()) ?? DateTime.tryParse(raw.toString())
+              : null;
+          if (dt != null) {
+            final diff = dt.difference(now).inDays;
+            if (diff <= 30 && diff >= 0) {
+              built.add({
+                'title':
+                    'CNH vencendo: ${m['name'] ?? m['nome'] ?? 'Motorista'}',
+                'subtitle': 'Vence em $diff dias',
+              });
+            }
+          }
+        }
+
+        // Caso ainda vazio, fornecer exemplos genéricos
+        if (built.isEmpty) {
+          built.addAll([
+            {
+              'title': 'Troca de óleo vencida',
+              'subtitle': 'Verificar 3 veículos',
+            },
+            {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
+          ]);
+        }
+
+        alerts = built.take(6).toList();
+      }
 
       setState(() {
         totalVeiculos = veiculos.length;
@@ -107,7 +378,7 @@ class _HomePageState extends State<HomePage> {
         alertasImportantes = alerts;
       });
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint('Erro ao carregar dashboard: ${e.toString()}');
     } finally {
       setState(() {
         carregando = false;
@@ -128,11 +399,15 @@ class _HomePageState extends State<HomePage> {
     }
 
     final spots = <FlSpot>[];
-    for (var i = 5; i >= 0; i--) {
-      final date = DateTime(now.year, now.month - i);
-      final key = date.year * 100 + date.month;
+    for (var i = 0; i <= 5; i++) {
+      final monthOffset = 5 - i;
+      final date = DateTime(now.year, now.month - monthOffset);
+      final adjustedDate = date.month <= 0
+          ? DateTime(date.year - 1, date.month + 12)
+          : date;
+      final key = adjustedDate.year * 100 + adjustedDate.month;
       final total = months[key] ?? 0;
-      spots.add(FlSpot(5 - i.toDouble(), total));
+      spots.add(FlSpot(i.toDouble(), total));
     }
     return spots;
   }
@@ -140,29 +415,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? _parseDate(String rawDate) {
     if (rawDate.isEmpty) return null;
 
-    final parsed = DateTime.tryParse(rawDate);
-    if (parsed != null) return parsed;
-
-    final cleaned = rawDate.replaceAll('/', '-').replaceAll('.', '-');
-    final parts = cleaned.split('-').map((part) => part.trim()).toList();
-    if (parts.length != 3) return null;
-
-    try {
-      if (parts[0].length == 4) {
-        return DateTime(
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-          int.parse(parts[2]),
-        );
-      }
-      return DateTime(
-        int.parse(parts[2]),
-        int.parse(parts[1]),
-        int.parse(parts[0]),
-      );
-    } catch (_) {
-      return null;
-    }
+    return app_date_utils.DateUtils.parseDate(rawDate);
   }
 
   Map<String, int> _formatOcorrenciaCategorias(List<dynamic> ocorrencias) {
@@ -241,7 +494,10 @@ class _HomePageState extends State<HomePage> {
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
-          title: const AppLogo(compact: true),
+          title: const Text(
+            'FrotaCheck',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
           actions: [
             IconButton(icon: const Icon(Icons.search), onPressed: () {}),
             IconButton(
@@ -280,7 +536,13 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: AppColors.background,
       appBar: width <= 1200
           ? AppBar(
-              title: const AppLogo(compact: true),
+              title: const Text(
+                'FrotaCheck',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               actions: [
                 IconButton(icon: const Icon(Icons.search), onPressed: () {}),
                 IconButton(
@@ -327,20 +589,21 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const AppLogo(compact: false),
-                            const SizedBox(height: 30),
+                            const SizedBox(height: 10),
                             const Text(
-                              'Dashboard',
+                              'Gestão de frota empresarial',
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 28),
                             _buildSidebarItem(
                               Icons.dashboard,
                               'Visão Geral',
                               () {},
+                              active: true,
                             ),
                             _buildSidebarItem(
                               Icons.directions_car,
@@ -499,6 +762,10 @@ class _HomePageState extends State<HomePage> {
                                 carregarDashboard();
                               },
                             ),
+                            const SizedBox(height: 18),
+                            const Divider(color: AppColors.border),
+                            const SizedBox(height: 12),
+                            _buildProfileCard(),
                           ],
                         ),
                       ),
@@ -888,7 +1155,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    bool active = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -897,19 +1169,27 @@ class _HomePageState extends State<HomePage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: active
+                ? AppColors.secondary.withOpacity(0.18)
+                : AppColors.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(
+              color: active ? AppColors.secondary : AppColors.border,
+            ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.secondary, size: 22),
+              Icon(
+                icon,
+                color: active ? AppColors.secondary : Colors.white,
+                size: 22,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: active ? AppColors.secondary : Colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -917,6 +1197,93 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileCard() {
+    final auth = AuthService();
+    final supaUser = supabase.auth.currentUser;
+    final metadata = (supaUser?.userMetadata ?? {}) as Map<String, dynamic>?;
+
+final name = getProfileDisplayName(
+      authServiceUser: auth.currentUser as Map<String, dynamic>?,
+      metadata: metadata,
+      supaEmail: supaUser?.email,
+    );
+    final email = auth.currentUser?.email ?? supaUser?.email ?? '';
+
+    final photoUrl = getProfilePhotoUrl(metadata, supabaseClient: supabase);
+
+    final initials = name
+        .split(' ')
+        .where((s) => s.isNotEmpty)
+        .map((s) => s[0])
+        .take(2)
+        .join();
+
+    Widget avatar = photoUrl != null && photoUrl.isNotEmpty
+        ? CircleAvatar(
+            radius: 28,
+            backgroundImage: NetworkImage(photoUrl),
+          )
+        : CircleAvatar(
+            radius: 28,
+            backgroundColor: AppColors.secondary,
+            child: Text(
+              initials.toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          );
+
+    return InkWell(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
+        );
+        carregarDashboard();
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            avatar,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    email.toString(),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          ],
         ),
       ),
     );
@@ -1047,7 +1414,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildHeader(double width) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(26),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(32),
@@ -1066,41 +1433,149 @@ class _HomePageState extends State<HomePage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 100,
+padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSoft,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const RotatedBox(
+                      quarterTurns: 3,
+                      child: Text(
+                        'Dashboard',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.secondary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const RotatedBox(
+                      quarterTurns: 3,
+                      child: Text(
+                        'Visão geral da frota',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 24),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Dashboard',
+                  children: [
+                    const Text(
+                      'Visão geral da frota',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Visão geral da frota',
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Acompanhe o desempenho da frota, custos e alertas em um único painel.',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 15,
+                        height: 1.75,
                       ),
+                    ),
+                    const SizedBox(height: 24),
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 14,
+                      children: [
+                        _buildHeaderStat(
+                          'Gasto total',
+                          'R\$ ${totalGasto.toStringAsFixed(2)}',
+                          AppColors.danger,
+                        ),
+                        _buildHeaderStat(
+                          'Abastecimentos',
+                          '$totalAbastecimentos',
+                          AppColors.warning,
+                        ),
+                        _buildHeaderStat(
+                          'Ocorrências',
+                          '$totalOcorrenciasAbertas abertas',
+                          AppColors.secondary,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              _buildHeaderActionButton(
-                Icons.calendar_month,
-                '01/05/2024 - 31/05/2024',
-                () {},
-              ),
-              const SizedBox(width: 12),
-              _buildHeaderActionButton(Icons.filter_list, 'Filtros', () {}),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Novo registro'),
+              const SizedBox(width: 24),
+              Container(
+                width: 220,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundSoft,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Text(
+                       'Status geral',
+                       style: TextStyle(
+                         color: AppColors.textSecondary,
+                         fontSize: 13,
+                       ),
+                     ),
+                     SizedBox(height: 18),
+                     Text(
+                       'Operacional',
+                       style: TextStyle(
+                         color: Colors.white,
+                         fontSize: 20,
+                         fontWeight: FontWeight.bold,
+                       ),
+                     ),
+                     SizedBox(height: 10),
+                     Text(
+                       'Sem incidentes críticos nas últimas 24h',
+                       style: TextStyle(
+                         color: AppColors.textSecondary,
+                         fontSize: 13,
+                         height: 1.7,
+                       ),
+                     ),
+                     SizedBox(height: 18),
+                     Container(
+                       padding:
+                           EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                       decoration: BoxDecoration(
+                         color: AppColors.background,
+                         borderRadius: BorderRadius.circular(16),
+                         border: Border.all(color: AppColors.border),
+                       ),
+                       child: Text(
+                          'Atualizado agora',
+                          style: TextStyle(
+                            color: AppColors.success,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1109,25 +1584,39 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildHeaderActionButton(
-    IconData icon,
-    String label,
-    VoidCallback onTap,
-  ) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, color: Colors.white70, size: 18),
-      label: Text(label, style: const TextStyle(color: Colors.white70)),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: AppColors.border),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+  Widget _buildHeaderStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundSoft,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
       ),
-    );
-  }
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+),
+     );
+   }
 
-  Widget _buildRecentFuelings(double width) {
+   Widget _buildRecentFuelings(double width) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1417,116 +1906,56 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTopKpiRow(double width) {
-    final isWide = width > 1200;
+    final crossAxisCount = width > 1200
+        ? 4
+        : width > 760
+        ? 2
+        : 1;
     return GridView.count(
-      crossAxisCount: isWide
-          ? 3
-          : width > 760
-          ? 2
-          : 1,
+      crossAxisCount: crossAxisCount,
       crossAxisSpacing: 16,
       mainAxisSpacing: 16,
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
-      childAspectRatio: 2.4,
+      childAspectRatio: 1.6,
       children: [
-        _buildKpiCard(
-          'Total de Veículos',
-          '$totalVeiculos',
-          'Todos os veículos',
-          Icons.directions_car,
+        DashboardCard(
+          title: 'Veículos',
+          value: '$totalVeiculos',
+          icon: Icons.directions_car,
+          color: AppColors.secondary,
         ),
-        _buildKpiCard(
-          'Veículos Ativos',
-          '${(totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos)}',
-          'Em operação',
-          Icons.ev_station,
+        DashboardCard(
+          title: 'Motoristas',
+          value: '$totalMotoristas',
+          icon: Icons.person,
+          color: AppColors.success,
         ),
-        _buildKpiCard(
-          'Em Manutenção',
-          '$totalEmManutencao',
-          'Indisponíveis',
-          Icons.build_circle,
+        DashboardCard(
+          title: 'Abastecimentos',
+          value: '$totalAbastecimentos',
+          icon: Icons.local_gas_station,
+          color: AppColors.warning,
         ),
-        _buildKpiCard(
-          'Motoristas Ativos',
-          '$totalMotoristas',
-          'Motoristas',
-          Icons.person,
+        DashboardCard(
+          title: 'Gasto total',
+          value: 'R\$ ${totalGasto.toStringAsFixed(2)}',
+          icon: Icons.attach_money,
+          color: AppColors.danger,
         ),
-        _buildKpiCard(
-          'Gasto Mensal',
-          'R\$ ${totalGasto.toStringAsFixed(2)}',
-          'Total de gastos',
-          Icons.attach_money,
+        DashboardCard(
+          title: 'Em manutenção',
+          value: '$totalEmManutencao',
+          icon: Icons.build_circle,
+          color: AppColors.info,
         ),
-        _buildKpiCard(
-          'Ocorrências Abertas',
-          '$totalOcorrenciasAbertas',
-          'Aguardando resolução',
-          Icons.warning,
+        DashboardCard(
+          title: 'Ocorrências abertas',
+          value: '$totalOcorrenciasAbertas',
+          icon: Icons.warning,
+          color: AppColors.danger,
         ),
       ],
-    );
-  }
-
-  Widget _buildKpiCard(
-    String title,
-    String value,
-    String subtitle,
-    IconData icon,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(0.16),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppColors.secondary, size: 24),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1589,7 +2018,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 260,
+            height: 320,
             child: LineChart(
               LineChartData(
                 gridData: FlGridData(
@@ -1676,13 +2105,51 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCostPieChart() {
-    final sections = [
-      PieChartSectionData(value: 60, color: AppColors.secondary, title: ''),
-      PieChartSectionData(value: 20, color: AppColors.success, title: ''),
-      PieChartSectionData(value: 10, color: AppColors.warning, title: ''),
-      PieChartSectionData(value: 6, color: AppColors.danger, title: ''),
-      PieChartSectionData(value: 4, color: AppColors.primary, title: ''),
-    ];
+    final costs = topCostVehicles;
+    final totalCost = costs.fold<double>(
+      0,
+      (sum, item) => sum + ((item['value'] as num?)?.toDouble() ?? 0),
+    );
+
+    final sections = costs.isNotEmpty
+        ? costs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final value = (item['value'] as num?)?.toDouble() ?? 0;
+            return PieChartSectionData(
+              value: value,
+              color: _dashboardPieColors[index % _dashboardPieColors.length],
+              title: '',
+              radius: 58,
+              showTitle: false,
+            );
+          }).toList()
+        : [
+            PieChartSectionData(
+              value: 1,
+              color: AppColors.secondary,
+              title: '',
+              radius: 58,
+              showTitle: false,
+            ),
+          ];
+
+    final legendItems = costs.isNotEmpty
+        ? costs.asMap().entries.map((entry) {
+            final item = entry.value;
+            final value = (item['value'] as num?)?.toDouble() ?? 0;
+            final percent = totalCost > 0 ? (value / totalCost) * 100 : 0;
+            return {
+              'color':
+                  _dashboardPieColors[entry.key % _dashboardPieColors.length],
+              'label':
+                  '${item['plate']?.toString() ?? 'Veículo'} — ${percent.toStringAsFixed(0)}%',
+            };
+          }).toList()
+        : [
+            {'color': AppColors.secondary, 'label': 'Sem dados suficientes'},
+          ];
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -1703,12 +2170,12 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Distribuição dos custos',
+            'Principais veículos por custo',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 260,
+            height: 320,
             child: Row(
               children: [
                 Expanded(
@@ -1724,19 +2191,15 @@ class _HomePageState extends State<HomePage> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      _PieLegend(
-                        color: AppColors.secondary,
-                        label: 'Abastecimento 60%',
-                      ),
-                      _PieLegend(
-                        color: AppColors.success,
-                        label: 'Manutenção 20%',
-                      ),
-                      _PieLegend(color: AppColors.warning, label: 'Pneus 10%'),
-                      _PieLegend(color: AppColors.danger, label: 'Multas 6%'),
-                      _PieLegend(color: AppColors.primary, label: 'Outros 4%'),
-                    ],
+                    children: legendItems.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _PieLegend(
+                          color: item['color'] as Color,
+                          label: item['label'] as String,
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
               ],
@@ -1774,7 +2237,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 20),
           SizedBox(
-            height: 260,
+            height: 320,
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceBetween,
@@ -1875,8 +2338,8 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Expanded(
+            children: [
+              const Expanded(
                 child: Text(
                   'Alertas Importantes',
                   style: TextStyle(
@@ -1886,17 +2349,40 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-              Text(
-                'Ver todos',
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.bold,
+              InkWell(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AlertasPage()),
+                  );
+                  carregarDashboard();
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Text(
+                    'Ver todos',
+                    style: TextStyle(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          ...alertasImportantes.map(
+          if (alertasImportantes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'Nenhum alerta no momento',
+                style: const TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            ...alertasImportantes.map(
             (alerta) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Container(
@@ -1962,7 +2448,17 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 18),
-          ...rankingMotoristas.map((driver) {
+          if (rankingMotoristas.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'Nenhum motorista cadastrado',
+                style: const TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            ...rankingMotoristas.map((driver) {
             final rank = rankingMotoristas.indexOf(driver) + 1;
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -2011,8 +2507,8 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Expanded(
+            children: [
+              const Expanded(
                 child: Text(
                   'Veículos com Maior Custo',
                   style: TextStyle(
@@ -2022,17 +2518,42 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-              Text(
-                'Ver todos',
-                style: TextStyle(
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.bold,
+              InkWell(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AbastecimentosPage(),
+                    ),
+                  );
+                  carregarDashboard();
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Text(
+                    'Ver todos',
+                    style: TextStyle(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          ...topCostVehicles.map((vehicle) {
+          if (topCostVehicles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'Nenhum dado de custo disponível',
+                style: const TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            ...topCostVehicles.map((vehicle) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
