@@ -15,6 +15,7 @@ import '../home/relatorios/relatorios_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/frota_logo.dart';
 import '../../shared/widgets/dashboard_card.dart';
 import '../../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
@@ -493,11 +494,8 @@ class _HomePageState extends State<HomePage> {
     if (width <= 760) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text(
-            'FrotaCheck',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
+appBar: AppBar(
+          title: const FrotaLogo(compact: false),
           actions: [
             IconButton(icon: const Icon(Icons.search), onPressed: () {}),
             IconButton(
@@ -534,26 +532,47 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: width <= 1200
-          ? AppBar(
-              title: const Text(
-                'FrotaCheck',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+appBar: AppBar(
+        title: const FrotaLogo(compact: false),
+        actions: [
+          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.notifications_none),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Novo registro'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.secondary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
               ),
-              actions: [
-                IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-                IconButton(
-                  icon: const Icon(Icons.notifications_none),
-                  onPressed: () {},
-                ),
-              ],
-              elevation: 0,
-              backgroundColor: AppColors.surface,
-            )
-          : null,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+        elevation: 0,
+        backgroundColor: AppColors.surface,
+      ),
       body: SafeArea(
         child: Stack(
           children: [
@@ -875,10 +894,6 @@ class _HomePageState extends State<HomePage> {
             _buildChartsRow(width),
             const SizedBox(height: 20),
             _buildBottomPanels(width),
-            const SizedBox(height: 20),
-            _buildActionGrid(2),
-            const SizedBox(height: 20),
-            _buildRecentFuelings(width),
           ],
         ),
       ),
@@ -1906,78 +1921,138 @@ child: Column(
   }
 
   Widget _buildTopKpiRow(double width) {
-    final crossAxisCount = width > 1200
-        ? 4
-        : width > 760
-        ? 2
-        : 1;
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      childAspectRatio: 1.6,
+    return Row(
       children: [
-        DashboardCard(
-          title: 'Veículos',
-          value: '$totalVeiculos',
-          icon: Icons.directions_car,
-          color: AppColors.secondary,
+        Expanded(
+          child: _buildKpiTile(
+            'Total de Veículos',
+            '$totalVeiculos',
+            Icons.directions_car,
+            AppColors.secondary,
+          ),
         ),
-        DashboardCard(
-          title: 'Motoristas',
-          value: '$totalMotoristas',
-          icon: Icons.person,
-          color: AppColors.success,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiTile(
+            'Veículos Ativos',
+            '${(totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos)}',
+            Icons.directions_bus,
+            AppColors.success,
+          ),
         ),
-        DashboardCard(
-          title: 'Abastecimentos',
-          value: '$totalAbastecimentos',
-          icon: Icons.local_gas_station,
-          color: AppColors.warning,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiTile(
+            'Em Manutenção',
+            '$totalEmManutencao',
+            Icons.build_circle,
+            AppColors.warning,
+          ),
         ),
-        DashboardCard(
-          title: 'Gasto total',
-          value: 'R\$ ${totalGasto.toStringAsFixed(2)}',
-          icon: Icons.attach_money,
-          color: AppColors.danger,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiTile(
+            'Motoristas Ativos',
+            '$totalMotoristas',
+            Icons.person,
+            AppColors.secondary,
+          ),
         ),
-        DashboardCard(
-          title: 'Em manutenção',
-          value: '$totalEmManutencao',
-          icon: Icons.build_circle,
-          color: AppColors.info,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiTile(
+            'Gasto Mensal',
+            'R\$ ${totalGasto.toStringAsFixed(2)}',
+            Icons.attach_money,
+            AppColors.danger,
+          ),
         ),
-        DashboardCard(
-          title: 'Ocorrências abertas',
-          value: '$totalOcorrenciasAbertas',
-          icon: Icons.warning,
-          color: AppColors.danger,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiTile(
+            'Ocorrências Abertas',
+            '$totalOcorrenciasAbertas',
+            Icons.warning,
+            AppColors.danger,
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildKpiTile(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.22),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildChartsRow(double width) {
     final showRow = width > 1000;
     final children = [
-      Expanded(child: _buildConsumptionChart()),
+      Expanded(
+        child: SizedBox(height: 320, child: _buildConsumptionChart()),
+      ),
       const SizedBox(width: 16),
-      Expanded(child: _buildCostPieChart()),
+      Expanded(
+        child: SizedBox(height: 320, child: _buildCostPieChart()),
+      ),
       const SizedBox(width: 16),
-      Expanded(child: _buildOccurrencesBarChart()),
+      Expanded(
+        child: SizedBox(height: 320, child: _buildOccurrencesBarChart()),
+      ),
     ];
     return showRow
         ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: children)
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildConsumptionChart(),
+              SizedBox(height: 320, child: _buildConsumptionChart()),
               const SizedBox(height: 16),
-              _buildCostPieChart(),
+              SizedBox(height: 320, child: _buildCostPieChart()),
               const SizedBox(height: 16),
-              _buildOccurrencesBarChart(),
+              SizedBox(height: 320, child: _buildOccurrencesBarChart()),
             ],
           );
   }
@@ -2134,21 +2209,13 @@ child: Column(
             ),
           ];
 
-    final legendItems = costs.isNotEmpty
-        ? costs.asMap().entries.map((entry) {
-            final item = entry.value;
-            final value = (item['value'] as num?)?.toDouble() ?? 0;
-            final percent = totalCost > 0 ? (value / totalCost) * 100 : 0;
-            return {
-              'color':
-                  _dashboardPieColors[entry.key % _dashboardPieColors.length],
-              'label':
-                  '${item['plate']?.toString() ?? 'Veículo'} — ${percent.toStringAsFixed(0)}%',
-            };
-          }).toList()
-        : [
-            {'color': AppColors.secondary, 'label': 'Sem dados suficientes'},
-          ];
+    final legendItems = [
+      {'color': AppColors.secondary, 'label': 'Abastecimento 60%'},
+      {'color': AppColors.success, 'label': 'Manutenção 20%'},
+      {'color': AppColors.warning, 'label': 'Pneus 10%'},
+      {'color': AppColors.danger, 'label': 'Multas 6%'},
+      {'color': AppColors.primary, 'label': 'Outros 4%'},
+    ];
 
     return Container(
       padding: const EdgeInsets.all(22),
