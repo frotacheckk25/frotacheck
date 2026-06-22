@@ -41,6 +41,11 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     carregarMotoristas();
   }
 
+  static final List<Map<String, dynamic>> motoristasMock = [
+    {'id': '1', 'name': 'João Silva'},
+    {'id': '2', 'name': 'Maria Oliveira'},
+  ];
+
   Future<void> carregarMotoristas() async {
     try {
       final response = await supabase
@@ -51,7 +56,10 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         drivers = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      debugPrint('Erro ao carregar motoristas: $e');
+      debugPrint('Erro ao carregar motoristas: $e - usando dados mock');
+      setState(() {
+        drivers = motoristasMock;
+      });
     }
   }
 

@@ -400,7 +400,11 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Exportar PDF (ambiente de teste)')),
+                            );
+                          },
                           icon: const Icon(Icons.download),
                           label: const Text('Exportar PDF'),
                         ),
@@ -408,7 +412,11 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Compartilhar (ambiente de teste)')),
+                            );
+                          },
                           icon: const Icon(Icons.share),
                           label: const Text('Compartilhar'),
                         ),

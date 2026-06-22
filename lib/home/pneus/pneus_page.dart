@@ -1,8 +1,47 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
-class PneusPage extends StatelessWidget {
+class PneusPage extends StatefulWidget {
   const PneusPage({super.key});
+
+  @override
+  State<PneusPage> createState() => _PneusPageState();
+}
+
+class _PneusPageState extends State<PneusPage> {
+  bool carregando = false;
+
+  final List<Map<String, dynamic>> pneusMock = [
+    {
+      'id': '1',
+      'veiculo': 'ABC-1234',
+      'posicao': 'Dianteiro Esquerdo',
+      'marca': 'Pirelli',
+      'pressao': '32 PSI',
+      'status': 'bom',
+    },
+    {
+      'id': '2',
+      'veiculo': 'XYZ-9999',
+      'posicao': 'Traseiro Direito',
+      'marca': 'Michelin',
+      'pressao': '30 PSI',
+      'status': 'revisar',
+    },
+  ];
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'bom':
+        return Colors.green;
+      case 'revisar':
+        return Colors.orange;
+      case 'troca':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,23 +87,29 @@ class PneusPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Liste aqui os pneus da frota, acompanhe desgaste e trocas programadas.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 15,
+              child: ListView.separated(
+                itemCount: pneusMock.length,
+                separatorBuilder: (context, _) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final pneu = pneusMock[index];
+                  return Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: _getStatusColor(pneu['status']).withOpacity(0.2),
+                        child: const Icon(Icons.tire_repair),
+                      ),
+                      title: Text('${pneu['veiculo']} - ${pneu['posicao']}'),
+                      subtitle: Text('${pneu['marca']} • Pressão: ${pneu['pressao']}'),
+                      trailing: Chip(
+                        label: Text(pneu['status'].toUpperCase()),
+                        backgroundColor: _getStatusColor(pneu['status']).withOpacity(0.3),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],

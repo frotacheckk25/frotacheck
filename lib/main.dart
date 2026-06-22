@@ -25,7 +25,7 @@ class FrotaCheckApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'FrotaCheck',
 
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.darkTheme,
 
       home: const LoginPage(),
     );

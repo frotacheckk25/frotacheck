@@ -20,6 +20,41 @@ class _ViagensPageState extends State<ViagensPage> {
   bool isLoading = true;
   String filtroStatus = 'todas';
 
+  static final List<Viagem> viagensMock = [
+    Viagem(
+      id: 'v1',
+      veiculoId: '1',
+      motoristaId: '1',
+      origem: 'São Paulo',
+      destino: 'Rio de Janeiro',
+      quilometragemInicio: 50000,
+      dataInicio: DateTime.now().subtract(const Duration(days: 2)),
+      status: 'em_progresso',
+      fotosRota: [],
+    ),
+    Viagem(
+      id: 'v2',
+      veiculoId: '2',
+      motoristaId: '2',
+      origem: 'Curitiba',
+      destino: 'Florianópolis',
+      quilometragemInicio: 30000,
+      dataInicio: DateTime.now().subtract(const Duration(days: 5)),
+      status: 'concluida',
+      fotosRota: [],
+    ),
+  ];
+
+  static final List<Veiculo> veiculosMock = [
+    Veiculo(id: '1', placa: 'ABC-1234', modelo: 'Fiesta'),
+    Veiculo(id: '2', placa: 'XYZ-9999', modelo: 'Civic'),
+  ];
+
+  static final List<Motorista> motoristasMock = [
+    Motorista(id: '1', nome: 'João Silva'),
+    Motorista(id: '2', nome: 'Maria Oliveira'),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -38,24 +73,37 @@ class _ViagensPageState extends State<ViagensPage> {
 
       if (!mounted) return;
       setState(() {
-        viagens = (viagensResponse as List)
-            .map((e) => Viagem.fromJson(e as Map<String, dynamic>))
-            .toList();
-        veiculos = (veiculosResponse as List)
-            .map((e) => Veiculo.fromJson(e as Map<String, dynamic>))
-            .toList();
-        motoristas = (motoristasResponse as List)
-            .map((e) => Motorista.fromJson(e as Map<String, dynamic>))
-            .toList();
+        viagens = (viagensResponse as List).isEmpty
+            ? viagensMock
+            : (viagensResponse)
+                .map((e) => Viagem.fromJson(e))
+                .toList();
+        veiculos = (veiculosResponse as List).isEmpty
+            ? veiculosMock
+            : (veiculosResponse)
+                .map((e) => Veiculo.fromJson(e))
+                .toList();
+        motoristas = (motoristasResponse as List).isEmpty
+            ? motoristasMock
+            : (motoristasResponse)
+                .map((e) => Motorista.fromJson(e))
+                .toList();
         isLoading = false;
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao carregar viagens: $e')));
+        ).showSnackBar(SnackBar(content: Text('Erro ao carregar viagens: $e - usando dados mock')));
       }
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        setState(() {
+          viagens = viagensMock;
+          veiculos = veiculosMock;
+          motoristas = motoristasMock;
+          isLoading = false;
+        });
+      }
     }
   }
 

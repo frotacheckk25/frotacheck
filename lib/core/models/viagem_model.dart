@@ -44,33 +44,33 @@ class Viagem {
 
   factory Viagem.fromJson(Map<String, dynamic> json) {
     return Viagem(
-      id: json['id'] as String,
-      veiculoId: json['veiculo_id'] as String,
-      motoristaId: json['motorista_id'] as String,
-      dataInicio: DateTime.parse(json['data_inicio'] as String),
+      id: json['id']?.toString() ?? '',
+      veiculoId: json['veiculo_id']?.toString() ?? '',
+      motoristaId: json['motorista_id']?.toString() ?? '',
+      dataInicio: DateTime.parse(json['data_inicio']?.toString() ?? DateTime.now().toIso8601String()),
       dataFim: json['data_fim'] != null
-          ? DateTime.parse(json['data_fim'] as String)
+          ? DateTime.parse(json['data_fim']?.toString() ?? '')
           : null,
-      origem: json['origem'] as String,
-      destino: json['destino'] as String,
-      quilometragemInicio: (json['quilometragem_inicio'] as num).toDouble(),
+      origem: json['origem']?.toString() ?? '',
+      destino: json['destino']?.toString() ?? '',
+      quilometragemInicio: (json['quilometragem_inicio'] as num?)?.toDouble() ?? 0.0,
       quilometragemFim: json['quilometragem_fim'] != null
-          ? (json['quilometragem_fim'] as num).toDouble()
+          ? (json['quilometragem_fim'] as num?)?.toDouble()
           : null,
-      status: json['status'] as String,
+      status: json['status']?.toString() ?? '',
       fotosRota: List<String>.from(json['fotos_rota'] as List? ?? []),
       consumoLitros: json['consumo_litros'] != null
-          ? (json['consumo_litros'] as num).toDouble()
+          ? (json['consumo_litros'] as num?)?.toDouble()
           : null,
       custoTotal: json['custo_total'] != null
-          ? (json['custo_total'] as num).toDouble()
+          ? (json['custo_total'] as num?)?.toDouble()
           : null,
       observacoes: json['observacoes'] as String?,
       criadoEm: json['criado_em'] != null
-          ? DateTime.parse(json['criado_em'] as String)
+          ? DateTime.parse(json['criado_em']?.toString() ?? '')
           : null,
       atualizadoEm: json['atualizado_em'] != null
-          ? DateTime.parse(json['atualizado_em'] as String)
+          ? DateTime.parse(json['atualizado_em']?.toString() ?? '')
           : null,
     );
   }

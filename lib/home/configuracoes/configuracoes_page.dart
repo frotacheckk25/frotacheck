@@ -287,7 +287,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                       'Controle perfis, permissões e logins.',
                     ),
                     trailing: const Icon(Icons.keyboard_arrow_right),
-                    onTap: () {},
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Ação registrada no ambiente de teste: Gestão de acessos')),
+                      );
+                    },
                   ),
                   const Divider(height: 1),
                   ListTile(
@@ -297,7 +301,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                       'Baixe configurações ou exporte relatórios.',
                     ),
                     trailing: const Icon(Icons.keyboard_arrow_right),
-                    onTap: () {},
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Ação registrada no ambiente de teste: Backup e exportação')),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -27,6 +27,39 @@ class _DocumentosPageState extends State<DocumentosPage> {
     _carregarDados();
   }
 
+  static final List<Documento> documentosMock = [
+    Documento(
+      id: '1',
+      tipo: 'Seguro',
+      veiculoId: '1',
+      descricao: 'Apólice anual do veículo',
+      fileUrl: 'https://example.com/seguro.pdf',
+      dataVencimento: DateTime.now().add(const Duration(days: 30)),
+      dataPagamento: DateTime.now(),
+      ativo: true,
+    ),
+    Documento(
+      id: '2',
+      tipo: 'CRLV',
+      motoristaId: '1',
+      descricao: 'Certificado de registro',
+      fileUrl: 'https://example.com/crlv.pdf',
+      dataVencimento: DateTime.now().add(const Duration(days: 60)),
+      dataPagamento: DateTime.now(),
+      ativo: true,
+    ),
+  ];
+
+  static final List<Veiculo> veiculosMock = [
+    Veiculo(id: '1', placa: 'ABC-1234', modelo: 'Fiesta'),
+    Veiculo(id: '2', placa: 'XYZ-9999', modelo: 'Civic'),
+  ];
+
+  static final List<Motorista> motoristasMock = [
+    Motorista(id: '1', nome: 'João Silva'),
+    Motorista(id: '2', nome: 'Maria Oliveira'),
+  ];
+
   Future<void> _carregarDados() async {
     try {
       final docsResponse = await supabase
@@ -39,24 +72,37 @@ class _DocumentosPageState extends State<DocumentosPage> {
 
       if (!mounted) return;
       setState(() {
-        documentos = (docsResponse as List)
-            .map((e) => Documento.fromJson(e as Map<String, dynamic>))
-            .toList();
-        veiculos = (veiculosResponse as List)
-            .map((e) => Veiculo.fromJson(e as Map<String, dynamic>))
-            .toList();
-        motoristas = (motoristasResponse as List)
-            .map((e) => Motorista.fromJson(e as Map<String, dynamic>))
-            .toList();
+        documentos = (docsResponse as List).isEmpty
+            ? documentosMock
+            : (docsResponse)
+                .map((e) => Documento.fromJson(e))
+                .toList();
+        veiculos = (veiculosResponse as List).isEmpty
+            ? veiculosMock
+            : (veiculosResponse)
+                .map((e) => Veiculo.fromJson(e))
+                .toList();
+        motoristas = (motoristasResponse as List).isEmpty
+            ? motoristasMock
+            : (motoristasResponse)
+                .map((e) => Motorista.fromJson(e))
+                .toList();
         isLoading = false;
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar documentos: $e')),
+          SnackBar(content: Text('Erro ao carregar documentos: $e - usando dados mock')),
         );
       }
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        setState(() {
+          documentos = documentosMock;
+          veiculos = veiculosMock;
+          motoristas = motoristasMock;
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -679,7 +725,9 @@ class _DetalheDocumentoPageState extends State<DetalheDocumentoPage> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      // TODO: Implementar download/visualização
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Visualizar arquivo (ambiente de teste)')),
+                      );
                     },
                     child: const Text('Visualizar Arquivo'),
                   ),

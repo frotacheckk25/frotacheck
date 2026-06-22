@@ -24,6 +24,16 @@ class _SelecionarVeiculoChecklistPageState
   String? motoristaSelecioando;
   String tipoChecklist = 'saida';
 
+  static final List<Veiculo> veiculosMock = [
+    Veiculo(id: '1', placa: 'ABC-1234', modelo: 'Fiesta'),
+    Veiculo(id: '2', placa: 'XYZ-9999', modelo: 'Civic'),
+  ];
+
+  static final List<Motorista> motoristasMock = [
+    Motorista(id: '1', nome: 'João Silva'),
+    Motorista(id: '2', nome: 'Maria Oliveira'),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -37,21 +47,31 @@ class _SelecionarVeiculoChecklistPageState
 
       if (!mounted) return;
       setState(() {
-        veiculos = (veiculosResponse as List)
-            .map((e) => Veiculo.fromJson(e as Map<String, dynamic>))
-            .toList();
-        motoristas = (motoristasResponse as List)
-            .map((e) => Motorista.fromJson(e as Map<String, dynamic>))
-            .toList();
+        veiculos = (veiculosResponse as List).isEmpty
+            ? veiculosMock
+            : (veiculosResponse)
+                .map((e) => Veiculo.fromJson(e))
+                .toList();
+        motoristas = (motoristasResponse as List).isEmpty
+            ? motoristasMock
+            : (motoristasResponse)
+                .map((e) => Motorista.fromJson(e))
+                .toList();
         isLoading = false;
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao carregar dados: $e')));
+        ).showSnackBar(SnackBar(content: Text('Erro ao carregar dados: $e - usando dados mock')));
       }
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        setState(() {
+          veiculos = veiculosMock;
+          motoristas = motoristasMock;
+          isLoading = false;
+        });
+      }
     }
   }
 

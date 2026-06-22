@@ -6,9 +6,9 @@ class Veiculo {
   Veiculo({this.id, this.placa, this.modelo});
 
   factory Veiculo.fromMap(Map<String, dynamic> map) => Veiculo(
-    id: map['id'] as String?,
-    placa: map['placa'] as String?,
-    modelo: map['modelo'] as String?,
+    id: map['id']?.toString(),
+    placa: map['placa']?.toString(),
+    modelo: map['modelo']?.toString(),
   );
 
   factory Veiculo.fromJson(Map<String, dynamic> json) => Veiculo.fromMap(json);

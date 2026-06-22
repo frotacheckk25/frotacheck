@@ -625,10 +625,21 @@ class _HomePageState extends State<HomePage> {
         appBar: AppBar(
           title: const FrotaLogo(compact: false),
           actions: [
-            IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Busca ativada (ambiente de teste)')),
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.notifications_none),
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notificações (ambiente de teste)')),
+                );
+              },
             ),
           ],
           elevation: 0,
@@ -1519,115 +1530,104 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildHeader(double width) {
     return _buildDashboardCard(
-      padding: const EdgeInsets.all(24),
-      borderRadius: BorderRadius.circular(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.all(20),
+      borderRadius: BorderRadius.circular(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Dashboard',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Visão geral da frota',
+                style: TextStyle(
+                  color: Color(0xFF9ca3af),
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Dashboard',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Color(0xFF0d1f3c),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Color(0xFF1e293b)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Color(0xFF9ca3af),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(width: 8),
                     Text(
-                      'Visão geral da frota',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 15,
+                      _currentDateRangeLabel(),
+                      style: const TextStyle(
+                        color: Color(0xFF9ca3af),
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 18),
-              Wrap(
-                spacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundSoft,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _currentDateRangeLabel(),
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Filtros ativados (ambiente de teste)')),
+                  );
+                },
+                icon: const Icon(Icons.filter_alt, size: 16),
+                label: const Text('Filtros'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xFF0ea5e9)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_alt, size: 18),
-                    label: const Text('Filtros'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: AppColors.secondary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
-                    ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      shadowColor: AppColors.secondary.withOpacity(0.6),
-                      elevation: 12,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
-                    ),
-                    child: const Text('+ Novo registro'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Novo registro (ambiente de teste)')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0ea5e9),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.search, color: Colors.white),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications, color: Colors.white),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.settings, color: Colors.white),
-                  ),
-                ],
+                ),
+                child: const Text('+ Novo registro'),
               ),
             ],
           ),
@@ -1642,43 +1642,43 @@ class _HomePageState extends State<HomePage> {
       _buildKpiTile(
         'Total de Veículos',
         '$totalVeiculos',
-        Icons.directions_car,
-        AppColors.secondary,
+        Icons.local_shipping,
+        const Color(0xFF0ea5e9),
       ),
       SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
       _buildKpiTile(
         'Veículos Ativos',
         '${(totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos)}',
-        Icons.directions_bus,
-        AppColors.success,
+        Icons.local_shipping,
+        const Color(0xFF0ea5e9),
       ),
       SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
       _buildKpiTile(
         'Em Manutenção',
         '$totalEmManutencao',
-        Icons.build_circle,
-        AppColors.warning,
+        Icons.build,
+        const Color(0xFFeab308),
       ),
       SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
       _buildKpiTile(
         'Motoristas Ativos',
         '$totalMotoristas',
         Icons.person,
-        AppColors.secondary,
+        const Color(0xFF0ea5e9),
       ),
       SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
       _buildKpiTile(
         'Gasto Mensal',
         'R\$ ${totalGasto.toStringAsFixed(2)}',
         Icons.attach_money,
-        AppColors.danger,
+        const Color(0xFF22c55e),
       ),
       SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
       _buildKpiTile(
         'Ocorrências Abertas',
         '$totalOcorrenciasAbertas',
         Icons.warning,
-        AppColors.danger,
+        const Color(0xFFef4444),
       ),
     ];
     return Wrap(spacing: 12, runSpacing: 12, children: children);
@@ -1688,9 +1688,14 @@ class _HomePageState extends State<HomePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFF0d1f3c),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border(
+          top: BorderSide(color: color, width: 4),
+          left: const BorderSide(color: Color(0xFF1e293b)),
+          right: const BorderSide(color: Color(0xFF1e293b)),
+          bottom: const BorderSide(color: Color(0xFF1e293b)),
+        ),
       ),
       child: Row(
         children: [
@@ -1718,8 +1723,8 @@ class _HomePageState extends State<HomePage> {
                 ),
                 Text(
                   title,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
+                  style: const TextStyle(
+                    color: Color(0xFF9ca3af),
                     fontSize: 13,
                   ),
                   overflow: TextOverflow.ellipsis,

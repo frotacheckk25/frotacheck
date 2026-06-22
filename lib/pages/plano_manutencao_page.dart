@@ -90,12 +90,23 @@ class _PlanoManutencaoPageState extends State<PlanoManutencaoPage> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Detalhar (ambiente de teste)')),
+                      );
+                    },
                     child: const Text('Detalhar'),
                   ),
                 ),
                 const SizedBox(width: 12),
-                OutlinedButton(onPressed: () {}, child: const Text('Agendar')),
+                OutlinedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Agendar (ambiente de teste)')),
+                    );
+                  },
+                  child: const Text('Agendar'),
+                ),
               ],
             ),
           ],

@@ -19,6 +19,39 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
   bool carregando = true;
   String statusFiltro = 'Todos';
 
+  final List<dynamic> ocorrenciasMock = [
+    {
+      'id': '1',
+      'driver_name': 'João Silva',
+      'problem_type': 'Mecânica',
+      'problem': 'Problema no freio dianteiro',
+      'location': 'Rua das Flores, 123',
+      'status': 'Aberto',
+      'priority': 'Alta',
+      'created_at': '2024-02-10',
+    },
+    {
+      'id': '2',
+      'driver_name': 'Maria Oliveira',
+      'problem_type': 'Elétrica',
+      'problem': 'Lanterna traseira queimada',
+      'location': 'Av. Brasil, 456',
+      'status': 'Em andamento',
+      'priority': 'Média',
+      'created_at': '2024-02-09',
+    },
+    {
+      'id': '3',
+      'driver_name': 'Carlos Souza',
+      'problem_type': 'Pneu',
+      'problem': 'Pneu traseiro furado',
+      'location': 'Rod. Anhanguera',
+      'status': 'Resolvido',
+      'priority': 'Baixa',
+      'created_at': '2024-02-08',
+    },
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -40,7 +73,10 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
         ocorrencias = response;
       });
     } catch (e) {
-      debugPrint('Erro ao carregar ocorrências: $e');
+      debugPrint('Erro ao carregar ocorrências: $e - usando dados mock');
+      setState(() {
+        ocorrencias = ocorrenciasMock;
+      });
     } finally {
       setState(() {
         carregando = false;

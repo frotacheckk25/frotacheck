@@ -5,7 +5,7 @@ class Motorista {
   Motorista({this.id, this.nome});
 
   factory Motorista.fromMap(Map<String, dynamic> map) =>
-      Motorista(id: map['id'] as String?, nome: map['nome'] as String?);
+      Motorista(id: map['id']?.toString(), nome: map['nome']?.toString());
 
   factory Motorista.fromJson(Map<String, dynamic> json) =>
       Motorista.fromMap(json);

@@ -34,6 +34,31 @@
 
   <!-- Passkeys Web SDK -->
   <script src="https://github.com/corbado/flutter-passkeys/releases/download/2.4.0/bundle.js"></script>
+
+  <!-- Cache Busting: Service Worker Disable -->
+  <!-- This script runs BEFORE flutter.js and prevents service worker caching -->
+  <script>
+    // Cache bust: Ensure unique version on each load
+    window.FLUTTER_BUILD_TS = Date.now();
+
+    // Unregister all service workers immediately
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+          registrations[i].unregister();
+        }
+      });
+    }
+
+    // Pre-define _flutter to intercept loader
+    window._flutter = window._flutter || {};
+    window._flutter.loader = window._flutter.loader || {
+      load: function(config) {
+        // Override to null serviceWorkerSettings before Flutter code runs
+        config.serviceWorkerSettings = null;
+      }
+    };
+  </script>
 </head>
 <body>
   <!--
@@ -44,6 +69,6 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter.js" type="module"></script>
 </body>
 </html>

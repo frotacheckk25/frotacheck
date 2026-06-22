@@ -94,7 +94,11 @@ class DetalheOcorrenciaPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Compartilhar ocorrência (ambiente de teste)')),
+                );
+              },
               icon: const Icon(Icons.share),
               label: const Text('Compartilhar ocorrência'),
             ),

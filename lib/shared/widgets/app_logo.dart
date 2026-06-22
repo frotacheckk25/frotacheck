@@ -22,29 +22,33 @@ class AppLogo extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: iconSize + 14,
-          height: iconSize + 16,
+          width: iconSize + 24,
+          height: iconSize + 24,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.secondary,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white12, width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.18),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.20),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: Image.asset(
-            logoAsset,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: AppColors.secondary,
-              child: Icon(Icons.shield, size: iconSize, color: Colors.white),
+          child: Center(
+            child: Image.asset(
+              logoAsset,
+              width: iconSize,
+              height: iconSize,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  Icon(Icons.shield, size: iconSize, color: Colors.white),
             ),
           ),
         ),
         if (!compact) ...[
-          SizedBox(width: spacing - 2),
+          SizedBox(width: spacing),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
@@ -57,7 +61,7 @@ class AppLogo extends StatelessWidget {
                   letterSpacing: 0.6,
                 ),
               ),
-              SizedBox(height: 2),
+              SizedBox(height: 4),
               Text(
                 'Gestão de frota',
                 style: TextStyle(color: Colors.white70, fontSize: 12),
