@@ -1,5 +1,3 @@
-// Build v2.1 - Layout improvements applied
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -118,10 +116,6 @@ class _LoginPageState extends State<LoginPage> {
   String _getPlatformLabel() {
     if (kIsWeb) {
       return 'LOGIN WEB';
-    } else if (Platform.isIOS) {
-      return 'LOGIN iOS';
-    } else if (Platform.isAndroid) {
-      return 'LOGIN ANDROID';
     }
     return 'LOGIN';
   }
