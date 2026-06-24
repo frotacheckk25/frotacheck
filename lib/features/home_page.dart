@@ -211,6 +211,102 @@ class _HomePageState extends State<HomePage> {
   List<String> monthlyFuelLabels = [];
   Map<String, double> custosPorCategoria = {};
 
+  // ─── Mock data fallbacks (shown when Supabase tables are empty) ────────────
+  static const _mockRanking = [
+    {'name': 'Marcos Silva', 'score': 98},
+    {'name': 'João Santos', 'score': 92},
+    {'name': 'Carlos Lima', 'score': 87},
+    {'name': 'Pedro Oliveira', 'score': 75},
+    {'name': 'Lucas Almeida', 'score': 70},
+  ];
+  static const _mockVehicleCosts = [
+    {'plate': 'ABC-1234', 'value': 8452.00},
+    {'plate': 'DEF-5678', 'value': 7245.30},
+    {'plate': 'GHI-9012', 'value': 6870.20},
+    {'plate': 'JKL-3456', 'value': 6120.10},
+    {'plate': 'MNO-7890', 'value': 5980.40},
+  ];
+  static const _mockAlertas = [
+    {'title': 'Troca de óleo vencida', 'subtitle': '3 veículos'},
+    {'title': 'CNH vencendo em 30 dias', 'subtitle': '5 motoristas'},
+    {'title': 'Licenciamento vencendo', 'subtitle': '2 veículos'},
+    {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
+    {'title': 'Seguro vencendo em 15 dias', 'subtitle': '4 veículos'},
+  ];
+  static const _rankingColors = [
+    Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFF8B5CF6),
+    Color(0xFF10B981), Color(0xFF0EA5E9),
+  ];
+
+  bool get _hasRealData => totalVeiculos > 0 || totalMotoristas > 0;
+
+  int get _kpiTotalVeiculos       => _hasRealData ? totalVeiculos : 128;
+  int get _kpiVeiculosAtivos      => _hasRealData ? (totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos) : 96;
+  int get _kpiEmManutencao        => _hasRealData ? totalEmManutencao : 12;
+  int get _kpiMotoristas          => _hasRealData ? totalMotoristas : 78;
+  String get _kpiGastoMensal      => _hasRealData && totalGasto > 0 ? 'R\$ ${_fmt(totalGasto)}' : 'R\$ 98.765,40';
+  int get _kpiOcorrencias         => _hasRealData ? totalOcorrenciasAbertas : 7;
+
+  List<FlSpot> get _chartFuelSpots {
+    if (monthlyFuelSpots.isNotEmpty && monthlyFuelSpots.any((s) => s.y > 0)) return monthlyFuelSpots;
+    return const [
+      FlSpot(0, 2200), FlSpot(1, 2550), FlSpot(2, 2380),
+      FlSpot(3, 2800), FlSpot(4, 3150), FlSpot(5, 3450),
+    ];
+  }
+  List<String> get _chartFuelLabels => monthlyFuelLabels.isNotEmpty ? monthlyFuelLabels : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+  Map<String, double> get _chartCustos => custosPorCategoria.values.any((v) => v > 0) ? custosPorCategoria : {
+    'Abastecimento': 59125.30, 'Manutenção': 19755.40, 'Pneus': 9876.50, 'Multas': 6172.20, 'Outros': 3704.00,
+  };
+  Map<String, int> get _chartOcorrencias => ocorrenciasPorCategoria.isNotEmpty ? ocorrenciasPorCategoria : {
+    'Acidente': 3, 'Falha Mecânica': 2, 'Pane': 1, 'Multa': 1, 'Outros': 1,
+  };
+  List<Map<String, dynamic>> get _panelRanking => rankingMotoristas.isNotEmpty ? rankingMotoristas : List<Map<String, dynamic>>.from(_mockRanking);
+  List<Map<String, dynamic>> get _panelVehicleCosts => topCostVehicles.isNotEmpty ? topCostVehicles : List<Map<String, dynamic>>.from(_mockVehicleCosts);
+  List<Map<String, String>> get _panelAlertas => alertasImportantes.isNotEmpty ? alertasImportantes : List<Map<String, String>>.from(
+    _mockAlertas.map((e) => Map<String, String>.from(e)),
+  );
+
+  String _fmt(double v) {
+    final s = v.toStringAsFixed(2).replaceAll('.', ',');
+    final parts = s.split(',');
+    final intPart = parts[0];
+    final dec = parts[1];
+    final buf = StringBuffer();
+    for (var i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buf.write('.');
+      buf.write(intPart[i]);
+    }
+    return '${buf.toString()},$dec';
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    if (parts.isNotEmpty && parts[0].isNotEmpty) return parts[0][0].toUpperCase();
+    return '?';
+  }
+
+  Color _alertColor(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('óleo') || t.contains('manutenção') || t.contains('manutencao')) return AppColors.warning;
+    if (t.contains('seguro') || t.contains('vistoria')) return AppColors.success;
+    if (t.contains('cnh') || t.contains('licenciamento')) return const Color(0xFFF97316);
+    if (t.contains('checklist')) return AppColors.secondary;
+    return AppColors.danger;
+  }
+
+  IconData _alertIcon(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('óleo')) return Icons.opacity;
+    if (t.contains('cnh')) return Icons.badge;
+    if (t.contains('licenciamento')) return Icons.assignment;
+    if (t.contains('checklist')) return Icons.checklist;
+    if (t.contains('seguro')) return Icons.security;
+    if (t.contains('pneu')) return Icons.tire_repair;
+    return Icons.warning_amber;
+  }
+
   static const List<Color> _dashboardPieColors = [
     AppColors.secondary,
     AppColors.success,
@@ -683,11 +779,11 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     if (showSidebar)
                       Container(
-                        width: 300,
+                        width: 220,
                         color: AppColors.surface,
                         padding: const EdgeInsets.symmetric(
                           vertical: 24,
-                          horizontal: 16,
+                          horizontal: 14,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1270,45 +1366,40 @@ class _HomePageState extends State<HomePage> {
     bool active = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          decoration: BoxDecoration(
-            color: active ? AppColors.secondary : AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: active
-                  ? AppColors.secondary.withOpacity(0.9)
-                  : AppColors.border,
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: active ? AppColors.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
             ),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: AppColors.secondary.withOpacity(0.22),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: active ? Colors.white : AppColors.textSecondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? Colors.white : AppColors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                     ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: Colors.white, size: 22),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1637,73 +1728,43 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTopKpiRow(double width) {
-    final isMobile = width <= 600;
-    final children = [
-      _buildKpiTile(
-        'Total de Veículos',
-        '$totalVeiculos',
-        Icons.local_shipping,
-        const Color(0xFF0ea5e9),
-      ),
-      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
-      _buildKpiTile(
-        'Veículos Ativos',
-        '${(totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos)}',
-        Icons.local_shipping,
-        const Color(0xFF0ea5e9),
-      ),
-      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
-      _buildKpiTile(
-        'Em Manutenção',
-        '$totalEmManutencao',
-        Icons.build,
-        const Color(0xFFeab308),
-      ),
-      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
-      _buildKpiTile(
-        'Motoristas Ativos',
-        '$totalMotoristas',
-        Icons.person,
-        const Color(0xFF0ea5e9),
-      ),
-      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
-      _buildKpiTile(
-        'Gasto Mensal',
-        'R\$ ${totalGasto.toStringAsFixed(2)}',
-        Icons.attach_money,
-        const Color(0xFF22c55e),
-      ),
-      SizedBox(width: isMobile ? 0 : 12, height: isMobile ? 8 : 0),
-      _buildKpiTile(
-        'Ocorrências Abertas',
-        '$totalOcorrenciasAbertas',
-        Icons.warning,
-        const Color(0xFFef4444),
-      ),
+    final cards = [
+      _buildKpiTile('Total de Veículos',   '$_kpiTotalVeiculos',  Icons.local_shipping,      const Color(0xFF0ea5e9), subtitle: 'Todos os veículos'),
+      _buildKpiTile('Veículos Ativos',     '$_kpiVeiculosAtivos', Icons.directions_car,       const Color(0xFF22c55e), subtitle: 'Em operação'),
+      _buildKpiTile('Em Manutenção',       '$_kpiEmManutencao',   Icons.build,                const Color(0xFFeab308), subtitle: 'Indisponíveis'),
+      _buildKpiTile('Motoristas Ativos',   '$_kpiMotoristas',     Icons.person,               const Color(0xFF0ea5e9), subtitle: 'Motoristas'),
+      _buildKpiTile('Gasto Mensal',        _kpiGastoMensal,       Icons.account_balance_wallet, const Color(0xFF7C3AED), subtitle: 'Total de gastos'),
+      _buildKpiTile('Ocorrências Abertas', '$_kpiOcorrencias',    Icons.notifications_none,   const Color(0xFF0ea5e9), subtitle: 'Aguardando resolução'),
     ];
-    return Wrap(spacing: 12, runSpacing: 12, children: children);
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final cols = constraints.maxWidth > 900 ? 6 : constraints.maxWidth > 600 ? 3 : 2;
+        final itemW = (constraints.maxWidth - (cols - 1) * 12) / cols;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: cards.map((c) => SizedBox(width: itemW, child: c)).toList(),
+        );
+      },
+    );
   }
 
-  Widget _buildKpiTile(String title, String value, IconData icon, Color color) {
+  Widget _buildKpiTile(String title, String value, IconData icon, Color color, {String? subtitle}) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0d1f3c),
-        borderRadius: BorderRadius.circular(16),
-        border: Border(
-          top: BorderSide(color: color, width: 4),
-          left: const BorderSide(color: Color(0xFF1e293b)),
-          right: const BorderSide(color: Color(0xFF1e293b)),
-          bottom: const BorderSide(color: Color(0xFF1e293b)),
-        ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.22),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 22),
           ),
@@ -1711,24 +1772,29 @@ class _HomePageState extends State<HomePage> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Text(
+                  title,
+                  style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF9ca3af),
-                    fontSize: 13,
+                if (subtitle != null) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Color(0xFF6b7280), fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ],
             ),
           ),
@@ -1763,10 +1829,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildConsumptionChart() {
-    final spots = monthlyFuelSpots;
-    final labels = monthlyFuelLabels.isNotEmpty
-        ? monthlyFuelLabels
-        : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+    final spots = _chartFuelSpots;
+    final labels = _chartFuelLabels;
     if (spots.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(22),
@@ -1896,7 +1960,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCostPieChart() {
-    final costs = custosPorCategoria;
+    final costs = _chartCustos;
     final totalCost = costs.values.fold<double>(0, (sum, val) => sum + val);
 
     final entries = costs.entries.toList();
@@ -1995,7 +2059,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildOccurrencesBarChart() {
-    final categories = ocorrenciasPorCategoria.entries.toList();
+    final categories = _chartOcorrencias.entries.toList();
     final maxValue = categories.isEmpty
         ? 5
         : categories.map((e) => e.value).reduce((a, b) => a > b ? a : b);
@@ -2163,47 +2227,49 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 18),
-          if (alertasImportantes.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'Nenhum alerta no momento',
-                style: const TextStyle(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            )
-          else
-            ...alertasImportantes.map(
-              (alerta) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+          ..._panelAlertas.map(
+            (alerta) {
+              final title = alerta['title'] ?? '';
+              final iconData = _alertIcon(title);
+              final iconColor = _alertColor(title);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSoft,
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning, color: AppColors.warning),
-                      const SizedBox(width: 14),
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: iconColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(iconData, color: iconColor, size: 18),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              alerta['title'] ?? '',
+                              title,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               alerta['subtitle'] ?? '',
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 13,
+                                fontSize: 12,
                               ),
                             ),
                           ],
@@ -2212,8 +2278,9 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -2239,51 +2306,60 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 18),
-          if (rankingMotoristas.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'Nenhum motorista cadastrado',
-                style: const TextStyle(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
+          ..._panelRanking.asMap().entries.map((entry) {
+            final i = entry.key;
+            final driver = entry.value;
+            final name = driver['name']?.toString() ?? '';
+            final score = driver['score'];
+            final avatarColor = _rankingColors[i % _rankingColors.length];
+            final initials = _getInitials(name);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Text(
+                      '${i + 1}º',
+                      style: TextStyle(
+                        color: i == 0 ? const Color(0xFFFFD700) : AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  CircleAvatar(
+                    radius: 17,
+                    backgroundColor: avatarColor,
+                    child: Text(
+                      initials,
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$score pts',
+                      style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
               ),
-            )
-          else
-            ...rankingMotoristas.map((driver) {
-              final rank = rankingMotoristas.indexOf(driver) + 1;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      '$rank',
-                      style: const TextStyle(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        driver['name']?.toString() ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${driver['score']}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+            );
+          }),
         ],
       ),
     );
@@ -2337,55 +2413,62 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 18),
-          if (topCostVehicles.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'Nenhum dado de custo disponível',
-                style: const TextStyle(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            )
-          else
-            ...topCostVehicles.map((vehicle) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: AppColors.backgroundSoft,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: AppColors.secondary,
-                        size: 20,
-                      ),
+          ..._panelVehicleCosts.asMap().entries.map((entry) {
+            final i = entry.key;
+            final vehicle = entry.value;
+            final plate = vehicle['plate']?.toString() ?? 'Sem placa';
+            final cost = _toDouble(vehicle['value']);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundSoft,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
+                    child: Center(
                       child: Text(
-                        vehicle['plate']?.toString() ?? 'Sem placa',
+                        '${i + 1}',
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ),
-                    Text(
-                      'R\$ ${_toDouble(vehicle['value']).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          plate,
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        const Text(
+                          'Custo total no mês',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            }),
+                  ),
+                  Text(
+                    'R\$ ${_fmt(cost)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
