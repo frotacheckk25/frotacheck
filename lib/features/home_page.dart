@@ -1626,82 +1626,100 @@ class _HomePageState extends State<HomePage> {
     return '${pad(firstDay.day)}/${pad(firstDay.month)}/${firstDay.year} - ${pad(lastDay.day)}/${pad(lastDay.month)}/${lastDay.year}';
   }
 
+  // Estilo de botão compacto — sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
+  static final _compactBtn = ButtonStyle(
+    minimumSize: WidgetStatePropertyAll(const Size(0, 36)),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: WidgetStatePropertyAll(
+      const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+    ),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+    textStyle: WidgetStatePropertyAll(
+      const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+    ),
+    elevation: WidgetStatePropertyAll(0),
+  );
+
   Widget _buildHeader(double width) {
-    final compact = width < 800;
+    final compact = width < 900;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Expanded(
+        // Título — usa Flexible para nunca ser comprimido a zero
+        Flexible(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Dashboard',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: compact ? 22 : 28,
+                  fontSize: compact ? 20 : 26,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 2),
               const Text(
                 'Visão geral da frota',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-        if (!compact) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.textSecondary),
-                const SizedBox(width: 8),
-                Text(
-                  _currentDateRangeLabel(),
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                ),
-              ],
-            ),
+        const SizedBox(width: 16),
+        // Data
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: AppColors.border),
           ),
-          const SizedBox(width: 10),
-        ],
-        _iconBtn(Icons.search, 'Busca'),
-        const SizedBox(width: 6),
-        _iconBtn(Icons.notifications_none_outlined, 'Alertas'),
-        const SizedBox(width: 10),
-        OutlinedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.tune, size: 15),
-          label: const Text('Filtros'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.textSecondary,
-            side: const BorderSide(color: AppColors.border),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Text(
+                _currentDateRangeLabel(),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
+        _iconBtn(Icons.search_outlined, 'Busca'),
+        const SizedBox(width: 6),
+        _iconBtn(Icons.notifications_none_outlined, 'Alertas'),
+        const SizedBox(width: 8),
+        if (!compact) ...[
+          OutlinedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.tune, size: 14),
+            label: const Text('Filtros'),
+            style: _compactBtn.copyWith(
+              foregroundColor: const WidgetStatePropertyAll(AppColors.textSecondary),
+              side: const WidgetStatePropertyAll(BorderSide(color: AppColors.border)),
+              backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         ElevatedButton.icon(
           onPressed: () {},
-          icon: const Icon(Icons.add, size: 16),
+          icon: const Icon(Icons.add, size: 15),
           label: const Text('Novo registro'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            elevation: 0,
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          style: _compactBtn.copyWith(
+            backgroundColor: const WidgetStatePropertyAll(AppColors.secondary),
+            foregroundColor: const WidgetStatePropertyAll(Colors.white),
           ),
         ),
       ],
@@ -1712,14 +1730,14 @@ class _HomePageState extends State<HomePage> {
     return Tooltip(
       message: tooltip,
       child: Container(
-        width: 38,
-        height: 38,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(9),
           border: Border.all(color: AppColors.border),
         ),
-        child: Icon(icon, color: AppColors.textSecondary, size: 20),
+        child: Icon(icon, color: AppColors.textSecondary, size: 18),
       ),
     );
   }
