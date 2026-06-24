@@ -1468,21 +1468,28 @@ class _HomePageState extends State<HomePage> {
     required Widget child,
     EdgeInsetsGeometry padding = const EdgeInsets.all(20),
     BorderRadiusGeometry borderRadius = const BorderRadius.all(
-      Radius.circular(12),
+      Radius.circular(14),
     ),
+    Color? glowColor,
   }) {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: borderRadius,
-        border: Border.all(color: AppColors.border.withOpacity(0.9)),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
+          if (glowColor != null)
+            BoxShadow(
+              color: glowColor.withOpacity(0.08),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
         ],
       ),
       child: child,
@@ -1620,109 +1627,99 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHeader(double width) {
-    return _buildDashboardCard(
-      padding: const EdgeInsets.all(20),
-      borderRadius: BorderRadius.circular(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Column(
+    final compact = width < 800;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
                 'Dashboard',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+                  fontSize: compact ? 22 : 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
                 ),
               ),
-              SizedBox(height: 4),
-              Text(
+              const SizedBox(height: 3),
+              const Text(
                 'Visão geral da frota',
-                style: TextStyle(
-                  color: Color(0xFF9ca3af),
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
               ),
             ],
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+        ),
+        if (!compact) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Text(
+                  _currentDateRangeLabel(),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
-                decoration: BoxDecoration(
-                  color: Color(0xFF0d1f3c),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFF1e293b)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Color(0xFF9ca3af),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _currentDateRangeLabel(),
-                      style: const TextStyle(
-                        color: Color(0xFF9ca3af),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Filtros ativados (ambiente de teste)')),
-                  );
-                },
-                icon: const Icon(Icons.filter_alt, size: 16),
-                label: const Text('Filtros'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFF0ea5e9)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Novo registro (ambiente de teste)')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0ea5e9),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
-                  ),
-                ),
-                child: const Text('+ Novo registro'),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 10),
         ],
+        _iconBtn(Icons.search, 'Busca'),
+        const SizedBox(width: 6),
+        _iconBtn(Icons.notifications_none_outlined, 'Alertas'),
+        const SizedBox(width: 10),
+        OutlinedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.tune, size: 15),
+          label: const Text('Filtros'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+            side: const BorderSide(color: AppColors.border),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ),
+        const SizedBox(width: 10),
+        ElevatedButton.icon(
+          onPressed: () {},
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('Novo registro'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            elevation: 0,
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _iconBtn(IconData icon, String tooltip) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(icon, color: AppColors.textSecondary, size: 20),
       ),
     );
   }
@@ -1828,6 +1825,65 @@ class _HomePageState extends State<HomePage> {
           );
   }
 
+  Widget _panelHeader(String title, IconData icon, Color color, {VoidCallback? onTap}) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+        ),
+        if (onTap != null)
+          TextButton(
+            onPressed: onTap,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.secondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            child: const Text('Ver todos'),
+          ),
+      ],
+    );
+  }
+
+  Widget _cardHeader(String title, String subtitle, IconData icon, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildConsumptionChart() {
     final spots = _chartFuelSpots;
     final labels = _chartFuelLabels;
@@ -1847,55 +1903,39 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
-    final maxY = spots.isNotEmpty
-        ? spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.2
-        : 5.0;
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.25;
+    final yInterval = (maxY / 4).ceilToDouble().clamp(100.0, double.infinity);
+    return _buildDashboardCard(
+      padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+      glowColor: AppColors.secondary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Consumo de Combustível',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Litros por mês',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 20),
+          _cardHeader('Consumo de Combustível', 'Litros por mês', Icons.local_gas_station, AppColors.secondary),
+          const SizedBox(height: 16),
           Expanded(
             child: LineChart(
               LineChartData(
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 1,
-                  getDrawingHorizontalLine: (value) =>
-                      FlLine(color: Colors.white12, strokeWidth: 1),
+                  horizontalInterval: yInterval,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: AppColors.border.withOpacity(0.7),
+                    strokeWidth: 1,
+                    dashArray: [4, 6],
+                  ),
                 ),
                 borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) => Text(
-                        value.toInt().toString(),
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
+                      interval: yInterval,
+                      reservedSize: 46,
+                      getTitlesWidget: (value, _) => Text(
+                        value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toInt().toString(),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                       ),
                     ),
                   ),
@@ -1903,46 +1943,55 @@ class _HomePageState extends State<HomePage> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: 1,
-                      reservedSize: 32,
-                      getTitlesWidget: (value, meta) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            labels[value.toInt().clamp(0, labels.length - 1)],
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        );
-                      },
+                      reservedSize: 28,
+                      getTitlesWidget: (value, _) => Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          labels[value.toInt().clamp(0, labels.length - 1)],
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        ),
+                      ),
                     ),
                   ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 clipData: FlClipData.all(),
                 minX: 0,
-                maxX: spots.length > 1 ? spots.last.x : 5,
+                maxX: (spots.length - 1).toDouble(),
                 minY: 0,
                 maxY: maxY,
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => AppColors.backgroundSoft,
+                    getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
+                      '${s.y.toStringAsFixed(0)} L',
+                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    )).toList(),
+                  ),
+                ),
                 lineBarsData: [
                   LineChartBarData(
                     isCurved: true,
+                    curveSmoothness: 0.35,
                     isStrokeCapRound: true,
                     color: AppColors.secondary,
-                    barWidth: 4,
-                    dotData: FlDotData(show: true),
+                    barWidth: 3,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                        radius: 4,
+                        color: AppColors.secondary,
+                        strokeWidth: 2,
+                        strokeColor: AppColors.surface,
+                      ),
+                    ),
                     belowBarData: BarAreaData(
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.secondary.withOpacity(0.26),
-                          Colors.transparent,
+                          AppColors.secondary.withOpacity(0.22),
+                          AppColors.secondary.withOpacity(0.0),
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -1999,45 +2048,52 @@ class _HomePageState extends State<HomePage> {
           }).toList()
         : <Map<String, dynamic>>[];
 
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _buildDashboardCard(
+      padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+      glowColor: _dashboardPieColors[0],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Custos da Frota',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Principais veículos por custo',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 20),
+          _cardHeader('Custos da Frota', 'Distribuição por categoria', Icons.pie_chart_outline, _dashboardPieColors[0]),
+          const SizedBox(height: 16),
           Expanded(
             child: Row(
               children: [
                 Expanded(
-                  child: PieChart(
-                    PieChartData(
-                      sections: sections,
-                      centerSpaceRadius: 40,
-                      sectionsSpace: 4,
-                    ),
+                  flex: 5,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      PieChart(
+                        PieChartData(
+                          sections: sections,
+                          centerSpaceRadius: 52,
+                          sectionsSpace: 3,
+                          startDegreeOffset: -90,
+                        ),
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'R\$ ${_fmt(totalCost / 1000)}k',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const Text('total', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 Expanded(
+                  flex: 5,
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: legendItems.map((item) {
                       return Padding(
@@ -2064,96 +2120,84 @@ class _HomePageState extends State<HomePage> {
         ? 5
         : categories.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+    final barColors = [
+      AppColors.secondary,
+      const Color(0xFF6366F1),
+      const Color(0xFF22c55e),
+      AppColors.warning,
+      AppColors.danger,
+    ];
+    return _buildDashboardCard(
+      padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+      glowColor: AppColors.secondary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Ocorrências por Categoria',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Quantidade',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
+          _cardHeader('Ocorrências por Categoria', 'Quantidade registrada', Icons.bar_chart, AppColors.secondary),
           const SizedBox(height: 20),
-          if (categories.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                'Nenhuma ocorrência registrada',
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-            )
-          else
-            Column(
-              children: categories.map((entry) {
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: categories.asMap().entries.map((entry) {
+                final i = entry.key;
+                final e = entry.value;
                 final widthFraction = maxValue > 0
-                    ? (entry.value / maxValue).clamp(0.05, 1.0)
-                    : 0.05;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 110,
-                        child: Text(
-                          entry.key,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
+                    ? (e.value / maxValue).clamp(0.04, 1.0)
+                    : 0.04;
+                final barColor = barColors[i % barColors.length];
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 96,
+                      child: Text(
+                        e.key,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Container(
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: AppColors.backgroundSoft,
+                              borderRadius: BorderRadius.circular(11),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Container(
-                              height: 24,
+                          FractionallySizedBox(
+                            widthFactor: widthFraction,
+                            child: Container(
+                              height: 22,
                               decoration: BoxDecoration(
-                                color: AppColors.backgroundSoft,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            FractionallySizedBox(
-                              widthFactor: widthFraction,
-                              child: Container(
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondary,
-                                  borderRadius: BorderRadius.circular(14),
+                                gradient: LinearGradient(
+                                  colors: [barColor.withOpacity(0.7), barColor],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
                                 ),
+                                borderRadius: BorderRadius.circular(11),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        entry.value.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 22,
+                      child: Text(
+                        '${e.value}',
+                        style: TextStyle(color: barColor, fontWeight: FontWeight.bold, fontSize: 13),
+                        textAlign: TextAlign.right,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 );
               }).toList(),
             ),
+          ),
         ],
       ),
     );
@@ -2182,51 +2226,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAlertsPanel() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _buildDashboardCard(
+      padding: const EdgeInsets.all(20),
+      glowColor: AppColors.warning,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Alertas Importantes',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              InkWell(
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AlertasPage()),
-                  );
-                  carregarDashboard();
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Text(
-                    'Ver todos',
-                    style: TextStyle(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
+          _panelHeader('Alertas Importantes', Icons.warning_amber_rounded, AppColors.warning, onTap: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+            carregarDashboard();
+          }),
+          const SizedBox(height: 16),
           ..._panelAlertas.map(
             (alerta) {
               final title = alerta['title'] ?? '';
@@ -2287,25 +2297,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildRankingPanel() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _buildDashboardCard(
+      padding: const EdgeInsets.all(20),
+      glowColor: AppColors.secondary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Ranking de Motoristas (Score)',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 18),
+          _panelHeader('Ranking de Motoristas', Icons.emoji_events_outlined, const Color(0xFFFFD700), onTap: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
+            carregarDashboard();
+          }),
+          const SizedBox(height: 16),
           ..._panelRanking.asMap().entries.map((entry) {
             final i = entry.key;
             final driver = entry.value;
@@ -2366,53 +2368,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTopCostPanel() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+    return _buildDashboardCard(
+      padding: const EdgeInsets.all(20),
+      glowColor: const Color(0xFF7C3AED),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Veículos com Maior Custo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              InkWell(
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AbastecimentosPage(),
-                    ),
-                  );
-                  carregarDashboard();
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Text(
-                    'Ver todos',
-                    style: TextStyle(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
+          _panelHeader('Veículos com Maior Custo', Icons.account_balance_wallet_outlined, const Color(0xFF7C3AED), onTap: () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
+            carregarDashboard();
+          }),
+          const SizedBox(height: 16),
           ..._panelVehicleCosts.asMap().entries.map((entry) {
             final i = entry.key;
             final vehicle = entry.value;
