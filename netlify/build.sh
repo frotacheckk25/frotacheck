@@ -12,3 +12,22 @@ export PATH="$PATH:$HOME/flutter/bin"
 flutter doctor -v
 flutter pub get
 flutter build web --release
+
+# Sanity checks (prevents publishing a blank page)
+if [ ! -f "build/web/index.html" ]; then
+  echo "ERROR: build/web/index.html not found" >&2
+  exit 1
+fi
+
+if [ ! -f "build/web/flutter_bootstrap.js" ]; then
+  echo "ERROR: build/web/flutter_bootstrap.js not found" >&2
+  exit 1
+fi
+
+if [ ! -f "build/web/main.dart.js" ]; then
+  echo "ERROR: build/web/main.dart.js not found" >&2
+  exit 1
+fi
+
+echo "Netlify build OK: Flutter artifacts present." 
+

@@ -1,7 +1,11 @@
 {
+  "buildCommand": "bash vercel_build.sh",
   "outputDirectory": "build/web",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    { "source": "/((?!assets|flutter_bootstrap\\.js|main\\.dart\\.js|manifest\\.json|favicon\\.png|icons|canvaskit).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

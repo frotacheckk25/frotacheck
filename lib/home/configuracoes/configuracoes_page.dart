@@ -10,8 +10,20 @@ class ConfiguracoesPage extends StatefulWidget {
 
 class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
   final _formKey = GlobalKey<FormState>();
-  final supabase = Supabase.instance.client;
   bool isSaving = false;
+
+  SupabaseClient? _supabaseClient;
+
+  SupabaseClient? get supabaseClient => _supabaseClient;
+
+  void _ensureSupabaseClient() {
+    try {
+      _supabaseClient = Supabase.instance.client;
+    } catch (e) {
+      debugPrint('Supabase client capture error: $e');
+      _supabaseClient = null;
+    }
+  }
 
   final empresaController = TextEditingController();
   final cnpjController = TextEditingController();
@@ -34,7 +46,14 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
 
   Future<void> carregarDados() async {
     try {
-      final dados = await supabase.from('company_settings').select().limit(1);
+      _ensureSupabaseClient();
+      final client = supabaseClient;
+      if (client == null) {
+        debugPrint('Supabase client não está pronto (web).');
+        return;
+      }
+
+      final dados = await client.from('company_settings').select().limit(1);
 
       if (dados.isNotEmpty) {
         final empresa = dados.first;
@@ -72,12 +91,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
       };
 
       if (registroId == null) {
-        await supabase.from('company_settings').insert(payload);
+        await (supabaseClient)!.from('company_settings').insert(payload);
       } else {
-        await supabase
+        await (supabaseClient)!
             .from('company_settings')
             .update(payload)
-            .eq('id', registroId!);
+            .eq('id', registroId ?? '');
       }
 
       if (!mounted) return;
@@ -289,7 +308,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                     trailing: const Icon(Icons.keyboard_arrow_right),
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Ação registrada no ambiente de teste: Gestão de acessos')),
+                        const SnackBar(
+                          content: Text(
+                            'Ação registrada no ambiente de teste: Gestão de acessos',
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -303,7 +326,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                     trailing: const Icon(Icons.keyboard_arrow_right),
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Ação registrada no ambiente de teste: Backup e exportação')),
+                        const SnackBar(
+                          content: Text(
+                            'Ação registrada no ambiente de teste: Backup e exportação',
+                          ),
+                        ),
                       );
                     },
                   ),

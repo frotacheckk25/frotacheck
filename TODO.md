@@ -1,7 +1,6 @@
-# TODO - Correção do Dashboard pós-login
+- [x] Identificar causa do null-check no Web (provável uso de Supabase client não inicializado)
+- [x] Corrigir ConfiguracoesPage para não capturar Supabase.instance.client em campo final; validar antes de usar
+- [ ] Build web e re-deploy (ver comandos abaixo)
+- [ ] Verificar se o erro do console desapareceu ao acessar Configurações
 
-- [ ] Adicionar debug logs em `lib/features/home_page.dart` no método `carregarDashboard()` (contagem de resultados e erro do `catch`).
-- [ ] Garantir que no mobile `mobileIndex` volte para 0 ao inicializar a tela `HomePage`.
-- [ ] Rodar build/flutter run e verificar logs no console para identificar a query/tabela que falhou.
-- [ ] Ajustar queries/schemas das tabelas/relacionamentos do Supabase (se necessário) para os gráficos voltarem a ter dados.
 
