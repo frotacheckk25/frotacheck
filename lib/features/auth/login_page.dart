@@ -160,24 +160,25 @@ class _Background extends StatelessWidget {
         Image.asset(
           asset,
           fit: BoxFit.cover,
-          alignment: const Alignment(0.15, 0.0),
+          alignment: Alignment.center,
           errorBuilder: (_, _, _) => const ColoredBox(color: _navy),
         ),
-        // left-to-right gradient so desktop form panel is readable
+        // Hero side (left) barely dimmed so image breathes; form side (right) darker for readability
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xBB030A16), Color(0xF2030A16)],
+              colors: [Color(0x66030A16), Color(0xEA030A16)],
+              stops: [0.0, 0.72],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
           ),
         ),
-        // top-to-bottom atmospheric vignette
+        // Subtle bottom vignette
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.transparent, Color(0xCC030A16)],
+              colors: [Colors.transparent, Color(0x99030A16)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -262,17 +263,6 @@ class _MobileLayout extends StatelessWidget {
       child: Column(
         children: [
           const _LogoWidget(iconSize: 30),
-          const SizedBox(height: 20),
-          const Text(
-            'Gestão completa da sua frota\nna palma da sua mão.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              height: 1.35,
-            ),
-          ),
           const SizedBox(height: 28),
           _FormCard(state: state),
           const SizedBox(height: 28),
@@ -300,7 +290,7 @@ class _HeroPanel extends StatelessWidget {
         Text(
           'Gestão completa\nda sua frota na\npalma da sua mão.',
           style: TextStyle(
-            color: Colors.white,
+            color: _sky,
             fontSize: 40,
             fontWeight: FontWeight.w800,
             height: 1.2,
@@ -385,9 +375,9 @@ class _FeaturesRow extends StatelessWidget {
   const _FeaturesRow();
 
   static const _items = [
-    (Icons.shield_outlined, 'Seguro'),
-    (Icons.psychology_outlined, 'Inteligente'),
-    (Icons.wifi_tethering, 'Conectado'),
+    (Icons.shield, 'Seguro'),
+    (Icons.insights, 'Inteligente'),
+    (Icons.wifi, 'Conectado'),
     (Icons.speed, 'Eficiente'),
   ];
 
