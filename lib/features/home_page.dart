@@ -779,17 +779,17 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     if (showSidebar)
                       Container(
-                        width: 188,
+                        width: 210,
                         color: AppColors.surface,
                         padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 10,
+                          vertical: 20,
+                          horizontal: 12,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const AppLogo(compact: false),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             Expanded(
                               child: SingleChildScrollView(
                                 child: Column(
@@ -979,25 +979,25 @@ class _HomePageState extends State<HomePage> {
                       ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                         child: RefreshIndicator(
                           onRefresh: carregarDashboard,
                           child: SingleChildScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
+                                horizontal: 16,
+                                vertical: 12,
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   _buildHeader(width),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 16),
                                   _buildTopKpiRow(width),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 14),
                                   _buildChartsRow(width),
-                                  const SizedBox(height: 12),
+                                  const SizedBox(height: 14),
                                   _buildBottomPanels(width),
                                 ],
                               ),
@@ -1359,33 +1359,33 @@ class _HomePageState extends State<HomePage> {
     bool active = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: 3),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(9),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(9),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
             decoration: BoxDecoration(
               color: active ? AppColors.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
             ),
             child: Row(
               children: [
                 Icon(
                   icon,
                   color: active ? Colors.white : AppColors.textSecondary,
-                  size: 17,
+                  size: 18,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 9),
                 Expanded(
                   child: Text(
                     label,
                     style: TextStyle(
                       color: active ? Colors.white : AppColors.textSecondary,
-                      fontSize: 12.5,
+                      fontSize: 13,
                       fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -1411,7 +1411,7 @@ class _HomePageState extends State<HomePage> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.backgroundSoft,
           borderRadius: BorderRadius.circular(10),
@@ -1420,11 +1420,11 @@ class _HomePageState extends State<HomePage> {
         child: Row(
           children: [
             const CircleAvatar(
-              radius: 18,
+              radius: 20,
               backgroundColor: AppColors.primary,
-              child: Icon(Icons.person, color: Colors.white, size: 16),
+              child: Icon(Icons.person, color: Colors.white, size: 18),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1434,7 +1434,7 @@ class _HomePageState extends State<HomePage> {
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                      fontSize: 13,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1442,7 +1442,7 @@ class _HomePageState extends State<HomePage> {
                     'Administrador',
                     style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 11,
+                      fontSize: 11.5,
                     ),
                   ),
                 ],
@@ -1745,10 +1745,10 @@ class _HomePageState extends State<HomePage> {
     return LayoutBuilder(
       builder: (_, constraints) {
         final cols = constraints.maxWidth > 900 ? 6 : constraints.maxWidth > 600 ? 3 : 2;
-        final itemW = (constraints.maxWidth - (cols - 1) * 8) / cols;
+        final itemW = (constraints.maxWidth - (cols - 1) * 10) / cols;
         return Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 10,
+          runSpacing: 10,
           children: cards.map((c) => SizedBox(width: itemW, child: c)).toList(),
         );
       },
@@ -1757,24 +1757,27 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildKpiTile(String title, String value, IconData icon, Color color, {String? subtitle}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(11),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               color: color.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, color: color, size: 16),
+            child: Icon(icon, color: color, size: 19),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1782,16 +1785,16 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 10.5),
+                  style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 11.5),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 17,
+                    fontSize: 19,
                     fontWeight: FontWeight.w700,
                     height: 1.1,
                   ),
@@ -1799,7 +1802,7 @@ class _HomePageState extends State<HomePage> {
                 if (subtitle != null)
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Color(0xFF6b7280), fontSize: 10),
+                    style: const TextStyle(color: Color(0xFF6b7280), fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -1814,12 +1817,12 @@ class _HomePageState extends State<HomePage> {
   Widget _buildChartsRow(double width) {
     final showRow = width > 1000;
     final children = [
-      Expanded(child: SizedBox(height: 330, child: _buildConsumptionChart())),
-      const SizedBox(width: 10),
-      Expanded(child: SizedBox(height: 330, child: _buildCostPieChart())),
-      const SizedBox(width: 10),
+      Expanded(child: SizedBox(height: 370, child: _buildConsumptionChart())),
+      const SizedBox(width: 12),
+      Expanded(child: SizedBox(height: 370, child: _buildCostPieChart())),
+      const SizedBox(width: 12),
       Expanded(
-        child: SizedBox(height: 330, child: _buildOccurrencesBarChart()),
+        child: SizedBox(height: 370, child: _buildOccurrencesBarChart()),
       ),
     ];
     return showRow
@@ -1840,18 +1843,18 @@ class _HomePageState extends State<HomePage> {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(5),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(7),
           ),
-          child: Icon(icon, color: color, size: 13),
+          child: Icon(icon, color: color, size: 14),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 9),
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
           ),
         ),
         if (onTap != null)
@@ -1862,7 +1865,7 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
             child: const Text('Ver todos'),
           ),
@@ -1874,20 +1877,20 @@ class _HomePageState extends State<HomePage> {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
             color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(7),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: color, size: 14),
+          child: Icon(icon, color: color, size: 16),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 11),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-              Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+              Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+              Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ],
           ),
         ),
@@ -1917,13 +1920,13 @@ class _HomePageState extends State<HomePage> {
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.25;
     final yInterval = (maxY / 4).ceilToDouble().clamp(100.0, double.infinity);
     return _buildDashboardCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
       glowColor: AppColors.secondary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _cardHeader('Consumo de Combustível', 'Litros por mês', Icons.local_gas_station, AppColors.secondary),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Expanded(
             child: LineChart(
               LineChartData(
@@ -1943,10 +1946,10 @@ class _HomePageState extends State<HomePage> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: yInterval,
-                      reservedSize: 36,
+                      reservedSize: 40,
                       getTitlesWidget: (value, _) => Text(
                         value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toInt().toString(),
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                       ),
                     ),
                   ),
@@ -1954,12 +1957,12 @@ class _HomePageState extends State<HomePage> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: 1,
-                      reservedSize: 22,
+                      reservedSize: 24,
                       getTitlesWidget: (value, _) => Padding(
-                        padding: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.only(top: 5),
                         child: Text(
                           labels[value.toInt().clamp(0, labels.length - 1)],
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                         ),
                       ),
                     ),
@@ -2060,13 +2063,13 @@ class _HomePageState extends State<HomePage> {
         : <Map<String, dynamic>>[];
 
     return _buildDashboardCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
       glowColor: _dashboardPieColors[0],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _cardHeader('Custos da Frota', 'Distribuição por categoria', Icons.pie_chart_outline, _dashboardPieColors[0]),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Expanded(
             child: Row(
               children: [
@@ -2078,7 +2081,7 @@ class _HomePageState extends State<HomePage> {
                       PieChart(
                         PieChartData(
                           sections: sections,
-                          centerSpaceRadius: 36,
+                          centerSpaceRadius: 44,
                           sectionsSpace: 2,
                           startDegreeOffset: -90,
                         ),
@@ -2090,17 +2093,17 @@ class _HomePageState extends State<HomePage> {
                             'R\$${_fmt(totalCost / 1000)}k',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const Text('total', style: TextStyle(color: AppColors.textSecondary, fontSize: 9)),
+                          const Text('total', style: TextStyle(color: AppColors.textSecondary, fontSize: 10)),
                         ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   flex: 6,
                   child: Column(
@@ -2108,7 +2111,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: legendItems.map((item) {
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: _PieLegend(
                           color: item['color'] as Color,
                           label: item['label'] as String,
@@ -2139,13 +2142,13 @@ class _HomePageState extends State<HomePage> {
       AppColors.danger,
     ];
     return _buildDashboardCard(
-      padding: const EdgeInsets.fromLTRB(14, 14, 10, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
       glowColor: AppColors.secondary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _cardHeader('Ocorrências por Categoria', 'Quantidade registrada', Icons.bar_chart, AppColors.secondary),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -2160,47 +2163,47 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     SizedBox(
-                      width: 82,
+                      width: 90,
                       child: Text(
                         e.key,
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Stack(
                         children: [
                           Container(
-                            height: 14,
+                            height: 17,
                             decoration: BoxDecoration(
                               color: AppColors.backgroundSoft,
-                              borderRadius: BorderRadius.circular(7),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           FractionallySizedBox(
                             widthFactor: widthFraction,
                             child: Container(
-                              height: 14,
+                              height: 17,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [barColor.withOpacity(0.7), barColor],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
-                                borderRadius: BorderRadius.circular(7),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     SizedBox(
-                      width: 18,
+                      width: 20,
                       child: Text(
                         '${e.value}',
-                        style: TextStyle(color: barColor, fontWeight: FontWeight.bold, fontSize: 11),
+                        style: TextStyle(color: barColor, fontWeight: FontWeight.bold, fontSize: 12),
                         textAlign: TextAlign.right,
                       ),
                     ),
@@ -2218,9 +2221,9 @@ class _HomePageState extends State<HomePage> {
     final showRow = width > 1000;
     final panels = [
       Expanded(child: _buildAlertsPanel()),
-      const SizedBox(width: 10),
+      const SizedBox(width: 12),
       Expanded(child: _buildRankingPanel()),
-      const SizedBox(width: 10),
+      const SizedBox(width: 12),
       Expanded(child: _buildTopCostPanel()),
     ];
     return showRow
@@ -2238,7 +2241,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildAlertsPanel() {
     return _buildDashboardCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       glowColor: AppColors.warning,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2247,32 +2250,32 @@ class _HomePageState extends State<HomePage> {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
             carregarDashboard();
           }),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           ..._panelAlertas.map(
             (alerta) {
               final title = alerta['title'] ?? '';
               final iconData = _alertIcon(title);
               final iconColor = _alertColor(title);
               return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSoft,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(9),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(5),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: iconColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(7),
                         ),
-                        child: Icon(iconData, color: iconColor, size: 13),
+                        child: Icon(iconData, color: iconColor, size: 15),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2282,14 +2285,14 @@ class _HomePageState extends State<HomePage> {
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 12,
+                                fontSize: 13,
                               ),
                             ),
                             Text(
                               alerta['subtitle'] ?? '',
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 10.5,
+                                fontSize: 11,
                               ),
                             ),
                           ],
@@ -2308,7 +2311,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildRankingPanel() {
     return _buildDashboardCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       glowColor: AppColors.secondary,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2317,7 +2320,7 @@ class _HomePageState extends State<HomePage> {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
             carregarDashboard();
           }),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           ..._panelRanking.asMap().entries.map((entry) {
             final i = entry.key;
             final driver = entry.value;
@@ -2326,46 +2329,46 @@ class _HomePageState extends State<HomePage> {
             final avatarColor = _rankingColors[i % _rankingColors.length];
             final initials = _getInitials(name);
             return Padding(
-              padding: const EdgeInsets.only(bottom: 7),
+              padding: const EdgeInsets.only(bottom: 9),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 20,
+                    width: 22,
                     child: Text(
                       '${i + 1}',
                       style: TextStyle(
                         color: i == 0 ? const Color(0xFFFFD700) : AppColors.textSecondary,
                         fontWeight: FontWeight.bold,
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                   CircleAvatar(
-                    radius: 13,
+                    radius: 15,
                     backgroundColor: avatarColor,
                     child: Text(
                       initials,
-                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 9),
                   Expanded(
                     child: Text(
                       name,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withOpacity(0.13),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       '$score pts',
-                      style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 10.5),
+                      style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 11),
                     ),
                   ),
                 ],
@@ -2379,7 +2382,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildTopCostPanel() {
     return _buildDashboardCard(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       glowColor: const Color(0xFF7C3AED),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2388,22 +2391,22 @@ class _HomePageState extends State<HomePage> {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
             carregarDashboard();
           }),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           ..._panelVehicleCosts.asMap().entries.map((entry) {
             final i = entry.key;
             final vehicle = entry.value;
             final plate = vehicle['plate']?.toString() ?? 'Sem placa';
             final cost = _toDouble(vehicle['value']);
             return Padding(
-              padding: const EdgeInsets.only(bottom: 7),
+              padding: const EdgeInsets.only(bottom: 9),
               child: Row(
                 children: [
                   Container(
-                    width: 26,
-                    height: 26,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
                       color: AppColors.backgroundSoft,
-                      borderRadius: BorderRadius.circular(7),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Center(
@@ -2412,23 +2415,23 @@ class _HomePageState extends State<HomePage> {
                         style: const TextStyle(
                           color: AppColors.secondary,
                           fontWeight: FontWeight.bold,
-                          fontSize: 11,
+                          fontSize: 12,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           plate,
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                         const Text(
                           'Custo no mês',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                         ),
                       ],
                     ),
@@ -2438,7 +2441,7 @@ class _HomePageState extends State<HomePage> {
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 11.5,
+                      fontSize: 12.5,
                     ),
                   ),
                 ],
@@ -2462,15 +2465,15 @@ class _PieLegend extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 7),
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 10.5),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
           ),
