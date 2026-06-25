@@ -2,9 +2,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/models/multa_model.dart';
-import '../../core/models/veiculo_model.dart';
-import '../../core/models/motorista_model.dart';
 import '../../core/theme/app_theme.dart';
 
 class MultasPage extends StatefulWidget {
@@ -16,10 +13,12 @@ class MultasPage extends StatefulWidget {
 
 class _MultasPageState extends State<MultasPage> {
   final supabase = Supabase.instance.client;
-  List<Multa> multas = [];
-  List<Veiculo> veiculos = [];
-  List<Motorista> motoristas = [];
-  bool isLoading = true;
+
+  List<Map<String, dynamic>> multas = [];
+  List<Map<String, dynamic>> veiculos = [];
+  List<Map<String, dynamic>> motoristas = [];
+  bool carregando = true;
+  String filtro = 'todos'; // todos | aberta | paga | contestada
 
   @override
   void initState() {
@@ -28,325 +27,595 @@ class _MultasPageState extends State<MultasPage> {
   }
 
   Future<void> _carregarDados() async {
+    setState(() => carregando = true);
     try {
-      final multasResponse = await supabase
-          .from('multas')
-          .select()
-          .order('data', ascending: false);
-
-      final veiculosResponse = await supabase.from('veiculos').select();
-      final motoristasResponse = await supabase.from('motoristas').select();
-
-      if (!mounted) return;
-      setState(() {
-        multas = (multasResponse as List).isEmpty
-            ? multasMock
-            : (multasResponse)
-                .map((e) => Multa.fromJson(e))
-                .toList();
-        veiculos = (veiculosResponse as List).isEmpty
-            ? veiculosMock
-            : (veiculosResponse)
-                .map((e) => Veiculo.fromJson(e))
-                .toList();
-        motoristas = (motoristasResponse as List).isEmpty
-            ? motoristasMock
-            : (motoristasResponse)
-                .map((e) => Motorista.fromJson(e))
-                .toList();
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Erro ao carregar multas: $e - usando dados mock');
+      final results = await Future.wait([
+        supabase
+            .from('multas')
+            .select('*, vehicles (plate, model), drivers (name)')
+            .order('created_at', ascending: false),
+        supabase.from('vehicles').select('id, plate, model').order('plate'),
+        supabase.from('drivers').select('id, name').order('name'),
+      ]);
       if (mounted) {
         setState(() {
-          multas = multasMock;
-          veiculos = veiculosMock;
-          motoristas = motoristasMock;
-          isLoading = false;
+          multas = List<Map<String, dynamic>>.from(results[0]);
+          veiculos = List<Map<String, dynamic>>.from(results[1]);
+          motoristas = List<Map<String, dynamic>>.from(results[2]);
         });
       }
-    }
-  }
-
-  static final List<Multa> multasMock = [
-    Multa(
-      id: '1',
-      veiculoId: 'v1',
-      motoristaId: 'm1',
-      data: DateTime.now().subtract(const Duration(days: 10)),
-      valor: 180.00,
-      tipo: 'infraçao',
-      descricao: 'Estacionamento proibido',
-      status: 'aberta',
-    ),
-    Multa(
-      id: '2',
-      veiculoId: 'v2',
-      motoristaId: 'm2',
-      data: DateTime.now().subtract(const Duration(days: 5)),
-      valor: 250.00,
-      tipo: 'infraçao',
-      descricao: 'Excesso de velocidade',
-      status: 'paga',
-    ),
-  ];
-
-  static final List<Veiculo> veiculosMock = [
-    Veiculo(id: 'v1', placa: 'ABC-1234', modelo: 'Fiesta'),
-    Veiculo(id: 'v2', placa: 'XYZ-9999', modelo: 'Civic'),
-  ];
-
-  static final List<Motorista> motoristasMock = [
-    Motorista(id: 'm1', nome: 'João Silva'),
-    Motorista(id: 'm2', nome: 'Maria Oliveira'),
-  ];
-
-  String _getNomeVeiculo(String? id) {
-    if (id == null) return 'N/A';
-    try {
-      return veiculos.firstWhere((v) => v.id == id).placa ?? 'Desconhecido';
     } catch (e) {
-      return 'Desconhecido';
+      debugPrint('Erro ao carregar multas: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => carregando = false);
     }
   }
 
-  String _getNomeMotorista(String? id) {
-    if (id == null) return 'N/A';
-    try {
-      return motoristas.firstWhere((m) => m.id == id).nome ?? 'Desconhecido';
-    } catch (e) {
-      return 'Desconhecido';
-    }
+  void _abrirNovaMulta() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _NovaMultaForm(
+        veiculos: veiculos,
+        motoristas: motoristas,
+        onSaved: () {
+          Navigator.pop(ctx);
+          _carregarDados();
+        },
+      ),
+    );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'aberta':
-        return Colors.orange;
-      case 'paga':
-        return Colors.green;
-      case 'contestada':
-        return Colors.purple;
-      default:
-        return Colors.grey;
-    }
+  void _abrirDetalhe(Map<String, dynamic> multa) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _DetalheMultaPage(
+          multa: multa,
+          onAtualizada: _carregarDados,
+        ),
+      ),
+    );
   }
 
-  String _getStatusLabel(String status) {
-    switch (status) {
-      case 'aberta':
-        return 'Aberta';
-      case 'paga':
-        return 'Paga';
-      case 'contestada':
-        return 'Contestada';
-      default:
-        return status;
-    }
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  List<Map<String, dynamic>> get _filtradas {
+    if (filtro == 'todos') return multas;
+    return multas
+        .where((m) => (m['status'] ?? 'aberta').toString() == filtro)
+        .toList();
+  }
+
+  int _count(String status) =>
+      multas.where((m) => (m['status'] ?? 'aberta').toString() == status).length;
+
+  double _totalAberto() => multas
+      .where((m) => (m['status'] ?? 'aberta') == 'aberta')
+      .fold(0.0, (sum, m) {
+        final v = m['valor'];
+        return sum + ((v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0);
+      });
+
+  Color _statusColor(String? s) => switch ((s ?? 'aberta').toLowerCase()) {
+        'paga' => AppColors.success,
+        'contestada' => const Color(0xFF8B5CF6),
+        _ => AppColors.warning,
+      };
+
+  String _statusLabel(String? s) => switch ((s ?? 'aberta').toLowerCase()) {
+        'paga' => 'Paga',
+        'contestada' => 'Contestada',
+        _ => 'Aberta',
+      };
+
+  String _fmtDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '-';
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return raw;
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
+
+  String _fmtValue(dynamic v) {
+    final d = (v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
+    return 'R\$ ${d.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String _veiculoLabel(Map<String, dynamic> m) {
+    final vj = m['vehicles'];
+    if (vj != null) return '${vj['plate'] ?? ''} — ${vj['model'] ?? ''}'.trim();
+    return m['veiculo_id']?.toString() ?? '-';
+  }
+
+  String _motoristaLabel(Map<String, dynamic> m) {
+    final dj = m['drivers'];
+    if (dj != null) return dj['name']?.toString() ?? '-';
+    return m['motorista_id']?.toString() ?? '-';
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtradas = _filtradas;
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Gestão de Multas'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, size: 26),
+            color: AppColors.secondary,
+            onPressed: _abrirNovaMulta,
+            tooltip: 'Nova Multa',
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _carregarDados,
+            tooltip: 'Atualizar',
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _abrirNovaMulta(),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _abrirNovaMulta,
+        backgroundColor: AppColors.danger,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Nova Multa', style: TextStyle(color: Colors.white)),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : multas.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.receipt_long, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text('Nenhuma multa registrada'),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => _abrirNovaMulta(),
-                    child: const Text('Registrar Multa'),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: multas.length,
-              itemBuilder: (context, index) {
-                final multa = multas[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
+      body: RefreshIndicator(
+        onRefresh: _carregarDados,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: _getStatusColor(
-                          multa.status,
-                        ).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFef4444), Color(0xFFf97316)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Icon(
-                        Icons.receipt_long,
-                        color: _getStatusColor(multa.status),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.gavel,
+                                color: Colors.white, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Gestão de Multas',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold)),
+                                Text(
+                                  '${_count('aberta')} aberta(s) · ${_fmtValue(_totalAberto())} a pagar',
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    title: Text(_getNomeVeiculo(multa.veiculoId)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 12),
+
+                    // KPIs
+                    Row(
                       children: [
-                        const SizedBox(height: 4),
-                        Text(
-                          'Motorista: ${_getNomeMotorista(multa.motoristaId)}',
-                        ),
-                        Text('Tipo: ${multa.tipo}'),
-                        Text(
-                          'Valor: R\$ ${multa.valor.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                        _kpi('Total', '${multas.length}',
+                            Icons.receipt_long, AppColors.secondary),
+                        const SizedBox(width: 8),
+                        _kpi('Abertas', '${_count('aberta')}',
+                            Icons.pending, AppColors.warning),
+                        const SizedBox(width: 8),
+                        _kpi('Pagas', '${_count('paga')}',
+                            Icons.check_circle, AppColors.success),
+                        const SizedBox(width: 8),
+                        _kpi('Contest.', '${_count('contestada')}',
+                            Icons.balance, const Color(0xFF8B5CF6)),
                       ],
                     ),
-                    trailing: Chip(
-                      label: Text(_getStatusLabel(multa.status)),
-                      backgroundColor: _getStatusColor(
-                        multa.status,
-                      ).withValues(alpha: 0.3),
-                      labelStyle: TextStyle(
-                        color: _getStatusColor(multa.status),
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 12),
+
+                    // Filtros
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _chip('Todas', 'todos'),
+                          const SizedBox(width: 8),
+                          _chip('Abertas', 'aberta',
+                              color: AppColors.warning),
+                          const SizedBox(width: 8),
+                          _chip('Pagas', 'paga',
+                              color: AppColors.success),
+                          const SizedBox(width: 8),
+                          _chip('Contestadas', 'contestada',
+                              color: const Color(0xFF8B5CF6)),
+                        ],
                       ),
                     ),
-                    onTap: () => _abrirDetalheMulta(multa),
-                  ),
-                );
-              },
+                    const SizedBox(height: 8),
+                    Text('${filtradas.length} multa(s)',
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 12)),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
             ),
-    );
-  }
 
-  void _abrirNovaMulta() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => NovaMultaPage(
-          onMultaSalva: () {
-            _carregarDados();
-          },
+            if (carregando)
+              const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()))
+            else if (filtradas.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.receipt_long,
+                          size: 64, color: AppColors.textSecondary),
+                      const SizedBox(height: 16),
+                      Text(
+                        multas.isEmpty
+                            ? 'Nenhuma multa registrada'
+                            : 'Nenhuma multa neste filtro',
+                        style:
+                            const TextStyle(color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _abrirNovaMulta,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Registrar Multa'),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.danger),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) {
+                      final m = filtradas[i];
+                      final status = m['status']?.toString() ?? 'aberta';
+                      final cor = _statusColor(status);
+                      final veiculo = _veiculoLabel(m);
+                      final motorista = _motoristaLabel(m);
+                      final valor = m['valor'];
+                      final tipo = m['tipo']?.toString() ?? '-';
+                      final descricao = m['descricao']?.toString() ?? '';
+                      final data = _fmtDate(
+                          m['data']?.toString() ?? m['created_at']?.toString());
+                      final paga = status == 'paga';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: GestureDetector(
+                          onTap: () => _abrirDetalhe(m),
+                          child: Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: cor.withOpacity(0.3)),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: cor.withOpacity(0.15),
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(Icons.gavel,
+                                          color: cor, size: 18),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(veiculo,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                  fontSize: 14)),
+                                          Text(tipo,
+                                              style: const TextStyle(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  fontSize: 12)),
+                                        ],
+                                      ),
+                                    ),
+                                    // Valor em destaque
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(_fmtValue(valor),
+                                            style: TextStyle(
+                                                color: paga
+                                                    ? AppColors.success
+                                                    : AppColors.danger,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 14)),
+                                        Container(
+                                          padding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                cor.withOpacity(0.13),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                              _statusLabel(status),
+                                              style: TextStyle(
+                                                  color: cor,
+                                                  fontSize: 10,
+                                                  fontWeight:
+                                                      FontWeight.w700)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                if (descricao.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(descricao,
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ],
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    _badge('Motorista: $motorista',
+                                        AppColors.textSecondary),
+                                    _badge(data, AppColors.textSecondary),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: filtradas.length,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 
-  void _abrirDetalheMulta(Multa multa) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => DetalheMultaPage(
-          multa: multa,
-          onMultaAtualizada: () {
-            _carregarDados();
-          },
+  Widget _kpi(String label, String value, IconData icon, Color color) =>
+      Expanded(
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 15),
+              const SizedBox(height: 4),
+              Text(value,
+                  style: TextStyle(
+                      color: color,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
+              Text(label,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 9),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class NovaMultaPage extends StatefulWidget {
-  final VoidCallback onMultaSalva;
-
-  const NovaMultaPage({required this.onMultaSalva, super.key});
-
-  @override
-  State<NovaMultaPage> createState() => _NovaMultaPageState();
-}
-
-class _NovaMultaPageState extends State<NovaMultaPage> {
-  final supabase = Supabase.instance.client;
-  final imagePicker = ImagePicker();
-
-  String? veiculoSelecionado;
-  String? motoristaSelecioando;
-  String? tipoSelecionado;
-  Uint8List? fotoBytes;
-  bool isLoading = false;
-
-  final valorkController = TextEditingController();
-  final descricaoController = TextEditingController();
-  final dataController = TextEditingController();
-
-  List<Veiculo> veiculos = [];
-  List<Motorista> motoristas = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _carregarVeiculosMotoristas();
-    dataController.text = DateTime.now().toString().split(' ')[0];
-  }
-
-  Future<void> _carregarVeiculosMotoristas() async {
-    try {
-      final veiculosResponse = await supabase.from('veiculos').select();
-      final motoristasResponse = await supabase.from('motoristas').select();
-
-      setState(() {
-        veiculos = (veiculosResponse as List)
-            .map((e) => Veiculo.fromJson(e as Map<String, dynamic>))
-            .toList();
-        motoristas = (motoristasResponse as List)
-            .map((e) => Motorista.fromJson(e as Map<String, dynamic>))
-            .toList();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao carregar dados: $e')));
-    }
-  }
-
-  Future<void> _selecionarFoto() async {
-    final foto = await imagePicker.pickImage(source: ImageSource.camera);
-    if (foto != null) {
-      final bytes = await foto.readAsBytes();
-      if (!mounted) return;
-      setState(() {
-        fotoBytes = bytes;
-      });
-    }
-  }
-
-  Future<void> _salvarMulta() async {
-    if (veiculoSelecionado == null ||
-        tipoSelecionado == null ||
-        valorkController.text.isEmpty ||
-        descricaoController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha todos os campos obrigatórios')),
       );
-      return;
+
+  Widget _chip(String label, String value, {Color? color}) {
+    final selected = filtro == value;
+    final c = color ?? AppColors.secondary;
+    return GestureDetector(
+      onTap: () => setState(() => filtro = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color:
+              selected ? c.withOpacity(0.15) : AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? c : AppColors.border,
+              width: selected ? 1.5 : 1),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: selected ? c : AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: selected
+                    ? FontWeight.w700
+                    : FontWeight.normal)),
+      ),
+    );
+  }
+
+  Widget _badge(String text, Color color) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text,
+            style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+      );
+}
+
+// ─── Formulário nova multa (modal) ────────────────────────────────────────────
+
+class _NovaMultaForm extends StatefulWidget {
+  final List<Map<String, dynamic>> veiculos;
+  final List<Map<String, dynamic>> motoristas;
+  final VoidCallback onSaved;
+
+  const _NovaMultaForm({
+    required this.veiculos,
+    required this.motoristas,
+    required this.onSaved,
+  });
+
+  @override
+  State<_NovaMultaForm> createState() => _NovaMultaFormState();
+}
+
+class _NovaMultaFormState extends State<_NovaMultaForm> {
+  final supabase = Supabase.instance.client;
+  final _formKey = GlobalKey<FormState>();
+  final imagePicker = ImagePicker();
+  bool isSaving = false;
+
+  String? selectedVehicle;
+  String? selectedDriver;
+  String? selectedTipo;
+  DateTime? dataMulta;
+  Uint8List? fotoBytes;
+
+  final valorController = TextEditingController();
+  final descricaoController = TextEditingController();
+
+  static const tipos = [
+    {'value': 'infracao', 'label': 'Infração de Trânsito'},
+    {'value': 'estacionamento', 'label': 'Estacionamento Proibido'},
+    {'value': 'velocidade', 'label': 'Excesso de Velocidade'},
+    {'value': 'semaforo', 'label': 'Avanço de Sinal'},
+    {'value': 'documentacao', 'label': 'Documentação Irregular'},
+    {'value': 'outros', 'label': 'Outros'},
+  ];
+
+  @override
+  void dispose() {
+    valorController.dispose();
+    descricaoController.dispose();
+    super.dispose();
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Future<void> _pickData() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2018),
+      lastDate: DateTime.now(),
+      helpText: 'Data da multa',
+    );
+    if (d != null) setState(() => dataMulta = d);
+  }
+
+  Future<void> _pickFoto() async {
+    try {
+      XFile? img;
+      try {
+        img = await imagePicker.pickImage(
+            source: ImageSource.camera,
+            imageQuality: 70,
+            maxWidth: 1000);
+      } catch (_) {
+        img = await imagePicker.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 70,
+            maxWidth: 1000);
+      }
+      if (img != null) {
+        final bytes = await img.readAsBytes();
+        if (mounted) setState(() => fotoBytes = bytes);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao selecionar foto: $e')));
+      }
     }
+  }
 
-    setState(() => isLoading = true);
+  Future<void> _salvar() async {
+    if (_formKey.currentState?.validate() != true) return;
 
+    setState(() => isSaving = true);
     try {
       String? fotoUrl;
       if (fotoBytes != null) {
-        final fileName = 'multa_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await supabase.storage
-            .from('multas')
-            .uploadBinary(
+        final fileName =
+            'multa_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        await supabase.storage.from('multas').uploadBinary(
               fileName,
               fotoBytes!,
               fileOptions: const FileOptions(upsert: true),
@@ -354,374 +623,699 @@ class _NovaMultaPageState extends State<NovaMultaPage> {
         fotoUrl = supabase.storage.from('multas').getPublicUrl(fileName);
       }
 
-      final multaData = {
-        'veiculo_id': veiculoSelecionado,
-        'motorista_id': motoristaSelecioando,
-        'data': dataController.text,
-        'valor': double.parse(valorkController.text),
-        'tipo': tipoSelecionado,
-        'descricao': descricaoController.text,
-        'foto_url': fotoUrl,
+      final payload = <String, dynamic>{
+        'veiculo_id': selectedVehicle,
+        'tipo': selectedTipo,
+        'valor': double.tryParse(
+                valorController.text.trim().replaceAll(',', '.')) ??
+            0,
+        'descricao': descricaoController.text.trim(),
         'status': 'aberta',
-        'criado_em': DateTime.now().toIso8601String(),
+        'data': (dataMulta ?? DateTime.now()).toIso8601String().split('T')[0],
+        if (selectedDriver != null) 'motorista_id': selectedDriver,
+        if (fotoUrl != null) 'foto_url': fotoUrl,
       };
 
-      await supabase.from('multas').insert(multaData);
+      await supabase.from('multas').insert(payload);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Multa registrada com sucesso!')),
-      );
-
-      widget.onMultaSalva();
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Multa registrada com sucesso!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+      widget.onSaved();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao salvar multa: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
       }
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) setState(() => isSaving = false);
     }
   }
 
   @override
-  void dispose() {
-    valorkController.dispose();
-    descricaoController.dispose();
-    dataController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.gavel,
+                        color: AppColors.danger, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Registrar Multa',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Veículo
+              DropdownButtonFormField<String>(
+                value: selectedVehicle,
+                decoration: _dec('Veículo *', Icons.directions_car_outlined),
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                items: widget.veiculos
+                    .map((v) => DropdownMenuItem(
+                          value: v['id']?.toString(),
+                          child: Text(
+                            '${v['plate'] ?? ''} — ${v['model'] ?? ''}',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ))
+                    .toList(),
+                validator: (v) => v == null ? 'Selecione um veículo' : null,
+                onChanged: (v) => setState(() => selectedVehicle = v),
+              ),
+              const SizedBox(height: 14),
+
+              // Motorista
+              DropdownButtonFormField<String>(
+                value: selectedDriver,
+                decoration:
+                    _dec('Motorista (opcional)', Icons.person_outline),
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                items: widget.motoristas
+                    .map((m) => DropdownMenuItem(
+                          value: m['id']?.toString(),
+                          child: Text(m['name'] ?? '-',
+                              style: const TextStyle(color: Colors.white)),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => selectedDriver = v),
+              ),
+              const SizedBox(height: 14),
+
+              // Tipo
+              DropdownButtonFormField<String>(
+                value: selectedTipo,
+                decoration: _dec('Tipo de Infração *', Icons.category_outlined),
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                items: tipos
+                    .map((t) => DropdownMenuItem(
+                          value: t['value'],
+                          child: Text(t['label']!,
+                              style: const TextStyle(color: Colors.white)),
+                        ))
+                    .toList(),
+                validator: (v) => v == null ? 'Selecione o tipo' : null,
+                onChanged: (v) => setState(() => selectedTipo = v),
+              ),
+              const SizedBox(height: 14),
+
+              // Valor
+              TextFormField(
+                controller: valorController,
+                style: const TextStyle(color: Colors.white),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration:
+                    _dec('Valor da Multa (R\$) *', Icons.attach_money),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Informe o valor';
+                  if (double.tryParse(v.replaceAll(',', '.')) == null) {
+                    return 'Valor inválido';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+
+              // Data da multa
+              GestureDetector(
+                onTap: _pickData,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSoft,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          color: AppColors.textSecondary, size: 18),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          dataMulta != null
+                              ? 'Data: ${_fmtDate(dataMulta!)}'
+                              : 'Data da Multa (toque para selecionar)',
+                          style: TextStyle(
+                              color: dataMulta != null
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontSize: 14),
+                        ),
+                      ),
+                      const Icon(Icons.edit_calendar,
+                          color: AppColors.textSecondary, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Descrição
+              TextFormField(
+                controller: descricaoController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: _dec('Descrição *', Icons.notes_outlined)
+                    .copyWith(alignLabelWithHint: true),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'Descreva a multa'
+                        : null,
+              ),
+              const SizedBox(height: 14),
+
+              // Foto (opcional)
+              if (fotoBytes != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.memory(fotoBytes!,
+                      height: 140, width: double.infinity, fit: BoxFit.cover),
+                ),
+                const SizedBox(height: 8),
+              ],
+              OutlinedButton.icon(
+                onPressed: _pickFoto,
+                icon: const Icon(Icons.camera_alt_outlined,
+                    color: AppColors.textSecondary, size: 18),
+                label: Text(
+                  fotoBytes != null ? 'Trocar Foto' : 'Adicionar Foto (opcional)',
+                  style:
+                      const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Botão salvar
+              ElevatedButton(
+                onPressed: isSaving ? null : _salvar,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: isSaving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2.5),
+                      )
+                    : const Text('Registrar Multa',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _dec(String label, IconData icon) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 18),
+        filled: true,
+        fillColor: AppColors.backgroundSoft,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.border)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.border)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.danger)),
+        errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.danger)),
+      );
+}
+
+// ─── Detalhe da multa ─────────────────────────────────────────────────────────
+
+class _DetalheMultaPage extends StatefulWidget {
+  final Map<String, dynamic> multa;
+  final VoidCallback onAtualizada;
+
+  const _DetalheMultaPage({required this.multa, required this.onAtualizada});
+
+  @override
+  State<_DetalheMultaPage> createState() => _DetalheMultaPageState();
+}
+
+class _DetalheMultaPageState extends State<_DetalheMultaPage> {
+  final supabase = Supabase.instance.client;
+  late Map<String, dynamic> multa;
+  bool salvando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    multa = Map<String, dynamic>.from(widget.multa);
+  }
+
+  String get _status => multa['status']?.toString() ?? 'aberta';
+  bool get _paga => _status == 'paga';
+
+  Color _statusColor(String s) => switch (s.toLowerCase()) {
+        'paga' => AppColors.success,
+        'contestada' => const Color(0xFF8B5CF6),
+        _ => AppColors.warning,
+      };
+
+  String _fmtDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '-';
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return raw;
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
+
+  String _fmtValue(dynamic v) {
+    final d = (v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
+    return 'R\$ ${d.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String get _veiculoLabel {
+    final vj = multa['vehicles'];
+    if (vj != null) return '${vj['plate'] ?? ''} — ${vj['model'] ?? ''}'.trim();
+    return multa['veiculo_id']?.toString() ?? '-';
+  }
+
+  String get _motoristaLabel {
+    final dj = multa['drivers'];
+    if (dj != null) return dj['name']?.toString() ?? '-';
+    return multa['motorista_id']?.toString() ?? '-';
+  }
+
+  Future<void> _marcarComoPaga() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Confirmar pagamento',
+            style: TextStyle(color: Colors.white)),
+        content: const Text('Marcar esta multa como paga?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success),
+            child: const Text('Confirmar',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+
+    setState(() => salvando = true);
+
+    final id = multa['id']?.toString();
+    if (id == null) return;
+
+    try {
+      // Atualiza status (sempre funciona)
+      await supabase
+          .from('multas')
+          .update({'status': 'paga'})
+          .eq('id', id);
+
+      // Tenta registrar data de pagamento (coluna pode não existir)
+      try {
+        await supabase
+            .from('multas')
+            .update({
+              'data_pagamento':
+                  DateTime.now().toIso8601String().split('T')[0],
+            })
+            .eq('id', id);
+      } catch (_) {}
+
+      // Atualização otimista
+      setState(() => multa = {...multa, 'status': 'paga'});
+
+      widget.onAtualizada();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Multa marcada como paga! Dashboard atualizado.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => salvando = false);
+    }
+  }
+
+  Future<void> _marcarContestada() async {
+    final id = multa['id']?.toString();
+    if (id == null) return;
+    try {
+      await supabase
+          .from('multas')
+          .update({'status': 'contestada'})
+          .eq('id', id);
+      setState(() => multa = {...multa, 'status': 'contestada'});
+      widget.onAtualizada();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Multa marcada como contestada.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro: $e')));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cor = _statusColor(_status);
+    final valor = multa['valor'];
+    final tipo = multa['tipo']?.toString() ?? '-';
+    final descricao = multa['descricao']?.toString() ?? '-';
+    final data = _fmtDate(multa['data']?.toString() ?? multa['created_at']?.toString());
+    final fotoUrl = multa['foto_url']?.toString();
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Nova Multa'),
-        backgroundColor: AppColors.primary,
+        title: const Text('Detalhe da Multa'),
+        backgroundColor: AppColors.surface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Veículo
-            DropdownButtonFormField<String>(
-              initialValue: veiculoSelecionado,
-              decoration: InputDecoration(
-                labelText: 'Veículo *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.directions_car),
-              ),
-              items: veiculos
-                  .map(
-                    (v) => DropdownMenuItem(
-                      value: v.id,
-                      child: Text(v.placa ?? ''),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                setState(() => veiculoSelecionado = value);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Motorista
-            DropdownButtonFormField<String>(
-              initialValue: motoristaSelecioando,
-              decoration: InputDecoration(
-                labelText: 'Motorista (Opcional)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.person),
-              ),
-              items: motoristas
-                  .map(
-                    (m) => DropdownMenuItem(
-                      value: m.id,
-                      child: Text(m.nome ?? ''),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                setState(() => motoristaSelecioando = value);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Data
-            TextField(
-              controller: dataController,
-              decoration: InputDecoration(
-                labelText: 'Data da Multa',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.calendar_today),
-              ),
-              readOnly: true,
-            ),
-            const SizedBox(height: 16),
-
-            // Tipo
-            DropdownButtonFormField<String>(
-              initialValue: tipoSelecionado,
-              decoration: InputDecoration(
-                labelText: 'Tipo de Multa *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'infraçao', child: Text('Infração')),
-                DropdownMenuItem(value: 'juizado', child: Text('Juizado')),
-              ],
-              onChanged: (value) {
-                setState(() => tipoSelecionado = value);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Valor
-            TextField(
-              controller: valorkController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Valor da Multa (R\$) *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.attach_money),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Descrição
-            TextField(
-              controller: descricaoController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Descrição da Multa *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                hintText:
-                    'Ex: Estacionamento proibido, excesso de velocidade...',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Foto
-            if (fotoBytes != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.primary),
-                ),
-                child: Image.memory(fotoBytes!, height: 200, fit: BoxFit.cover),
-              ),
-            ElevatedButton.icon(
-              onPressed: _selecionarFoto,
-              icon: const Icon(Icons.camera_alt),
-              label: Text(fotoBytes != null ? 'Trocar Foto' : 'Adicionar Foto'),
-            ),
-            const SizedBox(height: 24),
-
-            // Botão Salvar
-            ElevatedButton(
-              onPressed: isLoading ? null : _salvarMulta,
-              child: isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Registrar Multa'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class DetalheMultaPage extends StatefulWidget {
-  final Multa multa;
-  final VoidCallback onMultaAtualizada;
-
-  const DetalheMultaPage({
-    required this.multa,
-    required this.onMultaAtualizada,
-    super.key,
-  });
-
-  @override
-  State<DetalheMultaPage> createState() => _DetalheMultaPageState();
-}
-
-class _DetalheMultaPageState extends State<DetalheMultaPage> {
-  final supabase = Supabase.instance.client;
-  bool isLoading = false;
-
-  Future<void> _marcarComoPaga() async {
-    final confirmacao = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Marcar como Paga?'),
-        content: const Text('Deseja realmente marcar esta multa como paga?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmacao != true) return;
-    if (!mounted) return;
-
-    setState(() => isLoading = true);
-
-    try {
-      await supabase
-          .from('multas')
-          .update({
-            'status': 'paga',
-            'data_pagamento': DateTime.now().toIso8601String(),
-            'atualizado_em': DateTime.now().toIso8601String(),
-          })
-          .eq('id', widget.multa.id);
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Multa marcada como paga!')));
-
-      widget.onMultaAtualizada();
-      Navigator.pop(context);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detalhe da Multa'),
-        backgroundColor: AppColors.primary,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            // Header card
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                  ),
-                ],
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cor.withOpacity(0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Status',
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: cor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.gavel, color: cor, size: 22),
                       ),
-                      Chip(
-                        label: Text(widget.multa.status.toUpperCase()),
-                        backgroundColor: Colors.orange.withOpacity(0.3),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(tipo,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold)),
+                            Text(data,
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      // Valor + status
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(_fmtValue(valor),
+                              style: TextStyle(
+                                  color:
+                                      _paga ? AppColors.success : AppColors.danger,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: cor.withOpacity(0.13),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: cor.withOpacity(0.4)),
+                            ),
+                            child: Text(_status.toUpperCase(),
+                                style: TextStyle(
+                                    color: cor,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Valor',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  Text(
-                    'R\$ ${widget.multa.valor.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Tipo',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  Text(widget.multa.tipo, style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Descrição',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  Text(
-                    widget.multa.descricao,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  if (widget.multa.fotoUrl != null) ...[
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Foto',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    Image.network(
-                      widget.multa.fotoUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ],
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+
+            // Info
+            _section('Informações', [
+              _infoRow(Icons.directions_car_outlined, 'Veículo', _veiculoLabel),
+              _infoRow(Icons.person_outline, 'Motorista', _motoristaLabel),
+              _infoRow(Icons.category_outlined, 'Tipo', tipo),
+              _infoRow(Icons.calendar_today_outlined, 'Data', data),
+            ]),
+            const SizedBox(height: 14),
+
+            // Descrição
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Descrição',
+                      style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Text(descricao,
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 14)),
+                ],
+              ),
+            ),
+
+            // Foto
+            if (fotoUrl != null && fotoUrl.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  fotoUrl,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, _) => Container(
+                    height: 80,
+                    color: AppColors.backgroundSoft,
+                    child: const Center(
+                        child: Icon(Icons.broken_image,
+                            color: AppColors.textSecondary)),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
-            if (widget.multa.status != 'paga')
-              ElevatedButton(
-                onPressed: isLoading ? null : _marcarComoPaga,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: isLoading
+
+            // Botões de ação
+            if (!_paga) ...[
+              ElevatedButton.icon(
+                onPressed: salvando ? null : _marcarComoPaga,
+                icon: salvando
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Marcar como Paga'),
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.check_circle, color: Colors.white),
+                label: const Text('Marcar como Paga',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              if (_status != 'contestada') ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _marcarContestada,
+                  icon: const Icon(Icons.balance,
+                      color: Color(0xFF8B5CF6), size: 18),
+                  label: const Text('Contestar Multa',
+                      style: TextStyle(
+                          color: Color(0xFF8B5CF6), fontSize: 14)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF8B5CF6)),
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ] else
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppColors.success.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle,
+                        color: AppColors.success, size: 20),
+                    SizedBox(width: 8),
+                    Text('Multa paga',
+                        style: TextStyle(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
           ],
         ),
       ),
     );
   }
+
+  Widget _section(String title, List<Widget> rows) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Text(title,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4)),
+            ),
+            const Divider(height: 1, color: AppColors.border),
+            ...rows,
+          ],
+        ),
+      );
+
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 16),
+            const SizedBox(width: 10),
+            SizedBox(
+                width: 80,
+                child: Text(label,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 13))),
+            Expanded(
+                child: Text(value,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500))),
+          ],
+        ),
+      );
 }

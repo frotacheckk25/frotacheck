@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,6 +14,8 @@ import '../home/pneus/pneus_page.dart';
 import '../home/relatorios/relatorios_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
+import '../pages/ocorrencias_page.dart';
+import '../pages/troca_oleo_page.dart';
 import '../shared/widgets/app_logo.dart';
 import '../shared/widgets/frota_logo.dart';
 import '../shared/widgets/menu_card.dart';
@@ -61,7 +63,7 @@ String getProfileDisplayName({
       if (s.isNotEmpty) return s;
     }
   }
-  return 'Usuário';
+  return 'UsuÃ¡rio';
 }
 
 String? getProfilePhotoUrl(
@@ -196,6 +198,10 @@ class _HomePageState extends State<HomePage> {
   bool carregando = true;
   int mobileIndex = 0;
 
+  // Date range filter
+  DateTime _filterStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _filterEnd = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+
   int totalVeiculos = 0;
   int totalMotoristas = 0;
   int totalAbastecimentos = 0;
@@ -208,13 +214,14 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> topCostVehicles = [];
   List<Map<String, dynamic>> rankingMotoristas = [];
   List<Map<String, String>> alertasImportantes = [];
+  List<Map<String, dynamic>> ocorrenciasCriticasDash = [];
   List<String> monthlyFuelLabels = [];
   Map<String, double> custosPorCategoria = {};
 
-  // ─── Mock data fallbacks (shown when Supabase tables are empty) ────────────
+  // â”€â”€â”€ Mock data fallbacks (shown when Supabase tables are empty) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   static const _mockRanking = [
     {'name': 'Marcos Silva', 'score': 98},
-    {'name': 'João Santos', 'score': 92},
+    {'name': 'JoÃ£o Santos', 'score': 92},
     {'name': 'Carlos Lima', 'score': 87},
     {'name': 'Pedro Oliveira', 'score': 75},
     {'name': 'Lucas Almeida', 'score': 70},
@@ -227,11 +234,11 @@ class _HomePageState extends State<HomePage> {
     {'plate': 'MNO-7890', 'value': 5980.40},
   ];
   static const _mockAlertas = [
-    {'title': 'Troca de óleo vencida', 'subtitle': '3 veículos'},
+    {'title': 'Troca de Ã³leo vencida', 'subtitle': '3 veÃ­culos'},
     {'title': 'CNH vencendo em 30 dias', 'subtitle': '5 motoristas'},
-    {'title': 'Licenciamento vencendo', 'subtitle': '2 veículos'},
-    {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
-    {'title': 'Seguro vencendo em 15 dias', 'subtitle': '4 veículos'},
+    {'title': 'Licenciamento vencendo', 'subtitle': '2 veÃ­culos'},
+    {'title': 'Checklists pendentes', 'subtitle': '7 veÃ­culos'},
+    {'title': 'Seguro vencendo em 15 dias', 'subtitle': '4 veÃ­culos'},
   ];
   static const _rankingColors = [
     Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFF8B5CF6),
@@ -256,10 +263,10 @@ class _HomePageState extends State<HomePage> {
   }
   List<String> get _chartFuelLabels => monthlyFuelLabels.isNotEmpty ? monthlyFuelLabels : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
   Map<String, double> get _chartCustos => custosPorCategoria.values.any((v) => v > 0) ? custosPorCategoria : {
-    'Abastecimento': 59125.30, 'Manutenção': 19755.40, 'Pneus': 9876.50, 'Multas': 6172.20, 'Outros': 3704.00,
+    'Abastecimento': 59125.30, 'ManutenÃ§Ã£o': 19755.40, 'Pneus': 9876.50, 'Multas': 6172.20, 'Outros': 3704.00,
   };
   Map<String, int> get _chartOcorrencias => ocorrenciasPorCategoria.isNotEmpty ? ocorrenciasPorCategoria : {
-    'Acidente': 3, 'Falha Mecânica': 2, 'Pane': 1, 'Multa': 1, 'Outros': 1,
+    'Acidente': 3, 'Falha MecÃ¢nica': 2, 'Pane': 1, 'Multa': 1, 'Outros': 1,
   };
   List<Map<String, dynamic>> get _panelRanking => rankingMotoristas.isNotEmpty ? rankingMotoristas : List<Map<String, dynamic>>.from(_mockRanking);
   List<Map<String, dynamic>> get _panelVehicleCosts => topCostVehicles.isNotEmpty ? topCostVehicles : List<Map<String, dynamic>>.from(_mockVehicleCosts);
@@ -289,7 +296,7 @@ class _HomePageState extends State<HomePage> {
 
   Color _alertColor(String title) {
     final t = title.toLowerCase();
-    if (t.contains('óleo') || t.contains('manutenção') || t.contains('manutencao')) return AppColors.warning;
+    if (t.contains('Ã³leo') || t.contains('manutenÃ§Ã£o') || t.contains('manutencao')) return AppColors.warning;
     if (t.contains('seguro') || t.contains('vistoria')) return AppColors.success;
     if (t.contains('cnh') || t.contains('licenciamento')) return const Color(0xFFF97316);
     if (t.contains('checklist')) return AppColors.secondary;
@@ -298,7 +305,7 @@ class _HomePageState extends State<HomePage> {
 
   IconData _alertIcon(String title) {
     final t = title.toLowerCase();
-    if (t.contains('óleo')) return Icons.opacity;
+    if (t.contains('Ã³leo')) return Icons.opacity;
     if (t.contains('cnh')) return Icons.badge;
     if (t.contains('licenciamento')) return Icons.assignment;
     if (t.contains('checklist')) return Icons.checklist;
@@ -324,24 +331,27 @@ class _HomePageState extends State<HomePage> {
   Future<void> carregarDashboard() async {
     setState(() => carregando = true);
 
+    final dateStart = _filterStart.toIso8601String().split('T')[0];
+    final dateEnd = _filterEnd.toIso8601String().split('T')[0];
+
     try {
       final results = await Future.wait([
         _safeSelect('vehicles'), // 0
         _safeSelect('drivers'), // 1
-        supabase
-            .from('fuelings')
-            .select('*, vehicles (plate), drivers (name)'), // 2
-        _safeSelect('manutencoes'), // 3
-        _safeSelect('multas'), // 4
+        _fuelingsInRange(dateStart, dateEnd), // 2
+        _safeSelectFiltered('manutencoes', dateStart, dateEnd), // 3
+        _safeSelectFiltered('multas', dateStart, dateEnd), // 4
         _safeSelect('pneus'), // 5
-        _safeSelect('occurrences'), // 6
-        _safeSelect('ocorrencias'), // 7
+        _safeSelectFiltered('occurrences', dateStart, dateEnd), // 6
+        _safeSelectFiltered('ocorrencias', dateStart, dateEnd), // 7
         _safeSelect('documentos'), // 8
         supabase
             .from('fuelings')
             .select(
               'id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)',
             )
+            .gte('fuel_date', dateStart)
+            .lte('fuel_date', dateEnd)
             .order('created_at', ascending: false)
             .limit(3), // 9
       ]);
@@ -389,6 +399,31 @@ class _HomePageState extends State<HomePage> {
         motoristas: motoristas,
       );
 
+      // Carrega ocorrências críticas (Alta prioridade, não resolvidas)
+      List<Map<String, dynamic>> criticas = [];
+      try {
+        final critRes = await supabase
+            .from('occurrences')
+            .select('id, problem_type, priority, status, location, vehicle_id')
+            .neq('status', 'Resolvido')
+            .eq('priority', 'Alta')
+            .order('created_at', ascending: false)
+            .limit(5);
+        criticas = List<Map<String, dynamic>>.from(
+          (critRes as List).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+        // Resolve placa
+        for (final c in criticas) {
+          final vid = c['vehicle_id']?.toString();
+          if (vid != null) {
+            try {
+              final v = await supabase.from('vehicles').select('plate').eq('id', vid).maybeSingle();
+              c['_placa'] = v?['plate'] ?? '-';
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+
       setState(() {
         totalVeiculos = veiculos.length;
         totalMotoristas = motoristas.length;
@@ -402,6 +437,7 @@ class _HomePageState extends State<HomePage> {
         rankingMotoristas = ranking;
         topCostVehicles = topVehicles;
         alertasImportantes = alerts;
+        ocorrenciasCriticasDash = criticas;
         custosPorCategoria = costByCategory;
       });
     } catch (e) {
@@ -421,6 +457,53 @@ class _HomePageState extends State<HomePage> {
       debugPrint('Falha ao carregar $table: $e');
     }
     return [];
+  }
+
+  Future<List<Map<String, dynamic>>> _fuelingsInRange(
+    String dateStart,
+    String dateEnd,
+  ) async {
+    try {
+      final response = await supabase
+          .from('fuelings')
+          .select('*, vehicles (plate), drivers (name)')
+          .gte('fuel_date', dateStart)
+          .lte('fuel_date', dateEnd) as List;
+      return response
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      try {
+        final response = await supabase
+            .from('fuelings')
+            .select('*, vehicles (plate), drivers (name)') as List;
+        return response
+            .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+            .toList();
+      } catch (_) {
+        return [];
+      }
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _safeSelectFiltered(
+    String table,
+    String dateStart,
+    String dateEnd, {
+    String dateCol = 'created_at',
+  }) async {
+    try {
+      final response = await supabase
+          .from(table)
+          .select()
+          .gte(dateCol, dateStart)
+          .lte(dateCol, '${dateEnd}T23:59:59') as List;
+      return response
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return _safeSelect(table);
+    }
   }
 
   double _toDouble(dynamic value) {
@@ -475,17 +558,28 @@ class _HomePageState extends State<HomePage> {
   }) async {
     try {
       final supAlerts = await supabase
-          .from('alertas')
+          .from('alerts')
           .select()
+          .eq('status', 'ativo')
           .order('created_at', ascending: false)
           .limit(8);
       final supAlertsList = supAlerts as List;
       if (supAlertsList.isNotEmpty) {
-        return supAlertsList.map<Map<String, String>>((a) {
+        // Ordena: error (crítico) primeiro, depois warning, depois info
+        final sorted = List<Map<String, dynamic>>.from(
+          supAlertsList.map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+        const ordemTipo = {'error': 0, 'warning': 1, 'info': 2};
+        sorted.sort((a, b) {
+          final ta = ordemTipo[a['tipo'] ?? 'info'] ?? 2;
+          final tb = ordemTipo[b['tipo'] ?? 'info'] ?? 2;
+          return ta.compareTo(tb);
+        });
+        return sorted.map<Map<String, String>>((a) {
           return {
             'title': (a['title'] ?? a['titulo'] ?? '').toString(),
-            'subtitle': (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '')
-                .toString(),
+            'subtitle': (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '').toString(),
+            'tipo': (a['tipo'] ?? 'info').toString(),
           };
         }).toList();
       }
@@ -498,10 +592,10 @@ class _HomePageState extends State<HomePage> {
 
     for (final o in combinedOccurrences.where(_isOpenStatus).take(5)) {
       final tipo =
-          o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
+          o['problem_type'] ?? o['type'] ?? o['category'] ?? 'OcorrÃªncia';
       built.add({
-        'title': 'Ocorrência: ${tipo.toString()}',
-        'subtitle': '${o['vehicles']?['plate'] ?? ''} • ${o['status'] ?? ''}',
+        'title': 'OcorrÃªncia: ${tipo.toString()}',
+        'subtitle': '${o['vehicles']?['plate'] ?? ''} â€¢ ${o['status'] ?? ''}',
       });
     }
 
@@ -553,7 +647,6 @@ class _HomePageState extends State<HomePage> {
 
   List<FlSpot> _buildMonthlyFuelSpots(List<dynamic> abastecimentos) {
     final months = <int, double>{};
-    final now = DateTime.now();
     final labels = <String>[];
 
     for (var item in abastecimentos) {
@@ -564,19 +657,26 @@ class _HomePageState extends State<HomePage> {
       months[key] = (months[key] ?? 0) + _toDouble(item['liters']);
     }
 
+    // Build month list within the selected filter range
+    final rangeStart = DateTime(_filterStart.year, _filterStart.month);
+    final rangeEnd = DateTime(_filterEnd.year, _filterEnd.month);
+    final monthList = <DateTime>[];
+    var cur = rangeStart;
+    while (!cur.isAfter(rangeEnd)) {
+      monthList.add(cur);
+      cur = DateTime(cur.year, cur.month + 1);
+    }
+    // Cap at 12 months to keep chart readable
+    final display = monthList.length > 12
+        ? monthList.sublist(monthList.length - 12)
+        : monthList;
+
     final spots = <FlSpot>[];
-    for (var i = 0; i <= 5; i++) {
-      final monthOffset = 5 - i;
-      final date = DateTime(now.year, now.month - monthOffset);
-      final adjustedDate = date.month <= 0
-          ? DateTime(date.year - 1, date.month + 12)
-          : date;
-      final key = adjustedDate.year * 100 + adjustedDate.month;
-      final total = months[key] ?? 0;
-      spots.add(FlSpot(i.toDouble(), total));
-      labels.add(
-        '${_shortMonth(adjustedDate.month)} ${adjustedDate.year.toString().substring(2)}',
-      );
+    for (var i = 0; i < display.length; i++) {
+      final m = display[i];
+      final key = m.year * 100 + m.month;
+      spots.add(FlSpot(i.toDouble(), months[key] ?? 0));
+      labels.add('${_shortMonth(m.month)}/${m.year.toString().substring(2)}');
     }
 
     monthlyFuelLabels = List.unmodifiable(labels);
@@ -624,25 +724,28 @@ class _HomePageState extends State<HomePage> {
     }
 
     for (var item in manutencoes) {
-      manutencaoTotal += _toDouble(item['cost']);
-      manutencaoTotal += _toDouble(item['valor']);
-      manutencaoTotal += _toDouble(item['total_value']);
+      final cost = _toDouble(item['cost']);
+      final valor = _toDouble(item['valor']);
+      final totalValue = _toDouble(item['total_value']);
+      manutencaoTotal += cost > 0 ? cost : (valor > 0 ? valor : totalValue);
     }
 
     for (var item in pneus) {
-      pneuTotal += _toDouble(item['cost']);
-      pneuTotal += _toDouble(item['valor']);
+      final cost = _toDouble(item['cost']);
+      final valor = _toDouble(item['valor']);
+      pneuTotal += cost > 0 ? cost : valor;
     }
 
     for (var item in multas) {
-      multaTotal += _toDouble(item['amount']);
-      multaTotal += _toDouble(item['valor']);
-      multaTotal += _toDouble(item['fine_value']);
+      final amount = _toDouble(item['amount']);
+      final valor = _toDouble(item['valor']);
+      final fineValue = _toDouble(item['fine_value']);
+      multaTotal += amount > 0 ? amount : (valor > 0 ? valor : fineValue);
     }
 
     return {
       'Abastecimento': abastecimentoTotal,
-      'Manutenção': manutencaoTotal,
+      'ManutenÃ§Ã£o': manutencaoTotal,
       'Pneus': pneuTotal,
       'Multas': multaTotal,
     };
@@ -733,7 +836,7 @@ class _HomePageState extends State<HomePage> {
               icon: const Icon(Icons.notifications_none),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notificações (ambiente de teste)')),
+                  const SnackBar(content: Text('NotificaÃ§Ãµes (ambiente de teste)')),
                 );
               },
             ),
@@ -804,7 +907,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     _buildSidebarItem(
                                       Icons.directions_car,
-                                      'Veículos',
+                                      'VeÃ­culos',
                                       () async {
                                         await Navigator.push(
                                           context,
@@ -846,7 +949,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     _buildSidebarItem(
                                       Icons.build,
-                                      'Manutenções',
+                                      'ManutenÃ§Ãµes',
                                       () async {
                                         await Navigator.push(
                                           context,
@@ -874,7 +977,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     _buildSidebarItem(
                                       Icons.report_gmailerrorred,
-                                      'Ocorrências',
+                                      'OcorrÃªncias',
                                       () async {
                                         await Navigator.push(
                                           context,
@@ -927,7 +1030,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     _buildSidebarItem(
                                       Icons.bar_chart,
-                                      'Relatórios',
+                                      'RelatÃ³rios',
                                       () async {
                                         await Navigator.push(
                                           context,
@@ -954,7 +1057,7 @@ class _HomePageState extends State<HomePage> {
                                     ),
                                     _buildSidebarItem(
                                       Icons.settings,
-                                      'Configurações',
+                                      'ConfiguraÃ§Ãµes',
                                       () async {
                                         await Navigator.push(
                                           context,
@@ -1048,7 +1151,7 @@ class _HomePageState extends State<HomePage> {
                 physics: const BouncingScrollPhysics(),
                 children: [
                   _buildMobileStatCard(
-                    'Veículos',
+                    'VeÃ­culos',
                     '$totalVeiculos',
                     AppColors.primary,
                   ),
@@ -1089,7 +1192,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         children: [
           const Text(
-            'Veículos',
+            'VeÃ­culos',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -1098,13 +1201,13 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 14),
           const Text(
-            'Acesse a lista completa de veículos cadastrados e mantenha a frota atualizada.',
+            'Acesse a lista completa de veÃ­culos cadastrados e mantenha a frota atualizada.',
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
           MenuCard(
             icon: Icons.directions_car,
-            title: 'Ver todos os veículos',
+            title: 'Ver todos os veÃ­culos',
             color: const Color(0xFF0D47A1),
             onTap: () async {
               await Navigator.push(
@@ -1115,9 +1218,9 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           const SizedBox(height: 20),
-          _buildMobileInfoTile('Total de veículos', '$totalVeiculos'),
+          _buildMobileInfoTile('Total de veÃ­culos', '$totalVeiculos'),
           const SizedBox(height: 12),
-          _buildMobileInfoTile('Em manutenção', '$totalEmManutencao'),
+          _buildMobileInfoTile('Em manutenÃ§Ã£o', '$totalEmManutencao'),
         ],
       ),
     );
@@ -1128,7 +1231,7 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       children: [
         const Text(
-          'Ações',
+          'AÃ§Ãµes',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -1138,7 +1241,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 16),
         MenuCard(
           icon: Icons.directions_car,
-          title: 'Veículos',
+          title: 'VeÃ­culos',
           color: const Color(0xFF0D47A1),
           onTap: () async {
             await Navigator.push(
@@ -1164,7 +1267,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 12),
         MenuCard(
           icon: Icons.build,
-          title: 'Manutenções',
+          title: 'ManutenÃ§Ãµes',
           color: const Color(0xFF7C3AED),
           onTap: () async {
             await Navigator.push(
@@ -1177,7 +1280,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 12),
         MenuCard(
           icon: Icons.warning,
-          title: 'Ocorrências',
+          title: 'OcorrÃªncias',
           color: const Color(0xFFF97316),
           onTap: () async {
             await Navigator.push(
@@ -1231,18 +1334,18 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 16),
         _buildAlertCard(
-          'Manutenção agendada',
-          'Verifique o checklist do veículo X.',
+          'ManutenÃ§Ã£o agendada',
+          'Verifique o checklist do veÃ­culo X.',
         ),
         const SizedBox(height: 12),
         _buildAlertCard(
-          'Ocorrência aberta',
-          'Novo registro de ocorrência em viagem.',
+          'OcorrÃªncia aberta',
+          'Novo registro de ocorrÃªncia em viagem.',
         ),
         const SizedBox(height: 12),
         _buildAlertCard(
-          'Combustível baixo',
-          'Abastecer veículo Y nas próximas 24h.',
+          'CombustÃ­vel baixo',
+          'Abastecer veÃ­culo Y nas prÃ³ximas 24h.',
         ),
       ],
     );
@@ -1303,7 +1406,7 @@ class _HomePageState extends State<HomePage> {
           );
           carregarDashboard();
         }),
-        _buildMenuOption(Icons.settings, 'Configurações', () async {
+        _buildMenuOption(Icons.settings, 'ConfiguraÃ§Ãµes', () async {
           await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
@@ -1343,9 +1446,9 @@ class _HomePageState extends State<HomePage> {
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.directions_car),
-          label: 'Veículos',
+          label: 'VeÃ­culos',
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.flash_on), label: 'Ações'),
+        BottomNavigationBarItem(icon: Icon(Icons.flash_on), label: 'AÃ§Ãµes'),
         BottomNavigationBarItem(icon: Icon(Icons.warning), label: 'Alertas'),
         BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Menu'),
       ],
@@ -1400,7 +1503,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProfileCard() {
-    // Perfil fixo conforme especificação
+    final user = supabase.auth.currentUser;
+    final metadata = user?.userMetadata ?? {};
+    final email = user?.email ?? '';
+    final displayName = getProfileDisplayName(metadata: metadata, supaEmail: email);
+    final initials = _getInitials(displayName);
+
     return InkWell(
       onTap: () async {
         await Navigator.push(
@@ -1419,19 +1527,22 @@ class _HomePageState extends State<HomePage> {
         ),
         child: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 20,
               backgroundColor: AppColors.primary,
-              child: Icon(Icons.person, color: Colors.white, size: 18),
+              child: Text(
+                initials,
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
-                    'Fernando Admin',
-                    style: TextStyle(
+                    displayName,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
@@ -1439,11 +1550,12 @@ class _HomePageState extends State<HomePage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Administrador',
-                    style: TextStyle(
+                    email.isNotEmpty ? email : 'Administrador',
+                    style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 11.5,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -1610,14 +1722,149 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _currentDateRangeLabel() {
-    final now = DateTime.now();
-    final firstDay = DateTime(now.year, now.month, 1);
-    final lastDay = DateTime(now.year, now.month + 1, 0);
     String pad(int n) => n.toString().padLeft(2, '0');
-    return '${pad(firstDay.day)}/${pad(firstDay.month)}/${firstDay.year} - ${pad(lastDay.day)}/${pad(lastDay.month)}/${lastDay.year}';
+    return '${pad(_filterStart.day)}/${pad(_filterStart.month)}/${_filterStart.year} - ${pad(_filterEnd.day)}/${pad(_filterEnd.month)}/${_filterEnd.year}';
   }
 
-  // Estilo de botão compacto — sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
+  Future<void> _pickDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _filterStart, end: _filterEnd),
+      locale: const Locale('pt', 'BR'),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+            primary: AppColors.secondary,
+            onPrimary: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() {
+        _filterStart = picked.start;
+        _filterEnd = picked.end;
+      });
+      carregarDashboard();
+    }
+  }
+
+  void _showSearchDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (ctx) => _GlobalSearchDialog(
+        onNavigate: (page) {
+          Navigator.pop(ctx);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page))
+              .then((_) => carregarDashboard());
+        },
+      ),
+    );
+  }
+
+  void _showAlertsPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _AlertsPanelSheet(
+        onViewAll: () {
+          Navigator.pop(ctx);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()))
+              .then((_) => carregarDashboard());
+        },
+      ),
+    );
+  }
+
+  void _showNovoRegistroMenu(BuildContext context) {
+    final items = [
+      _RegistroOption(Icons.directions_car, 'Novo VeÃ­culo', const Color(0xFF0ea5e9), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.person, 'Novo Motorista', const Color(0xFF22c55e), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.local_gas_station, 'Novo Abastecimento', const Color(0xFFeab308), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.receipt_long, 'Nova Multa', const Color(0xFFef4444), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.build, 'Nova ManutenÃ§Ã£o', const Color(0xFF7C3AED), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.opacity, 'Nova Troca de Ã“leo', const Color(0xFF8B5CF6), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrocaOleoPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.warning_amber, 'Nova OcorrÃªncia', const Color(0xFFF97316), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OcorrenciasPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.description, 'Novo Documento', const Color(0xFF0ea5e9), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.tire_repair, 'Novo Controle de Pneu', const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage())).then((_) => carregarDashboard())),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Novo Registro', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 3,
+              childAspectRatio: 1.1,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              children: items.map((opt) => InkWell(
+                onTap: () { Navigator.pop(ctx); opt.action(); },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSoft,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: opt.color.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(opt.icon, color: opt.color, size: 20),
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(opt.label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w500), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Estilo de botÃ£o compacto â€” sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
   static final _compactBtn = ButtonStyle(
     minimumSize: WidgetStatePropertyAll(const Size(0, 36)),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1638,7 +1885,6 @@ class _HomePageState extends State<HomePage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Título — usa Flexible para nunca ser comprimido a zero
         Flexible(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1657,7 +1903,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 2),
               const Text(
-                'Visão geral da frota',
+                'VisÃ£o geral da frota',
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1666,34 +1912,37 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(width: 16),
-        // Data
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                _currentDateRangeLabel(),
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-              ),
-            ],
+        // Date range â€” clickable to open date range picker
+        GestureDetector(
+          onTap: _pickDateRange,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Text(
+                  _currentDateRangeLabel(),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(width: 8),
-        _iconBtn(Icons.search_outlined, 'Busca'),
+        _iconBtn(Icons.search_outlined, 'Busca', onTap: _showSearchDialog),
         const SizedBox(width: 6),
-        _iconBtn(Icons.notifications_none_outlined, 'Alertas'),
+        _iconBtn(Icons.notifications_none_outlined, 'Alertas', onTap: _showAlertsPanel),
         const SizedBox(width: 8),
         if (!compact) ...[
           OutlinedButton.icon(
-            onPressed: () {},
+            onPressed: _pickDateRange,
             icon: const Icon(Icons.tune, size: 14),
             label: const Text('Filtros'),
             style: _compactBtn.copyWith(
@@ -1705,7 +1954,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 8),
         ],
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () => _showNovoRegistroMenu(context),
           icon: const Icon(Icons.add, size: 15),
           label: const Text('Novo registro'),
           style: _compactBtn.copyWith(
@@ -1717,30 +1966,33 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _iconBtn(IconData icon, String tooltip) {
+  Widget _iconBtn(IconData icon, String tooltip, {VoidCallback? onTap}) {
     return Tooltip(
       message: tooltip,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: AppColors.border),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Icon(icon, color: AppColors.textSecondary, size: 18),
         ),
-        child: Icon(icon, color: AppColors.textSecondary, size: 18),
       ),
     );
   }
 
   Widget _buildTopKpiRow(double width) {
     final cards = [
-      _buildKpiTile('Total de Veículos',   '$_kpiTotalVeiculos',  Icons.local_shipping,      const Color(0xFF0ea5e9), subtitle: 'Todos os veículos'),
-      _buildKpiTile('Veículos Ativos',     '$_kpiVeiculosAtivos', Icons.directions_car,       const Color(0xFF22c55e), subtitle: 'Em operação'),
-      _buildKpiTile('Em Manutenção',       '$_kpiEmManutencao',   Icons.build,                const Color(0xFFeab308), subtitle: 'Indisponíveis'),
+      _buildKpiTile('Total de VeÃ­culos',   '$_kpiTotalVeiculos',  Icons.local_shipping,      const Color(0xFF0ea5e9), subtitle: 'Todos os veÃ­culos'),
+      _buildKpiTile('VeÃ­culos Ativos',     '$_kpiVeiculosAtivos', Icons.directions_car,       const Color(0xFF22c55e), subtitle: 'Em operaÃ§Ã£o'),
+      _buildKpiTile('Em ManutenÃ§Ã£o',       '$_kpiEmManutencao',   Icons.build,                const Color(0xFFeab308), subtitle: 'IndisponÃ­veis'),
       _buildKpiTile('Motoristas Ativos',   '$_kpiMotoristas',     Icons.person,               const Color(0xFF0ea5e9), subtitle: 'Motoristas'),
       _buildKpiTile('Gasto Mensal',        _kpiGastoMensal,       Icons.account_balance_wallet, const Color(0xFF7C3AED), subtitle: 'Total de gastos'),
-      _buildKpiTile('Ocorrências Abertas', '$_kpiOcorrencias',    Icons.notifications_none,   const Color(0xFF0ea5e9), subtitle: 'Aguardando resolução'),
+      _buildKpiTile('OcorrÃªncias Abertas', '$_kpiOcorrencias',    Icons.notifications_none,   const Color(0xFF0ea5e9), subtitle: 'Aguardando resoluÃ§Ã£o'),
     ];
     return LayoutBuilder(
       builder: (_, constraints) {
@@ -1925,7 +2177,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader('Consumo de Combustível', 'Litros por mês', Icons.local_gas_station, AppColors.secondary),
+          _cardHeader('Consumo de CombustÃ­vel', 'Litros por mÃªs', Icons.local_gas_station, AppColors.secondary),
           const SizedBox(height: 12),
           Expanded(
             child: LineChart(
@@ -2057,7 +2309,7 @@ class _HomePageState extends State<HomePage> {
             return {
               'color': _dashboardPieColors[index % _dashboardPieColors.length],
               'label':
-                  '${entry.value.key} — ${percent.toStringAsFixed(0)}% • R\$ ${value.toStringAsFixed(2)}',
+                  '${entry.value.key} â€” ${percent.toStringAsFixed(0)}% â€¢ R\$ ${value.toStringAsFixed(2)}',
             };
           }).toList()
         : <Map<String, dynamic>>[];
@@ -2068,7 +2320,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader('Custos da Frota', 'Distribuição por categoria', Icons.pie_chart_outline, _dashboardPieColors[0]),
+          _cardHeader('Custos da Frota', 'DistribuiÃ§Ã£o por categoria', Icons.pie_chart_outline, _dashboardPieColors[0]),
           const SizedBox(height: 10),
           Expanded(
             child: Row(
@@ -2147,7 +2399,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader('Ocorrências por Categoria', 'Quantidade registrada', Icons.bar_chart, AppColors.secondary),
+          _cardHeader('OcorrÃªncias por Categoria', 'Quantidade registrada', Icons.bar_chart, AppColors.secondary),
           const SizedBox(height: 12),
           Expanded(
             child: Column(
@@ -2242,20 +2494,92 @@ class _HomePageState extends State<HomePage> {
   Widget _buildAlertsPanel() {
     return _buildDashboardCard(
       padding: const EdgeInsets.all(16),
-      glowColor: AppColors.warning,
+      glowColor: ocorrenciasCriticasDash.isNotEmpty ? AppColors.danger : AppColors.warning,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelHeader('Alertas Importantes', Icons.warning_amber_rounded, AppColors.warning, onTap: () async {
+          _panelHeader('Alertas & Ocorrências', Icons.warning_amber_rounded, AppColors.warning, onTap: () async {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
             carregarDashboard();
           }),
           const SizedBox(height: 12),
+
+          // Ocorrências críticas em destaque
+          if (ocorrenciasCriticasDash.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.danger.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber, color: AppColors.danger, size: 14),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${ocorrenciasCriticasDash.length} ocorrência(s) crítica(s) em aberto',
+                    style: const TextStyle(color: AppColors.danger, fontSize: 11, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...ocorrenciasCriticasDash.take(3).map((o) {
+              final tipo = o['problem_type']?.toString() ?? 'Ocorrência';
+              final placa = o['_placa']?.toString() ?? '-';
+              final local = o['location']?.toString() ?? '';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                    carregarDashboard();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.danger.withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.report_problem, color: AppColors.danger, size: 14),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('$tipo — $placa',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                              if (local.isNotEmpty)
+                                Text(local, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            const Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 8),
+          ],
+
           ..._panelAlertas.map(
             (alerta) {
               final title = alerta['title'] ?? '';
+              final tipo = alerta['tipo'] ?? 'info';
               final iconData = _alertIcon(title);
-              final iconColor = _alertColor(title);
+              final iconColor = tipo == 'error'
+                  ? AppColors.danger
+                  : tipo == 'warning'
+                      ? AppColors.warning
+                      : _alertColor(title);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
@@ -2263,7 +2587,7 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSoft,
                     borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: iconColor.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: [
@@ -2387,7 +2711,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelHeader('Veículos com Maior Custo', Icons.account_balance_wallet_outlined, const Color(0xFF7C3AED), onTap: () async {
+          _panelHeader('VeÃ­culos com Maior Custo', Icons.account_balance_wallet_outlined, const Color(0xFF7C3AED), onTap: () async {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
             carregarDashboard();
           }),
@@ -2430,7 +2754,7 @@ class _HomePageState extends State<HomePage> {
                           style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                         const Text(
-                          'Custo no mês',
+                          'Custo no mÃªs',
                           style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                         ),
                       ],
@@ -2452,6 +2776,389 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+}
+
+// â”€â”€â”€ Alerts Panel Sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class _AlertsPanelSheet extends StatefulWidget {
+  final VoidCallback onViewAll;
+  const _AlertsPanelSheet({required this.onViewAll});
+
+  @override
+  State<_AlertsPanelSheet> createState() => _AlertsPanelSheetState();
+}
+
+class _AlertsPanelSheetState extends State<_AlertsPanelSheet> {
+  final supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> alertas = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await supabase
+          .from('alerts')
+          .select()
+          .eq('status', 'ativo')
+          .order('created_at', ascending: false)
+          .limit(8);
+      if (mounted) setState(() { alertas = List<Map<String, dynamic>>.from(res); loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Color _color(String? tipo) {
+    switch (tipo) {
+      case 'error': return AppColors.danger;
+      case 'warning': return AppColors.warning;
+      default: return AppColors.secondary;
+    }
+  }
+
+  IconData _icon(String? title) {
+    final t = (title ?? '').toLowerCase();
+    if (t.contains('Ã³leo') || t.contains('oleo')) return Icons.opacity;
+    if (t.contains('cnh')) return Icons.badge;
+    if (t.contains('licen')) return Icons.assignment;
+    if (t.contains('pneu')) return Icons.tire_repair;
+    if (t.contains('ocorrÃªncia') || t.contains('ocorr')) return Icons.report_problem;
+    if (t.contains('seguro')) return Icons.security;
+    return Icons.warning_amber;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (_, controller) => Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                const Icon(Icons.notifications_active, color: AppColors.warning, size: 20),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('Alertas Pendentes', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                if (!loading)
+                  Text('${alertas.length}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : alertas.isEmpty
+                    ? const Center(child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text('Nenhum alerta pendente', style: TextStyle(color: AppColors.textSecondary)),
+                      ))
+                    : ListView.separated(
+                        controller: controller,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: alertas.length,
+                        separatorBuilder: (context, i) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          final a = alertas[i];
+                          final title = a['title'] ?? a['titulo'] ?? 'Alerta';
+                          final sub = a['subtitle'] ?? a['descricao'] ?? '';
+                          final cor = _color(a['tipo']?.toString());
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.backgroundSoft,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: cor.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(color: cor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                                  child: Icon(_icon(title), color: cor, size: 16),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                                      if (sub.isNotEmpty) Text(sub, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: widget.onViewAll,
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('Ver todos os alertas'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.secondary,
+                  side: const BorderSide(color: AppColors.secondary),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// â”€â”€â”€ Global Search Dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class _GlobalSearchDialog extends StatefulWidget {
+  final void Function(Widget page) onNavigate;
+  const _GlobalSearchDialog({required this.onNavigate});
+
+  @override
+  State<_GlobalSearchDialog> createState() => _GlobalSearchDialogState();
+}
+
+class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
+  final supabase = Supabase.instance.client;
+  final _ctrl = TextEditingController();
+  List<_SearchResult> _results = [];
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String q) async {
+    if (q.trim().length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+    setState(() => _searching = true);
+    final term = q.trim().toLowerCase();
+    final out = <_SearchResult>[];
+
+    try {
+      // Vehicles by plate or model
+      final vehicles = await supabase
+          .from('vehicles')
+          .select('id, plate, model')
+          .or('plate.ilike.%$term%,model.ilike.%$term%')
+          .limit(5);
+      for (final v in vehicles as List) {
+        out.add(_SearchResult(
+          icon: Icons.directions_car,
+          title: v['plate']?.toString() ?? '',
+          subtitle: v['model']?.toString() ?? 'VeÃ­culo',
+          color: const Color(0xFF0ea5e9),
+          page: const VeiculosPage(),
+        ));
+      }
+    } catch (_) {}
+
+    try {
+      // Drivers by name
+      final drivers = await supabase
+          .from('drivers')
+          .select('id, name')
+          .ilike('name', '%$term%')
+          .limit(5);
+      for (final d in drivers as List) {
+        out.add(_SearchResult(
+          icon: Icons.person,
+          title: d['name']?.toString() ?? '',
+          subtitle: 'Motorista',
+          color: const Color(0xFF22c55e),
+          page: const MotoristasPage(),
+        ));
+      }
+    } catch (_) {}
+
+    try {
+      // Occurrences by problem or driver name
+      final occs = await supabase
+          .from('occurrences')
+          .select('id, problem_type, driver_name, status')
+          .or('problem_type.ilike.%$term%,driver_name.ilike.%$term%')
+          .limit(4);
+      for (final o in occs as List) {
+        out.add(_SearchResult(
+          icon: Icons.report_problem,
+          title: o['problem_type']?.toString() ?? 'OcorrÃªncia',
+          subtitle: o['driver_name']?.toString() ?? '',
+          color: const Color(0xFFF97316),
+          page: const OcorrenciasPage(),
+        ));
+      }
+    } catch (_) {}
+
+    try {
+      // Multas by vehicle plate
+      final multas = await supabase
+          .from('multas')
+          .select('id, placa, descricao')
+          .ilike('placa', '%$term%')
+          .limit(4);
+      for (final m in multas as List) {
+        out.add(_SearchResult(
+          icon: Icons.receipt_long,
+          title: m['placa']?.toString() ?? 'Multa',
+          subtitle: m['descricao']?.toString() ?? 'InfraÃ§Ã£o',
+          color: const Color(0xFFef4444),
+          page: const MultasPage(),
+        ));
+      }
+    } catch (_) {}
+
+    if (mounted) setState(() { _results = out; _searching = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: TextField(
+                controller: _ctrl,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Buscar placa, motorista, ocorrÃªncia...',
+                  hintStyle: const TextStyle(color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                  suffixIcon: _searching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : _ctrl.text.isNotEmpty
+                          ? IconButton(icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18), onPressed: () { _ctrl.clear(); setState(() => _results = []); })
+                          : null,
+                  filled: true,
+                  fillColor: AppColors.backgroundSoft,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onChanged: _search,
+              ),
+            ),
+            if (_results.isEmpty && _ctrl.text.length >= 2 && !_searching)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Text('Nenhum resultado encontrado', style: TextStyle(color: AppColors.textSecondary)),
+              )
+            else if (_results.isNotEmpty)
+              Flexible(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  shrinkWrap: true,
+                  itemCount: _results.length,
+                  separatorBuilder: (context, i) => const SizedBox(height: 6),
+                  itemBuilder: (_, i) {
+                    final r = _results[i];
+                    return InkWell(
+                      onTap: () => widget.onNavigate(r.page),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundSoft,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: r.color.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(r.icon, color: r.color, size: 16),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(r.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                                  if (r.subtitle.isNotEmpty)
+                                    Text(r.subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios, color: AppColors.textSecondary, size: 13),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              )
+            else
+              const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Fechar', style: TextStyle(color: AppColors.textSecondary)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchResult {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final Widget page;
+  const _SearchResult({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.page,
+  });
+}
+
+class _RegistroOption {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback action;
+  const _RegistroOption(this.icon, this.label, this.color, this.action);
 }
 
 class _PieLegend extends StatelessWidget {

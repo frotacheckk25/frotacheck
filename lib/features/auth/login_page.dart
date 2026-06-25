@@ -9,7 +9,7 @@ import 'register_page.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _sky = Color(0xFF0ea5e9);
-const _skyDark = Color(0xFF0369a1);
+
 const _navy = Color(0xFF030A16);
 const _card = Color(0xFF0a1628);
 const _surface = Color(0xFF112035);
@@ -23,7 +23,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const _bgAsset = 'assets/images/login_bg.jpg';
+  static const _bgAsset = 'assets/images/lofoFROTA.png';
 
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
@@ -97,8 +97,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
     try {
-      await (Supabase.instance.client.auth as dynamic)
-          .resetPasswordForEmail(email);
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Email de recuperação enviado')),
@@ -159,28 +158,19 @@ class _Background extends StatelessWidget {
       children: [
         Image.asset(
           asset,
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
+          fit: BoxFit.fitWidth,
+          alignment: Alignment.topCenter,
           errorBuilder: (_, _, _) => const ColoredBox(color: _navy),
         ),
-        // Hero side (left) barely dimmed so image breathes; form side (right) darker for readability
+        // Left side: completely transparent — cores vivas da imagem aparecem
+        // Right side: escuro para o formulário ser legível
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0x66030A16), Color(0xEA030A16)],
-              stops: [0.0, 0.72],
+              colors: [Color(0x00030A16), Color(0xF2030A16)],
+              stops: [0.42, 0.72],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-            ),
-          ),
-        ),
-        // Subtle bottom vignette
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.transparent, Color(0x99030A16)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
             ),
           ),
         ),
@@ -199,13 +189,7 @@ class _DesktopLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          flex: 6,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 48),
-            child: _HeroPanel(),
-          ),
-        ),
+        const Spacer(flex: 6),
         Expanded(
           flex: 4,
           child: Center(
@@ -237,15 +221,7 @@ class _TabletLayout extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            children: [
-              const _LogoWidget(iconSize: 36),
-              const SizedBox(height: 32),
-              _FormCard(state: state),
-              const SizedBox(height: 32),
-              const _FeaturesRow(),
-            ],
-          ),
+          child: _FormCard(state: state),
         ),
       ),
     );
@@ -258,279 +234,10 @@ class _MobileLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Column(
-        children: [
-          const _LogoWidget(iconSize: 30),
-          const SizedBox(height: 28),
-          _FormCard(state: state),
-          const SizedBox(height: 28),
-          const _FeaturesRow(),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Hero Panel (desktop only) ────────────────────────────────────────────────
-
-class _HeroPanel extends StatelessWidget {
-  const _HeroPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        _LogoWidget(iconSize: 42),
-        SizedBox(height: 48),
-        Text(
-          'Gestão completa\nda sua frota na\npalma da sua mão.',
-          style: TextStyle(
-            color: _sky,
-            fontSize: 40,
-            fontWeight: FontWeight.w800,
-            height: 1.2,
-          ),
-        ),
-        SizedBox(height: 48),
-        _FeaturesRow(),
-        SizedBox(height: 48),
-        _DashboardPreviewCard(),
-      ],
-    );
-  }
-}
-
-// ─── Logo ─────────────────────────────────────────────────────────────────────
-
-class _LogoWidget extends StatelessWidget {
-  const _LogoWidget({this.iconSize = 36});
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final box = iconSize + 16;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: box,
-          height: box,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_skyDark, _sky],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(box * 0.26),
-            boxShadow: [
-              BoxShadow(
-                color: _sky.withOpacity(0.45),
-                blurRadius: 18,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Icon(Icons.shield, color: Colors.white, size: iconSize * 0.65),
-        ),
-        SizedBox(width: iconSize * 0.35),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'FROTA',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: iconSize * 0.62,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-                height: 1.05,
-              ),
-            ),
-            Text(
-              'CHECK',
-              style: TextStyle(
-                color: _sky,
-                fontSize: iconSize * 0.62,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-                height: 1.05,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Feature badges ───────────────────────────────────────────────────────────
-
-class _FeaturesRow extends StatelessWidget {
-  const _FeaturesRow();
-
-  static const _items = [
-    (Icons.shield, 'Seguro'),
-    (Icons.insights, 'Inteligente'),
-    (Icons.wifi, 'Conectado'),
-    (Icons.speed, 'Eficiente'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 28,
-      runSpacing: 16,
-      children: _items.map((e) => _FeatureBadge(icon: e.$1, label: e.$2)).toList(),
-    );
-  }
-}
-
-class _FeatureBadge extends StatelessWidget {
-  const _FeatureBadge({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _sky.withOpacity(0.10),
-            shape: BoxShape.circle,
-            border: Border.all(color: _sky.withOpacity(0.25), width: 1.5),
-          ),
-          child: Icon(icon, color: _sky, size: 22),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Dashboard preview card (hero) ────────────────────────────────────────────
-
-class _DashboardPreviewCard extends StatelessWidget {
-  const _DashboardPreviewCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: _sky.withOpacity(0.07),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _sky.withOpacity(0.18), width: 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.public, color: _sky, size: 14),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'MONITORAMENTO EM TEMPO REAL',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 10,
-                      letterSpacing: 1.4,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.greenAccent.withOpacity(0.7),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  SizedBox(
-                    width: 54,
-                    height: 54,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          value: 0.96,
-                          strokeWidth: 4.5,
-                          backgroundColor: Colors.white12,
-                          valueColor:
-                              const AlwaysStoppedAnimation<Color>(_sky),
-                        ),
-                        const Text(
-                          '96%',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'FROTA ATIVA',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '47 / 49 veículos',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: _FormCard(state: state),
       ),
     );
   }

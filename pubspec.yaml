@@ -37,6 +37,8 @@ dependencies:
   image_picker: ^1.1.2
   file_picker: ^5.5.0
   path: ^1.9.0
+  pdf: ^3.11.1
+  printing: ^5.13.2
 
 dev_dependencies:
   flutter_test:
