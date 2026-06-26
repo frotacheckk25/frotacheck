@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -43,14 +43,13 @@ class _AlertasPageState extends State<AlertasPage> {
     try {
       final results = await Future.wait([
         // Alertas ordenados: erro primeiro, depois warning, depois info; mais recentes primeiro
-        supabase
-            .from('alerts')
-            .select()
-            .order('created_at', ascending: false),
+        supabase.from('alerts').select().order('created_at', ascending: false),
         // Ocorrências críticas abertas (Alta prioridade, não resolvidas)
         supabase
             .from('occurrences')
-            .select('id, problem_type, problem, priority, status, location, created_at, vehicle_id, driver_id')
+            .select(
+              'id, problem_type, problem, priority, status, location, created_at, vehicle_id, driver_id',
+            )
             .neq('status', 'Resolvido')
             .eq('priority', 'Alta')
             .order('created_at', ascending: false)
@@ -127,7 +126,10 @@ class _AlertasPageState extends State<AlertasPage> {
     });
 
     try {
-      await supabase.from('alerts').update({'status': 'resolvido'}).eq('id', id);
+      await supabase
+          .from('alerts')
+          .update({'status': 'resolvido'})
+          .eq('id', id);
 
       final occId = alerta['occurrence_id']?.toString();
       if (occId != null && occId.isNotEmpty) {
@@ -142,11 +144,13 @@ class _AlertasPageState extends State<AlertasPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Row(children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Alerta marcado como resolvido'),
-            ]),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Alerta marcado como resolvido'),
+              ],
+            ),
             backgroundColor: AppColors.success,
             duration: Duration(seconds: 2),
           ),
@@ -160,8 +164,9 @@ class _AlertasPageState extends State<AlertasPage> {
           final idx = alertas.indexWhere((a) => a['id']?.toString() == id);
           if (idx != -1) alertas[idx] = {...alertas[idx], 'status': 'ativo'};
         });
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao atualizar: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao atualizar: $e')));
       }
     } finally {
       if (mounted) setState(() => _processando.remove(id));
@@ -198,8 +203,9 @@ class _AlertasPageState extends State<AlertasPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
       }
     }
   }
@@ -214,15 +220,19 @@ class _AlertasPageState extends State<AlertasPage> {
     }).toList();
   }
 
-  int get _pendentes => alertas.where((a) => (a['status'] ?? 'ativo') == 'ativo').length;
-  int get _criticos => alertas.where((a) => a['tipo'] == 'error' && (a['status'] ?? 'ativo') == 'ativo').length;
-  int get _resolvidos => alertas.where((a) => a['status'] == 'resolvido').length;
+  int get _pendentes =>
+      alertas.where((a) => (a['status'] ?? 'ativo') == 'ativo').length;
+  int get _criticos => alertas
+      .where((a) => a['tipo'] == 'error' && (a['status'] ?? 'ativo') == 'ativo')
+      .length;
+  int get _resolvidos =>
+      alertas.where((a) => a['status'] == 'resolvido').length;
 
   Color _tipoColor(String? tipo) => switch (tipo) {
-        'error' => AppColors.danger,
-        'warning' => AppColors.warning,
-        _ => AppColors.secondary,
-      };
+    'error' => AppColors.danger,
+    'warning' => AppColors.warning,
+    _ => AppColors.secondary,
+  };
 
   IconData _tipoIcon(String? titulo, String? tipo) {
     final t = (titulo ?? '').toLowerCase();
@@ -232,8 +242,10 @@ class _AlertasPageState extends State<AlertasPage> {
     if (t.contains('checklist')) return Icons.checklist;
     if (t.contains('seguro')) return Icons.security;
     if (t.contains('pneu')) return Icons.tire_repair;
-    if (t.contains('ocorrência') || t.contains('ocorr')) return Icons.report_problem;
-    if (t.contains('manutenção') || t.contains('manutencao')) return Icons.build;
+    if (t.contains('ocorrência') || t.contains('ocorr'))
+      return Icons.report_problem;
+    if (t.contains('manutenção') || t.contains('manutencao'))
+      return Icons.build;
     if (t.contains('document')) return Icons.description;
     if (t.contains('multa')) return Icons.gavel;
     return switch (tipo) {
@@ -265,7 +277,13 @@ class _AlertasPageState extends State<AlertasPage> {
           if (carregando)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
             )
           else
             IconButton(
@@ -305,18 +323,31 @@ class _AlertasPageState extends State<AlertasPage> {
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.notifications_active, color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.notifications_active,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Alertas da Frota',
-                                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                const Text(
+                                  'Alertas da Frota',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 Text(
                                   '$_pendentes pendente(s) · $_resolvidos resolvido(s) • auto-atualiza a cada 30s',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -329,13 +360,33 @@ class _AlertasPageState extends State<AlertasPage> {
                     // KPIs
                     Row(
                       children: [
-                        _kpi('Total', '${alertas.length}', Icons.notifications, AppColors.secondary),
+                        _kpi(
+                          'Total',
+                          '${alertas.length}',
+                          Icons.notifications,
+                          AppColors.secondary,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Pendentes', '$_pendentes', Icons.pending, AppColors.warning),
+                        _kpi(
+                          'Pendentes',
+                          '$_pendentes',
+                          Icons.pending,
+                          AppColors.warning,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Críticos', '$_criticos', Icons.priority_high, AppColors.danger),
+                        _kpi(
+                          'Críticos',
+                          '$_criticos',
+                          Icons.priority_high,
+                          AppColors.danger,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Resolvidos', '$_resolvidos', Icons.check_circle, AppColors.success),
+                        _kpi(
+                          'Resolvidos',
+                          '$_resolvidos',
+                          Icons.check_circle,
+                          AppColors.success,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -344,22 +395,35 @@ class _AlertasPageState extends State<AlertasPage> {
                     if (ocorrenciasCriticas.isNotEmpty) ...[
                       Row(
                         children: [
-                          const Icon(Icons.warning_amber, color: AppColors.danger, size: 16),
+                          const Icon(
+                            Icons.warning_amber,
+                            color: AppColors.danger,
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             '${ocorrenciasCriticas.length} ocorrência(s) crítica(s) em aberto',
-                            style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700, fontSize: 13),
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      ...ocorrenciasCriticas.take(3).map(_buildOcorrenciaCriticaCard),
+                      ...ocorrenciasCriticas
+                          .take(3)
+                          .map(_buildOcorrenciaCriticaCard),
                       if (ocorrenciasCriticas.length > 3)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 4),
                           child: Text(
                             '+${ocorrenciasCriticas.length - 3} outras ocorrências críticas',
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -373,25 +437,68 @@ class _AlertasPageState extends State<AlertasPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _chip('Todos', filtroStatus, 'todos', (v) => setState(() => filtroStatus = v)),
+                          _chip(
+                            'Todos',
+                            filtroStatus,
+                            'todos',
+                            (v) => setState(() => filtroStatus = v),
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Pendentes', filtroStatus, 'ativo', (v) => setState(() => filtroStatus = v), color: AppColors.warning),
+                          _chip(
+                            'Pendentes',
+                            filtroStatus,
+                            'ativo',
+                            (v) => setState(() => filtroStatus = v),
+                            color: AppColors.warning,
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Resolvidos', filtroStatus, 'resolvido', (v) => setState(() => filtroStatus = v), color: AppColors.success),
+                          _chip(
+                            'Resolvidos',
+                            filtroStatus,
+                            'resolvido',
+                            (v) => setState(() => filtroStatus = v),
+                            color: AppColors.success,
+                          ),
                           const SizedBox(width: 16),
-                          Container(width: 1, height: 20, color: AppColors.border),
+                          Container(
+                            width: 1,
+                            height: 20,
+                            color: AppColors.border,
+                          ),
                           const SizedBox(width: 16),
-                          _chip('Todos tipos', filtroTipo, 'todos', (v) => setState(() => filtroTipo = v)),
+                          _chip(
+                            'Todos tipos',
+                            filtroTipo,
+                            'todos',
+                            (v) => setState(() => filtroTipo = v),
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Crítico', filtroTipo, 'error', (v) => setState(() => filtroTipo = v), color: AppColors.danger),
+                          _chip(
+                            'Crítico',
+                            filtroTipo,
+                            'error',
+                            (v) => setState(() => filtroTipo = v),
+                            color: AppColors.danger,
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Aviso', filtroTipo, 'warning', (v) => setState(() => filtroTipo = v), color: AppColors.warning),
+                          _chip(
+                            'Aviso',
+                            filtroTipo,
+                            'warning',
+                            (v) => setState(() => filtroTipo = v),
+                            color: AppColors.warning,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('${filtrados.length} alerta(s)',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    Text(
+                      '${filtrados.length} alerta(s)',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                   ],
                 ),
@@ -400,14 +507,20 @@ class _AlertasPageState extends State<AlertasPage> {
 
             // Lista de alertas
             if (carregando)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
             else if (filtrados.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.notifications_off, size: 64, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.notifications_off,
+                        size: 64,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         alertas.isEmpty
@@ -467,10 +580,20 @@ class _AlertasPageState extends State<AlertasPage> {
                 children: [
                   Text(
                     '$tipo — $placa${modelo.isNotEmpty ? ' ($modelo)' : ''}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                   if (local.isNotEmpty)
-                    Text(local, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                    Text(
+                      local,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -480,10 +603,21 @@ class _AlertasPageState extends State<AlertasPage> {
                 color: AppColors.warning.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(status, style: const TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w700)),
+              child: Text(
+                status,
+                style: const TextStyle(
+                  color: AppColors.warning,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 16),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+              size: 16,
+            ),
           ],
         ),
       ),
@@ -492,8 +626,10 @@ class _AlertasPageState extends State<AlertasPage> {
 
   Widget _alertaCard(Map<String, dynamic> alerta) {
     final id = alerta['id']?.toString() ?? '';
-    final titulo = alerta['title']?.toString() ?? alerta['titulo']?.toString() ?? 'Alerta';
-    final descricao = alerta['subtitle']?.toString() ?? alerta['descricao']?.toString() ?? '';
+    final titulo =
+        alerta['title']?.toString() ?? alerta['titulo']?.toString() ?? 'Alerta';
+    final descricao =
+        alerta['subtitle']?.toString() ?? alerta['descricao']?.toString() ?? '';
     final tipo = alerta['tipo']?.toString() ?? 'info';
     final status = alerta['status']?.toString() ?? 'ativo';
     final resolvido = status == 'resolvido';
@@ -510,11 +646,17 @@ class _AlertasPageState extends State<AlertasPage> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: resolvido ? AppColors.success.withOpacity(0.25) : cor.withOpacity(0.35),
+          color: resolvido
+              ? AppColors.success.withOpacity(0.25)
+              : cor.withOpacity(0.35),
           width: resolvido ? 1.5 : 1,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -543,19 +685,28 @@ class _AlertasPageState extends State<AlertasPage> {
                     Text(
                       titulo,
                       style: TextStyle(
-                        color: resolvido ? AppColors.textSecondary : Colors.white,
+                        color: resolvido
+                            ? AppColors.textSecondary
+                            : Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        decoration: resolvido ? TextDecoration.lineThrough : null,
+                        decoration: resolvido
+                            ? TextDecoration.lineThrough
+                            : null,
                         decorationColor: AppColors.textSecondary,
                       ),
                     ),
                     if (descricao.isNotEmpty) ...[
                       const SizedBox(height: 3),
-                      Text(descricao,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        descricao,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ],
                 ),
@@ -564,24 +715,46 @@ class _AlertasPageState extends State<AlertasPage> {
               // Botão resolver
               if (resolvido)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.success.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.success.withOpacity(0.4)),
+                    border: Border.all(
+                      color: AppColors.success.withOpacity(0.4),
+                    ),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle, color: AppColors.success, size: 12),
+                      Icon(
+                        Icons.check_circle,
+                        color: AppColors.success,
+                        size: 12,
+                      ),
                       SizedBox(width: 4),
-                      Text('Resolvido',
-                          style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.w700)),
+                      Text(
+                        'Resolvido',
+                        style: TextStyle(
+                          color: AppColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                 )
               else if (processando)
-                const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.success))
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.success,
+                  ),
+                )
               else
                 Tooltip(
                   message: 'Marcar como resolvido',
@@ -592,9 +765,15 @@ class _AlertasPageState extends State<AlertasPage> {
                       decoration: BoxDecoration(
                         color: AppColors.success.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppColors.success.withOpacity(0.3),
+                        ),
                       ),
-                      child: const Icon(Icons.check_circle_outline, color: AppColors.success, size: 18),
+                      child: const Icon(
+                        Icons.check_circle_outline,
+                        color: AppColors.success,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
@@ -604,7 +783,13 @@ class _AlertasPageState extends State<AlertasPage> {
           Row(
             children: [
               _badge(
-                resolvido ? 'Resolvido' : tipo == 'error' ? 'Crítico' : tipo == 'warning' ? 'Aviso' : 'Info',
+                resolvido
+                    ? 'Resolvido'
+                    : tipo == 'error'
+                    ? 'Crítico'
+                    : tipo == 'warning'
+                    ? 'Aviso'
+                    : 'Info',
                 cor,
               ),
               if (data.isNotEmpty) ...[
@@ -616,19 +801,34 @@ class _AlertasPageState extends State<AlertasPage> {
                 GestureDetector(
                   onTap: () => _verOcorrencia(occId),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                      border: Border.all(
+                        color: AppColors.secondary.withOpacity(0.3),
+                      ),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.open_in_new, color: AppColors.secondary, size: 11),
+                        Icon(
+                          Icons.open_in_new,
+                          color: AppColors.secondary,
+                          size: 11,
+                        ),
                         SizedBox(width: 4),
-                        Text('Ver ocorrência',
-                            style: TextStyle(color: AppColors.secondary, fontSize: 10, fontWeight: FontWeight.w600)),
+                        Text(
+                          'Ver ocorrência',
+                          style: TextStyle(
+                            color: AppColors.secondary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -654,15 +854,36 @@ class _AlertasPageState extends State<AlertasPage> {
           children: [
             Icon(icon, color: color, size: 16),
             const SizedBox(height: 4),
-            Text(value, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 9,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _chip(String label, String current, String value, ValueChanged<String> onTap, {Color? color}) {
+  Widget _chip(
+    String label,
+    String current,
+    String value,
+    ValueChanged<String> onTap, {
+    Color? color,
+  }) {
     final selected = current == value;
     final c = color ?? AppColors.secondary;
     return GestureDetector(
@@ -673,20 +894,32 @@ class _AlertasPageState extends State<AlertasPage> {
         decoration: BoxDecoration(
           color: selected ? c.withOpacity(0.15) : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.5 : 1),
+          border: Border.all(
+            color: selected ? c : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? c : AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? c : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
 
   Widget _badge(String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-        child: Text(text, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+    ),
+  );
 }
