@@ -20,6 +20,8 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
   List<Map<String, dynamic>> ocorrencias = [];
   List<Map<String, dynamic>> veiculos = [];
   List<Map<String, dynamic>> motoristas = [];
+  Map<String, Map<String, dynamic>> veiculosMap = {};
+  Map<String, Map<String, dynamic>> motoristasMap = {};
 
   bool carregando = true;
   bool isSaving = false;
@@ -64,25 +66,29 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     setState(() => carregando = true);
     try {
       final results = await Future.wait([
-        supabase
-            .from('occurrences')
-            .select('*, vehicles(plate, model), drivers(name)')
-            .order('created_at', ascending: false)
-            .limit(100),
+        supabase.from('occurrences').select('*').order('created_at', ascending: false).limit(100),
         supabase.from('vehicles').select('id, plate, brand, model').order('plate'),
         supabase.from('drivers').select('id, name').order('name'),
       ]);
       if (!mounted) return;
+      final vList = List<Map<String, dynamic>>.from(
+        (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      final mList = List<Map<String, dynamic>>.from(
+        (results[2] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      final vMap = <String, Map<String, dynamic>>{};
+      final mMap = <String, Map<String, dynamic>>{};
+      for (final v in vList) { vMap[v['id'].toString()] = v; }
+      for (final m in mList) { mMap[m['id'].toString()] = m; }
       setState(() {
         ocorrencias = List<Map<String, dynamic>>.from(
           (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
-        veiculos = List<Map<String, dynamic>>.from(
-          (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
-        );
-        motoristas = List<Map<String, dynamic>>.from(
-          (results[2] as List).map((e) => Map<String, dynamic>.from(e as Map)),
-        );
+        veiculos = vList;
+        motoristas = mList;
+        veiculosMap = vMap;
+        motoristasMap = mMap;
         carregando = false;
       });
     } catch (e) {
@@ -159,6 +165,35 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
       debugPrint('ERRO OCORRÊNCIA: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
+    }
+  }
+
+  Future<void> _deletar(String id) async {
+    final conf = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir ocorrência', style: TextStyle(color: Colors.white)),
+        content: const Text('Excluir esta ocorrência permanentemente?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || conf != true) return;
+    try {
+      await supabase.from('occurrences').delete().eq('id', id);
+      if (mounted) setState(() => ocorrencias.removeWhere((o) => o['id']?.toString() == id));
+      if (mounted) _snackSucesso('Ocorrência excluída');
+    } catch (e) {
+      if (mounted) _snackErro('Erro ao excluir: $e');
     }
   }
 
@@ -717,9 +752,11 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
   }
 
   Widget _buildCard(Map<String, dynamic> o) {
-    final placa = o['vehicles']?['plate']?.toString() ?? '-';
-    final modelo = o['vehicles']?['model']?.toString() ?? '';
-    final motorista = o['drivers']?['name']?.toString() ?? '-';
+    final vid = o['vehicle_id']?.toString() ?? '';
+    final did = o['driver_id']?.toString() ?? '';
+    final placa = veiculosMap[vid]?['plate']?.toString() ?? '-';
+    final modelo = veiculosMap[vid]?['model']?.toString() ?? '';
+    final motorista = motoristasMap[did]?['name']?.toString() ?? '-';
     final tipo = o['problem_type']?.toString() ?? 'Ocorrência';
     final problema = o['problem']?.toString() ?? '';
     final prioridade = o['priority']?.toString() ?? '-';
@@ -797,23 +834,32 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
               _badge(data, AppColors.textSecondary),
             ],
           ),
-          if (!resolvida) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: id.isNotEmpty ? () => _resolver(id) : null,
-                icon: const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
-                label: const Text('Marcar resolvido',
-                    style: TextStyle(color: AppColors.success, fontSize: 12)),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (!resolvida)
+                TextButton.icon(
+                  onPressed: id.isNotEmpty ? () => _resolver(id) : null,
+                  icon: const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+                  label: const Text('Marcar resolvido',
+                      style: TextStyle(color: AppColors.success, fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
+                tooltip: 'Excluir',
+                onPressed: id.isNotEmpty ? () => _deletar(id) : null,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
-            ),
-          ],
+            ],
+          ),
         ],
       ),
     );

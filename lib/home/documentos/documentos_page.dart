@@ -1178,6 +1178,22 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
     if (ok != true || !mounted) return;
 
     try {
+      // Apaga o arquivo do Storage se existir
+      final fileUrl = widget.documento['file_url']?.toString() ?? '';
+      if (fileUrl.isNotEmpty) {
+        try {
+          final uri = Uri.tryParse(fileUrl);
+          if (uri != null) {
+            final segments = uri.pathSegments;
+            final bucketIndex = segments.indexOf('documentos');
+            if (bucketIndex >= 0 && bucketIndex + 1 < segments.length) {
+              final filePath = segments.sublist(bucketIndex + 1).join('/');
+              await supabase.storage.from('documentos').remove([filePath]);
+            }
+          }
+        } catch (_) {}
+      }
+
       await supabase.from('documentos').delete().eq('id', widget.documento['id']);
       widget.onAtualizado();
       if (mounted) {
@@ -1193,6 +1209,134 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
     }
   }
 
+  void _abrirEdicao() {
+    final doc = widget.documento;
+    final descController = TextEditingController(text: doc['descricao']?.toString() ?? '');
+    DateTime? vencimento = _parseDate(doc['data_vencimento']);
+    String tipo = doc['tipo']?.toString() ?? 'CNH';
+    final tipos = ['CNH', 'CRLV', 'Seguro', 'Licença', 'Outros'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: EdgeInsets.only(
+            left: 20, right: 20, top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(child: Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              const Text('Editar Documento',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: tipos.contains(tipo) ? tipo : tipos.last,
+                decoration: InputDecoration(
+                  labelText: 'Tipo',
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                  filled: true, fillColor: AppColors.backgroundSoft,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border)),
+                ),
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                items: tipos.map((t) => DropdownMenuItem(value: t,
+                    child: Text(t, style: const TextStyle(color: Colors.white)))).toList(),
+                onChanged: (v) => setLocal(() => tipo = v ?? tipo),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: descController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Descrição',
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
+                  filled: true, fillColor: AppColors.backgroundSoft,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: vencimento ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2040),
+                  );
+                  if (picked != null) setLocal(() => vencimento = picked);
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSoft,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary, size: 18),
+                    const SizedBox(width: 10),
+                    Text(
+                      vencimento != null
+                          ? '${vencimento!.day.toString().padLeft(2, '0')}/${vencimento!.month.toString().padLeft(2, '0')}/${vencimento!.year}'
+                          : 'Vencimento (opcional)',
+                      style: TextStyle(
+                        color: vencimento != null ? Colors.white : AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await supabase.from('documentos').update({
+                      'tipo': tipo,
+                      'descricao': descController.text.trim(),
+                      if (vencimento != null) 'data_vencimento': vencimento!.toIso8601String().split('T')[0],
+                    }).eq('id', widget.documento['id']);
+                    widget.onAtualizado();
+                    if (ctx.mounted) { Navigator.pop(ctx); }
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Documento atualizado'), backgroundColor: AppColors.success),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e'))); }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Salvar alterações', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final doc = widget.documento;
@@ -1205,6 +1349,13 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
       appBar: AppBar(
         title: const Text('Detalhe do Documento'),
         backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Editar',
+            onPressed: _abrirEdicao,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

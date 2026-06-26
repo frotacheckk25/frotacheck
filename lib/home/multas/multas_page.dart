@@ -1066,6 +1066,37 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
     }
   }
 
+  Future<void> _deletar() async {
+    final id = multa['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final conf = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir multa', style: TextStyle(color: Colors.white)),
+        content: const Text('Excluir esta multa permanentemente?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || conf != true) return;
+    try {
+      await supabase.from('multas').delete().eq('id', id);
+      widget.onAtualizada();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cor = _statusColor(_status);
@@ -1080,6 +1111,13 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
       appBar: AppBar(
         title: const Text('Detalhe da Multa'),
         backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.danger),
+            tooltip: 'Excluir multa',
+            onPressed: _deletar,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

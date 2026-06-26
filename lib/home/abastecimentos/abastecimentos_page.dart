@@ -17,6 +17,8 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
   List<Map<String, dynamic>> fuelings = [];
   List<Map<String, dynamic>> vehicles = [];
   List<Map<String, dynamic>> drivers = [];
+  Map<String, Map<String, dynamic>> vehiclesMap = {};
+  Map<String, Map<String, dynamic>> driversMap = {};
   bool carregando = true;
 
   @override
@@ -29,19 +31,23 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
     setState(() => carregando = true);
     try {
       final results = await Future.wait([
-        supabase
-            .from('fuelings')
-            .select('*, vehicles (plate, model), drivers (name)')
-            .order('created_at', ascending: false)
-            .limit(50),
+        supabase.from('fuelings').select('*').order('created_at', ascending: false).limit(50),
         supabase.from('vehicles').select('id, plate, model').order('plate'),
         supabase.from('drivers').select('id, name').order('name'),
       ]);
       if (mounted) {
+        final vList = List<Map<String, dynamic>>.from(results[1]);
+        final dList = List<Map<String, dynamic>>.from(results[2]);
+        final vMap = <String, Map<String, dynamic>>{};
+        final dMap = <String, Map<String, dynamic>>{};
+        for (final v in vList) { vMap[v['id'].toString()] = v; }
+        for (final d in dList) { dMap[d['id'].toString()] = d; }
         setState(() {
           fuelings = List<Map<String, dynamic>>.from(results[0]);
-          vehicles = List<Map<String, dynamic>>.from(results[1]);
-          drivers = List<Map<String, dynamic>>.from(results[2]);
+          vehicles = vList;
+          drivers = dList;
+          vehiclesMap = vMap;
+          driversMap = dMap;
         });
       }
     } catch (e) {
@@ -70,6 +76,56 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
     );
   }
 
+  Future<void> _deletar(Map<String, dynamic> f) async {
+    final id = f['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final conf = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir abastecimento', style: TextStyle(color: Colors.white)),
+        content: const Text('Excluir este registro permanentemente?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || conf != true) return;
+    try {
+      await supabase.from('fuelings').delete().eq('id', id);
+      if (mounted) setState(() => fuelings.removeWhere((x) => x['id']?.toString() == id));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Abastecimento excluído'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+    }
+  }
+
+  String _placa(Map<String, dynamic> f) {
+    final vid = f['vehicle_id']?.toString() ?? '';
+    return vehiclesMap[vid]?['plate']?.toString() ?? '-';
+  }
+
+  String _modelo(Map<String, dynamic> f) {
+    final vid = f['vehicle_id']?.toString() ?? '';
+    return vehiclesMap[vid]?['model']?.toString() ?? '';
+  }
+
+  String _motorista(Map<String, dynamic> f) {
+    final did = f['driver_id']?.toString() ?? '';
+    return driversMap[did]?['name']?.toString() ?? '-';
+  }
+
   String _fmtDate(String? raw) {
     if (raw == null || raw.isEmpty) return '-';
     final dt = DateTime.tryParse(raw);
@@ -95,11 +151,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         title: const Text('Abastecimentos'),
         backgroundColor: AppColors.surface,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: carregarDados,
-            tooltip: 'Atualizar',
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: carregarDados, tooltip: 'Atualizar'),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -119,7 +171,6 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -156,7 +207,6 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // KPIs
                     Row(
                       children: [
                         _kpi('Registros', '${fuelings.length}', Icons.local_gas_station, AppColors.warning),
@@ -201,9 +251,9 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                   delegate: SliverChildBuilderDelegate(
                     (context, i) {
                       final f = fuelings[i];
-                      final placa = f['vehicles']?['plate'] ?? '-';
-                      final modelo = f['vehicles']?['model'] ?? '';
-                      final motorista = f['drivers']?['name'] ?? '-';
+                      final placa = _placa(f);
+                      final modelo = _modelo(f);
+                      final motorista = _motorista(f);
                       final litros = f['liters'];
                       final valor = f['total_value'];
                       final odometro = f['odometer'];
@@ -264,6 +314,13 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                                     ),
                                   ],
                                 ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
+                                tooltip: 'Excluir',
+                                onPressed: () => _deletar(f),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                               ),
                             ],
                           ),
@@ -434,9 +491,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
+        left: 20, right: 20, top: 20,
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       child: Form(
@@ -446,7 +501,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 40, height: 4,
@@ -458,7 +512,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                   style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
 
-              // Veículo
               DropdownButtonFormField<String>(
                 value: selectedVehicle,
                 decoration: _dec('Veículo *', Icons.directions_car_outlined),
@@ -474,7 +527,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Motorista
               DropdownButtonFormField<String>(
                 value: selectedDriver,
                 decoration: _dec('Motorista *', Icons.person_outline),
@@ -489,7 +541,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Litros
               TextFormField(
                 controller: litrosController,
                 style: const TextStyle(color: Colors.white),
@@ -503,7 +554,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Valor Total
               TextFormField(
                 controller: valorController,
                 style: const TextStyle(color: Colors.white),
@@ -517,7 +567,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Odômetro
               TextFormField(
                 controller: odometroController,
                 style: const TextStyle(color: Colors.white),
@@ -531,7 +580,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 20),
 
-              // Fotos
               const Text('Fotos (opcional)',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500)),
               const SizedBox(height: 10),
@@ -555,7 +603,6 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 24),
 
-              // Botão salvar
               ElevatedButton(
                 onPressed: isSaving ? null : _salvar,
                 style: ElevatedButton.styleFrom(
@@ -564,10 +611,8 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: isSaving
-                    ? const SizedBox(
-                        height: 22, width: 22,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                      )
+                    ? const SizedBox(height: 22, width: 22,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
                     : const Text('Salvar Abastecimento',
                         style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
               ),
@@ -597,8 +642,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
             Text(label,
                 style: TextStyle(
                   color: ok ? AppColors.success : AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 11, fontWeight: FontWeight.w500,
                 )),
           ],
         ),

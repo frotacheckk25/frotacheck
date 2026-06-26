@@ -76,6 +76,10 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
           telefoneController.text = empresa['phone'] ?? '';
           emailController.text = empresa['email'] ?? '';
           reportEmailController.text = empresa['report_email'] ?? '';
+          auditoriaAtiva = empresa['auditoria_ativa'] as bool? ?? true;
+          alertaGasto = empresa['alerta_gasto'] as bool? ?? true;
+          alertasPush = empresa['alertas_push'] as bool? ?? true;
+          apiIntegration = empresa['api_integration'] as bool? ?? false;
         });
       }
     } catch (e) {
@@ -107,6 +111,10 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         'phone': telefoneController.text.trim(),
         'email': emailController.text.trim(),
         'report_email': reportEmailController.text.trim(),
+        'auditoria_ativa': auditoriaAtiva,
+        'alerta_gasto': alertaGasto,
+        'alertas_push': alertasPush,
+        'api_integration': apiIntegration,
       };
 
       if (registroId == null) {

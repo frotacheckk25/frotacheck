@@ -76,11 +76,11 @@ class _MotoristasPageState extends State<MotoristasPage> {
       'cnh_expiration': cnhValidade!.toIso8601String().split('T')[0],
     };
 
-    // Campos opcionais — só envia se preenchidos
+    // Campos opcionais — envia null explicitamente no update para permitir limpeza
     final telefone = telefoneController.text.trim();
     final categoria = categoriaController.text.trim().toUpperCase();
-    if (telefone.isNotEmpty) payload['phone'] = telefone;
-    if (categoria.isNotEmpty) payload['cnh_category'] = categoria;
+    payload['phone'] = telefone.isNotEmpty ? telefone : null;
+    payload['cnh_category'] = categoria.isNotEmpty ? categoria : null;
 
     try {
       final isNew = editingId == null;

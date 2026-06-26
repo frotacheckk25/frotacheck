@@ -57,6 +57,110 @@ class _PneusPageState extends State<PneusPage> {
     }
   }
 
+  Future<void> _deletarPneu(Map<String, dynamic> p) async {
+    final id = p['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    final conf = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir pneu', style: TextStyle(color: Colors.white)),
+        content: const Text('Excluir este registro permanentemente?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || conf != true) return;
+    try {
+      await supabase.from('pneus').delete().eq('id', id);
+      if (mounted) setState(() => pneus.removeWhere((x) => x['id']?.toString() == id));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pneu excluído'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+    }
+  }
+
+  void _editarStatusPneu(Map<String, dynamic> p) {
+    final id = p['id']?.toString() ?? '';
+    String statusAtual = p['status']?.toString() ?? 'bom';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(child: Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              const Text('Alterar Status do Pneu',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ...['bom', 'revisar', 'troca'].map((s) {
+                final cor = _statusColor(s);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InkWell(
+                    onTap: () async {
+                      setLocal(() => statusAtual = s);
+                      Navigator.pop(ctx);
+                      try {
+                        await supabase.from('pneus').update({'status': s}).eq('id', id);
+                        if (mounted) {
+                          setState(() {
+                            final idx = pneus.indexWhere((x) => x['id']?.toString() == id);
+                            if (idx >= 0) { pneus[idx] = {...pneus[idx], 'status': s}; }
+                          });
+                        }
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Status atualizado: ${_statusLabel(s)}'), backgroundColor: AppColors.success),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e'))); }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: statusAtual == s ? cor.withOpacity(0.2) : AppColors.backgroundSoft,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: statusAtual == s ? cor : AppColors.border),
+                      ),
+                      child: Row(children: [
+                        Icon(statusAtual == s ? Icons.radio_button_checked : Icons.radio_button_off, color: cor, size: 18),
+                        const SizedBox(width: 12),
+                        Text(_statusLabel(s), style: TextStyle(color: cor, fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _abrirNovoPneu() {
     showModalBottomSheet(
       context: context,
@@ -319,6 +423,30 @@ class _PneusPageState extends State<PneusPage> {
                                   if (dataInst != '-')
                                     _badge('Inst: $dataInst', AppColors.textSecondary),
                                   if (obs.isNotEmpty) _badge(obs, AppColors.textSecondary),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => _editarStatusPneu(p),
+                                    icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.secondary),
+                                    label: const Text('Editar status', style: TextStyle(color: AppColors.secondary, fontSize: 12)),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
+                                    tooltip: 'Excluir',
+                                    onPressed: () => _deletarPneu(p),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
                                 ],
                               ),
                             ],

@@ -19,6 +19,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
 
   List<Map<String, dynamic>> veiculos = [];
   List<Map<String, dynamic>> historico = [];
+  Map<String, Map<String, dynamic>> veiculosMap = {};
 
   bool carregando = true;
   bool isSaving = false;
@@ -66,18 +67,18 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     try {
       final results = await Future.wait([
         supabase.from('vehicles').select('id, plate, brand, model, odometer').order('plate'),
-        supabase
-            .from('oil_changes')
-            .select('*, vehicles(plate, model)')
-            .order('created_at', ascending: false)
-            .limit(100),
+        supabase.from('oil_changes').select('*').order('created_at', ascending: false).limit(100),
       ]);
 
       if (!mounted) return;
+      final vList = List<Map<String, dynamic>>.from(
+        (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      final vMap = <String, Map<String, dynamic>>{};
+      for (final v in vList) { vMap[v['id'].toString()] = v; }
       setState(() {
-        veiculos = List<Map<String, dynamic>>.from(
-          (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
-        );
+        veiculos = vList;
+        veiculosMap = vMap;
         historico = List<Map<String, dynamic>>.from(
           (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
@@ -673,9 +674,40 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     );
   }
 
+  Future<void> _deletarOleo(String id) async {
+    final conf = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir registro', style: TextStyle(color: Colors.white)),
+        content: const Text('Excluir este registro permanentemente?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || conf != true) return;
+    try {
+      await supabase.from('oil_changes').delete().eq('id', id);
+      if (mounted) setState(() => historico.removeWhere((x) => x['id']?.toString() == id));
+      if (mounted) _snackSucesso('Registro excluído');
+    } catch (e) {
+      if (mounted) _snackErro('Erro ao excluir: $e');
+    }
+  }
+
   Widget _buildHistoricoCard(Map<String, dynamic> item) {
-    final placa = item['vehicles']?['plate'] ?? item['vehicle_plate'] ?? '-';
-    final modelo = item['vehicles']?['model'] ?? '';
+    final vid = item['vehicle_id']?.toString() ?? '';
+    final veiculo = veiculosMap[vid];
+    final placa = veiculo?['plate']?.toString() ?? item['vehicle_plate']?.toString() ?? '-';
+    final modelo = veiculo?['model']?.toString() ?? '';
     final tipo = item['service_type'] ?? 'Serviço';
     final data = _fmtDate(item['oil_change_date']?.toString() ?? item['created_at']?.toString());
     final kmAtual = item['current_km'];
@@ -739,6 +771,16 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
                 ],
               ],
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
+            tooltip: 'Excluir',
+            onPressed: () {
+              final id = item['id']?.toString() ?? '';
+              if (id.isNotEmpty) _deletarOleo(id);
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
