@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -93,7 +93,9 @@ class _AlertasPageState extends State<AlertasPage> {
       // Documentos (todos, para filtrar vencidos/vencendo)
       supabase
           .from('documentos')
-          .select('id, vehicle_id, veiculo_id, tipo, descricao, data_vencimento, created_at')
+          .select(
+            'id, vehicle_id, veiculo_id, tipo, descricao, data_vencimento, created_at',
+          )
           .then((r) {
             rawDocs = List<Map<String, dynamic>>.from(
               (r as List).map((e) => Map<String, dynamic>.from(e as Map)),
@@ -106,7 +108,9 @@ class _AlertasPageState extends State<AlertasPage> {
       // Ocorrências críticas abertas
       supabase
           .from('occurrences')
-          .select('id, problem_type, problem, priority, status, location, created_at, vehicle_id, driver_id')
+          .select(
+            'id, problem_type, problem, priority, status, location, created_at, vehicle_id, driver_id',
+          )
           .neq('status', 'Resolvido')
           .eq('priority', 'Alta')
           .order('created_at', ascending: false)
@@ -123,7 +127,9 @@ class _AlertasPageState extends State<AlertasPage> {
       // Trocas de óleo recentes (últimos 30 registros, para detectar próximas trocas)
       supabase
           .from('oil_changes')
-          .select('id, vehicle_id, service_type, oil_change_date, next_change_km, current_km, notes, created_at')
+          .select(
+            'id, vehicle_id, service_type, oil_change_date, next_change_km, current_km, notes, created_at',
+          )
           .order('created_at', ascending: false)
           .limit(30)
           .then((r) {
@@ -177,11 +183,15 @@ class _AlertasPageState extends State<AlertasPage> {
           }),
     ]);
 
-    // ── Alertas da tabela alerts (marcar fonte) ───────────────────────────────
-    final alertasTabela = rawAlertas.map((a) => <String, dynamic>{
-          ...a,
-          '_source': _srcAlert,
-        }).toList();
+    // ── Alertas da tabela alerts — exclui os vinculados a ocorrências
+    // (já exibidos no bloco de destaque crítico via tabela occurrences)
+    final alertasTabela = rawAlertas
+        .where((a) {
+          final occId = a['occurrence_id']?.toString() ?? '';
+          return occId.isEmpty;
+        })
+        .map((a) => <String, dynamic>{...a, '_source': _srcAlert})
+        .toList();
 
     // ── Sintéticos: Multas abertas ────────────────────────────────────────────
     final alertasMultas = rawMultas.map((m) {
@@ -189,12 +199,15 @@ class _AlertasPageState extends State<AlertasPage> {
       final veiculo = vid != null ? veicMap[vid] : null;
       final placa = veiculo?['plate']?.toString() ?? 'Veículo desconhecido';
       final v = m['valor'];
-      final valor = (v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
+      final valor = (v is num)
+          ? v.toDouble()
+          : double.tryParse(v?.toString() ?? '') ?? 0.0;
       return <String, dynamic>{
         '_source': _srcMulta,
         '_ref_id': m['id']?.toString(),
         'title': 'Multa Aberta — $placa',
-        'subtitle': '${m['tipo'] ?? 'Infração'} · R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
+        'subtitle':
+            '${m['tipo'] ?? 'Infração'} · R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
         'tipo': 'warning',
         'status': 'ativo',
         'created_at': m['data'] ?? m['created_at'],
@@ -224,8 +237,8 @@ class _AlertasPageState extends State<AlertasPage> {
         'subtitle': dias < 0
             ? 'Venceu há ${(-dias)} dia(s)'
             : dias == 0
-                ? 'Vence hoje!'
-                : 'Vence em $dias dia(s)',
+            ? 'Vence hoje!'
+            : 'Vence em $dias dia(s)',
         'tipo': dias < 0 ? 'error' : 'warning',
         'status': 'ativo',
         'created_at': vencStr,
@@ -249,9 +262,13 @@ class _AlertasPageState extends State<AlertasPage> {
       final nextKm = o['next_change_km'];
       final currentKm = veiculo?['odometer'] ?? o['current_km'];
       if (nextKm == null) continue;
-      final nextInt = (nextKm is num) ? nextKm.toInt() : int.tryParse(nextKm.toString()) ?? 0;
+      final nextInt = (nextKm is num)
+          ? nextKm.toInt()
+          : int.tryParse(nextKm.toString()) ?? 0;
       final currInt = currentKm != null
-          ? ((currentKm is num) ? currentKm.toInt() : int.tryParse(currentKm.toString()) ?? 0)
+          ? ((currentKm is num)
+                ? currentKm.toInt()
+                : int.tryParse(currentKm.toString()) ?? 0)
           : 0;
       final faltam = nextInt - currInt;
       if (faltam > 2000) continue; // Só mostra se faltam 2000 km ou menos
@@ -274,7 +291,9 @@ class _AlertasPageState extends State<AlertasPage> {
     for (final p in rawPlanos) {
       final nextKm = p['next_service_km'];
       if (nextKm == null) continue;
-      final nextInt = (nextKm is num) ? nextKm.toInt() : int.tryParse(nextKm.toString()) ?? 0;
+      final nextInt = (nextKm is num)
+          ? nextKm.toInt()
+          : int.tryParse(nextKm.toString()) ?? 0;
       final plate = p['vehicle_plate']?.toString() ?? '-';
       // Tenta encontrar odômetro do veículo pela placa
       final veiculo = veicMap.values.firstWhere(
@@ -283,8 +302,8 @@ class _AlertasPageState extends State<AlertasPage> {
       );
       final currInt = veiculo.isNotEmpty
           ? ((veiculo['odometer'] is num)
-              ? veiculo['odometer'].toInt()
-              : int.tryParse(veiculo['odometer']?.toString() ?? '') ?? 0)
+                ? veiculo['odometer'].toInt()
+                : int.tryParse(veiculo['odometer']?.toString() ?? '') ?? 0)
           : 0;
       final faltam = nextInt - currInt;
       if (faltam > 2000) continue;
@@ -358,24 +377,32 @@ class _AlertasPageState extends State<AlertasPage> {
     });
 
     try {
-      await supabase.from('alerts').update({'status': 'resolvido'}).eq('id', id);
+      await supabase
+          .from('alerts')
+          .update({'status': 'resolvido'})
+          .eq('id', id);
 
       // Se o alerta tem ocorrência vinculada, resolve também
       final occId = alerta['occurrence_id']?.toString();
       if (occId != null && occId.isNotEmpty) {
         try {
-          await supabase.from('occurrences').update({'status': 'Resolvido'}).eq('id', occId);
+          await supabase
+              .from('occurrences')
+              .update({'status': 'Resolvido'})
+              .eq('id', occId);
         } catch (_) {}
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Row(children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 18),
-              SizedBox(width: 8),
-              Text('Alerta marcado como resolvido'),
-            ]),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text('Alerta marcado como resolvido'),
+              ],
+            ),
             backgroundColor: AppColors.success,
             duration: Duration(seconds: 2),
           ),
@@ -388,8 +415,9 @@ class _AlertasPageState extends State<AlertasPage> {
           final idx = alertas.indexWhere((a) => a['id']?.toString() == id);
           if (idx != -1) alertas[idx] = {...alertas[idx], 'status': 'ativo'};
         });
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
       }
     } finally {
       if (mounted) setState(() => _processando.remove(id));
@@ -407,7 +435,8 @@ class _AlertasPageState extends State<AlertasPage> {
       if (result == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Ocorrência não encontrada')));
+            const SnackBar(content: Text('Ocorrência não encontrada')),
+          );
         }
         return;
       }
@@ -424,34 +453,38 @@ class _AlertasPageState extends State<AlertasPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
       }
     }
   }
 
   // ── Filtros ───────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> get _filtrados => alertas.where((a) {
-        final status = (a['status'] ?? 'ativo').toString();
-        final tipo = (a['tipo'] ?? 'info').toString();
-        final fonte = (a['_source'] ?? _srcAlert).toString();
-        if (filtroStatus != 'todos' && status != filtroStatus) return false;
-        if (filtroTipo != 'todos' && tipo != filtroTipo) return false;
-        if (filtroFonte != 'todos' && fonte != filtroFonte) return false;
-        return true;
-      }).toList();
+    final status = (a['status'] ?? 'ativo').toString();
+    final tipo = (a['tipo'] ?? 'info').toString();
+    final fonte = (a['_source'] ?? _srcAlert).toString();
+    if (filtroStatus != 'todos' && status != filtroStatus) return false;
+    if (filtroTipo != 'todos' && tipo != filtroTipo) return false;
+    if (filtroFonte != 'todos' && fonte != filtroFonte) return false;
+    return true;
+  }).toList();
 
-  int get _pendentes => alertas.where((a) => (a['status'] ?? 'ativo') == 'ativo').length;
-  int get _criticos =>
-      alertas.where((a) => a['tipo'] == 'error' && (a['status'] ?? 'ativo') == 'ativo').length;
-  int get _resolvidos => alertas.where((a) => a['status'] == 'resolvido').length;
+  int get _pendentes =>
+      alertas.where((a) => (a['status'] ?? 'ativo') == 'ativo').length;
+  int get _criticos => alertas
+      .where((a) => a['tipo'] == 'error' && (a['status'] ?? 'ativo') == 'ativo')
+      .length;
+  int get _resolvidos =>
+      alertas.where((a) => a['status'] == 'resolvido').length;
 
   // ── Helpers visuais ───────────────────────────────────────────────────────
   Color _tipoColor(String? tipo) => switch (tipo) {
-        'error' => AppColors.danger,
-        'warning' => AppColors.warning,
-        _ => AppColors.secondary,
-      };
+    'error' => AppColors.danger,
+    'warning' => AppColors.warning,
+    _ => AppColors.secondary,
+  };
 
   IconData _fonteIcon(Map<String, dynamic> alerta) {
     final fonte = alerta['_source']?.toString() ?? _srcAlert;
@@ -472,7 +505,9 @@ class _AlertasPageState extends State<AlertasPage> {
     if (t.contains('checklist')) return Icons.checklist;
     if (t.contains('seguro')) return Icons.security;
     if (t.contains('pneu')) return Icons.tire_repair;
-    if (t.contains('ocorrência') || t.contains('ocorr')) return Icons.report_problem;
+    if (t.contains('ocorrência') || t.contains('ocorr')) {
+      return Icons.report_problem;
+    }
     if (t.contains('manut')) return Icons.build;
     if (t.contains('document')) return Icons.description;
     if (t.contains('multa')) return Icons.gavel;
@@ -484,12 +519,12 @@ class _AlertasPageState extends State<AlertasPage> {
   }
 
   String _fonteLabel(String? fonte) => switch (fonte) {
-        _srcMulta => 'Multa',
-        _srcDoc => 'Documento',
-        _srcOleo => 'Troca de Óleo',
-        _srcManut => 'Manutenção',
-        _ => 'Alerta',
-      };
+    _srcMulta => 'Multa',
+    _srcDoc => 'Documento',
+    _srcOleo => 'Troca de Óleo',
+    _srcManut => 'Manutenção',
+    _ => 'Alerta',
+  };
 
   String _fmtDate(String? raw) {
     if (raw == null) return '';
@@ -514,9 +549,10 @@ class _AlertasPageState extends State<AlertasPage> {
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Center(
                 child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2)),
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
             )
           else
@@ -557,22 +593,31 @@ class _AlertasPageState extends State<AlertasPage> {
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.notifications_active,
-                                color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.notifications_active,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Alertas da Frota',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold)),
+                                const Text(
+                                  'Alertas da Frota',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 Text(
                                   '$_pendentes pendente(s) · $_resolvidos resolvido(s) · auto-atualiza 30s',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -585,40 +630,70 @@ class _AlertasPageState extends State<AlertasPage> {
                     // KPIs
                     Row(
                       children: [
-                        _kpi('Total', '${alertas.length}', Icons.notifications,
-                            AppColors.secondary),
+                        _kpi(
+                          'Total',
+                          '${alertas.length}',
+                          Icons.notifications,
+                          AppColors.secondary,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Pendentes', '$_pendentes', Icons.pending, AppColors.warning),
+                        _kpi(
+                          'Pendentes',
+                          '$_pendentes',
+                          Icons.pending,
+                          AppColors.warning,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Críticos', '$_criticos', Icons.priority_high, AppColors.danger),
+                        _kpi(
+                          'Críticos',
+                          '$_criticos',
+                          Icons.priority_high,
+                          AppColors.danger,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Resolvidos', '$_resolvidos', Icons.check_circle, AppColors.success),
+                        _kpi(
+                          'Resolvidos',
+                          '$_resolvidos',
+                          Icons.check_circle,
+                          AppColors.success,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
                     // Ocorrências críticas em destaque
                     if (ocorrenciasCriticas.isNotEmpty) ...[
-                      Row(children: [
-                        const Icon(Icons.warning_amber, color: AppColors.danger, size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${ocorrenciasCriticas.length} ocorrência(s) crítica(s) em aberto',
-                          style: const TextStyle(
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber,
+                            color: AppColors.danger,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${ocorrenciasCriticas.length} ocorrência(s) crítica(s) em aberto',
+                            style: const TextStyle(
                               color: AppColors.danger,
                               fontWeight: FontWeight.w700,
-                              fontSize: 13),
-                        ),
-                      ]),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
-                      ...ocorrenciasCriticas.take(3).map(_buildOcorrenciaCriticaCard),
+                      ...ocorrenciasCriticas
+                          .take(3)
+                          .map(_buildOcorrenciaCriticaCard),
                       if (ocorrenciasCriticas.length > 3)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, bottom: 4),
                           child: Text(
                             '+${ocorrenciasCriticas.length - 3} outras ocorrências críticas',
                             style: const TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -632,29 +707,57 @@ class _AlertasPageState extends State<AlertasPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _chip('Todos', filtroStatus, 'todos',
-                              (v) => setState(() => filtroStatus = v)),
+                          _chip(
+                            'Todos',
+                            filtroStatus,
+                            'todos',
+                            (v) => setState(() => filtroStatus = v),
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Pendentes', filtroStatus, 'ativo',
-                              (v) => setState(() => filtroStatus = v),
-                              color: AppColors.warning),
+                          _chip(
+                            'Pendentes',
+                            filtroStatus,
+                            'ativo',
+                            (v) => setState(() => filtroStatus = v),
+                            color: AppColors.warning,
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Resolvidos', filtroStatus, 'resolvido',
-                              (v) => setState(() => filtroStatus = v),
-                              color: AppColors.success),
+                          _chip(
+                            'Resolvidos',
+                            filtroStatus,
+                            'resolvido',
+                            (v) => setState(() => filtroStatus = v),
+                            color: AppColors.success,
+                          ),
                           const SizedBox(width: 16),
-                          Container(width: 1, height: 20, color: AppColors.border),
+                          Container(
+                            width: 1,
+                            height: 20,
+                            color: AppColors.border,
+                          ),
                           const SizedBox(width: 16),
-                          _chip('Todos tipos', filtroTipo, 'todos',
-                              (v) => setState(() => filtroTipo = v)),
+                          _chip(
+                            'Todos tipos',
+                            filtroTipo,
+                            'todos',
+                            (v) => setState(() => filtroTipo = v),
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Crítico', filtroTipo, 'error',
-                              (v) => setState(() => filtroTipo = v),
-                              color: AppColors.danger),
+                          _chip(
+                            'Crítico',
+                            filtroTipo,
+                            'error',
+                            (v) => setState(() => filtroTipo = v),
+                            color: AppColors.danger,
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Aviso', filtroTipo, 'warning',
-                              (v) => setState(() => filtroTipo = v),
-                              color: AppColors.warning),
+                          _chip(
+                            'Aviso',
+                            filtroTipo,
+                            'warning',
+                            (v) => setState(() => filtroTipo = v),
+                            color: AppColors.warning,
+                          ),
                         ],
                       ),
                     ),
@@ -663,37 +766,72 @@ class _AlertasPageState extends State<AlertasPage> {
                     // Filtros: Fonte
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: Row(children: [
-                        const Text('Fonte: ',
+                      child: Row(
+                        children: [
+                          const Text(
+                            'Fonte: ',
                             style: TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12)),
-                        const SizedBox(width: 4),
-                        _chip('Todos', filtroFonte, 'todos',
-                            (v) => setState(() => filtroFonte = v)),
-                        const SizedBox(width: 8),
-                        _chip('Alertas', filtroFonte, _srcAlert,
-                            (v) => setState(() => filtroFonte = v)),
-                        const SizedBox(width: 8),
-                        _chip('Multas', filtroFonte, _srcMulta,
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          _chip(
+                            'Todos',
+                            filtroFonte,
+                            'todos',
                             (v) => setState(() => filtroFonte = v),
-                            color: AppColors.danger),
-                        const SizedBox(width: 8),
-                        _chip('Documentos', filtroFonte, _srcDoc,
+                          ),
+                          const SizedBox(width: 8),
+                          _chip(
+                            'Alertas',
+                            filtroFonte,
+                            _srcAlert,
                             (v) => setState(() => filtroFonte = v),
-                            color: const Color(0xFF0ea5e9)),
-                        const SizedBox(width: 8),
-                        _chip('Óleo', filtroFonte, _srcOleo,
+                          ),
+                          const SizedBox(width: 8),
+                          _chip(
+                            'Multas',
+                            filtroFonte,
+                            _srcMulta,
                             (v) => setState(() => filtroFonte = v),
-                            color: const Color(0xFFf97316)),
-                        const SizedBox(width: 8),
-                        _chip('Manutenção', filtroFonte, _srcManut,
+                            color: AppColors.danger,
+                          ),
+                          const SizedBox(width: 8),
+                          _chip(
+                            'Documentos',
+                            filtroFonte,
+                            _srcDoc,
                             (v) => setState(() => filtroFonte = v),
-                            color: const Color(0xFF8B5CF6)),
-                      ]),
+                            color: const Color(0xFF0ea5e9),
+                          ),
+                          const SizedBox(width: 8),
+                          _chip(
+                            'Óleo',
+                            filtroFonte,
+                            _srcOleo,
+                            (v) => setState(() => filtroFonte = v),
+                            color: const Color(0xFFf97316),
+                          ),
+                          const SizedBox(width: 8),
+                          _chip(
+                            'Manutenção',
+                            filtroFonte,
+                            _srcManut,
+                            (v) => setState(() => filtroFonte = v),
+                            color: const Color(0xFF8B5CF6),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Text('${filtrados.length} alerta(s)',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    Text(
+                      '${filtrados.length} alerta(s)',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                   ],
                 ),
@@ -702,14 +840,20 @@ class _AlertasPageState extends State<AlertasPage> {
 
             // Lista
             if (carregando)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
             else if (filtrados.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.notifications_off, size: 64, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.notifications_off,
+                        size: 64,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         alertas.isEmpty
@@ -771,11 +915,19 @@ class _AlertasPageState extends State<AlertasPage> {
                   Text(
                     '$tipo — $placa${modelo.isNotEmpty ? ' ($modelo)' : ''}',
                     style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                   if (local.isNotEmpty)
-                    Text(local,
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                    Text(
+                      local,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -785,12 +937,21 @@ class _AlertasPageState extends State<AlertasPage> {
                 color: AppColors.warning.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(status,
-                  style: const TextStyle(
-                      color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.w700)),
+              child: Text(
+                status,
+                style: const TextStyle(
+                  color: AppColors.warning,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 16),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+              size: 16,
+            ),
           ],
         ),
       ),
@@ -799,8 +960,10 @@ class _AlertasPageState extends State<AlertasPage> {
 
   Widget _alertaCard(Map<String, dynamic> alerta) {
     final id = alerta['id']?.toString() ?? '';
-    final titulo = alerta['title']?.toString() ?? alerta['titulo']?.toString() ?? 'Alerta';
-    final descricao = alerta['subtitle']?.toString() ?? alerta['descricao']?.toString() ?? '';
+    final titulo =
+        alerta['title']?.toString() ?? alerta['titulo']?.toString() ?? 'Alerta';
+    final descricao =
+        alerta['subtitle']?.toString() ?? alerta['descricao']?.toString() ?? '';
     final tipo = alerta['tipo']?.toString() ?? 'info';
     final status = alerta['status']?.toString() ?? 'ativo';
     final resolvido = status == 'resolvido';
@@ -819,12 +982,17 @@ class _AlertasPageState extends State<AlertasPage> {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: resolvido ? AppColors.success.withOpacity(0.25) : cor.withOpacity(0.35),
+          color: resolvido
+              ? AppColors.success.withOpacity(0.25)
+              : cor.withOpacity(0.35),
           width: resolvido ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -853,20 +1021,28 @@ class _AlertasPageState extends State<AlertasPage> {
                     Text(
                       titulo,
                       style: TextStyle(
-                        color: resolvido ? AppColors.textSecondary : Colors.white,
+                        color: resolvido
+                            ? AppColors.textSecondary
+                            : Colors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        decoration: resolvido ? TextDecoration.lineThrough : null,
+                        decoration: resolvido
+                            ? TextDecoration.lineThrough
+                            : null,
                         decorationColor: AppColors.textSecondary,
                       ),
                     ),
                     if (descricao.isNotEmpty) ...[
                       const SizedBox(height: 3),
-                      Text(descricao,
-                          style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 12),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        descricao,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ],
                 ),
@@ -876,25 +1052,46 @@ class _AlertasPageState extends State<AlertasPage> {
               if (isDaTabela)
                 if (resolvido)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.success.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.success.withOpacity(0.4)),
+                      border: Border.all(
+                        color: AppColors.success.withOpacity(0.4),
+                      ),
                     ),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.check_circle, color: AppColors.success, size: 12),
-                      SizedBox(width: 4),
-                      Text('Resolvido',
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: AppColors.success,
+                          size: 12,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Resolvido',
                           style: TextStyle(
-                              color: AppColors.success, fontSize: 10, fontWeight: FontWeight.w700)),
-                    ]),
+                            color: AppColors.success,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 else if (processando)
                   const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.success))
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.success,
+                    ),
+                  )
                 else
                   Tooltip(
                     message: 'Marcar como resolvido',
@@ -905,10 +1102,15 @@ class _AlertasPageState extends State<AlertasPage> {
                         decoration: BoxDecoration(
                           color: AppColors.success.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                          border: Border.all(
+                            color: AppColors.success.withOpacity(0.3),
+                          ),
                         ),
-                        child: const Icon(Icons.check_circle_outline,
-                            color: AppColors.success, size: 18),
+                        child: const Icon(
+                          Icons.check_circle_outline,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ),
@@ -922,10 +1124,10 @@ class _AlertasPageState extends State<AlertasPage> {
                 resolvido
                     ? 'Resolvido'
                     : tipo == 'error'
-                        ? 'Crítico'
-                        : tipo == 'warning'
-                            ? 'Aviso'
-                            : 'Info',
+                    ? 'Crítico'
+                    : tipo == 'warning'
+                    ? 'Aviso'
+                    : 'Info',
                 cor,
               ),
               const SizedBox(width: 6),
@@ -940,21 +1142,36 @@ class _AlertasPageState extends State<AlertasPage> {
                 GestureDetector(
                   onTap: () => _verOcorrencia(occId),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                      border: Border.all(
+                        color: AppColors.secondary.withOpacity(0.3),
+                      ),
                     ),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.open_in_new, color: AppColors.secondary, size: 11),
-                      SizedBox(width: 4),
-                      Text('Ver ocorrência',
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.open_in_new,
+                          color: AppColors.secondary,
+                          size: 11,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Ver ocorrência',
                           style: TextStyle(
-                              color: AppColors.secondary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600)),
-                    ]),
+                            color: AppColors.secondary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -965,14 +1182,15 @@ class _AlertasPageState extends State<AlertasPage> {
   }
 
   Color _fonteColor(String? fonte) => switch (fonte) {
-        _srcMulta => AppColors.danger,
-        _srcDoc => const Color(0xFF0ea5e9),
-        _srcOleo => const Color(0xFFf97316),
-        _srcManut => const Color(0xFF8B5CF6),
-        _ => AppColors.secondary,
-      };
+    _srcMulta => AppColors.danger,
+    _srcDoc => const Color(0xFF0ea5e9),
+    _srcOleo => const Color(0xFFf97316),
+    _srcManut => const Color(0xFF8B5CF6),
+    _ => AppColors.secondary,
+  };
 
-  Widget _kpi(String label, String value, IconData icon, Color color) => Expanded(
+  Widget _kpi(String label, String value, IconData icon, Color color) =>
+      Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
@@ -985,19 +1203,35 @@ class _AlertasPageState extends State<AlertasPage> {
             children: [
               Icon(icon, color: color, size: 16),
               const SizedBox(height: 4),
-              Text(value,
-                  style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
-              Text(label,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 9),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 9,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
       );
 
-  Widget _chip(String label, String current, String value, ValueChanged<String> onTap,
-      {Color? color}) {
+  Widget _chip(
+    String label,
+    String current,
+    String value,
+    ValueChanged<String> onTap, {
+    Color? color,
+  }) {
     final selected = current == value;
     final c = color ?? AppColors.secondary;
     return GestureDetector(
@@ -1008,24 +1242,32 @@ class _AlertasPageState extends State<AlertasPage> {
         decoration: BoxDecoration(
           color: selected ? c.withOpacity(0.15) : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.5 : 1),
+          border: Border.all(
+            color: selected ? c : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? c : AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? c : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
 
   Widget _badge(String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(text,
-            style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+    ),
+  );
 }

@@ -139,28 +139,7 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         novaOcorrencia['drivers']  = {'name': motorista['name']};
         setState(() => ocorrencias = [novaOcorrencia!, ...ocorrencias]);
       }
-      final placa = veiculo['plate']?.toString() ?? '';
-      final nomeMotorista = motorista['name']?.toString() ?? '';
-      final prioridadeStr = (selectedPriority ?? '').toLowerCase();
-      final tipoAlerta = prioridadeStr == 'alta' ? 'error' : 'warning';
-      final occId = novaOcorrencia?['id']?.toString();
-
-      // Gera alerta vinculado à ocorrência (silencioso se falhar)
-      try {
-        final alertPayload = <String, dynamic>{
-          'title': 'Nova Ocorrência: ${selectedProblem ?? "Problema"}',
-          'subtitle': '${placa.isNotEmpty ? placa : nomeMotorista}${locationController.text.trim().isNotEmpty ? ' • ${locationController.text.trim()}' : ''}',
-          'tipo': tipoAlerta,
-          'status': 'ativo',
-          'priority': selectedPriority ?? 'Média',
-        };
-        if (occId != null) alertPayload['occurrence_id'] = occId;
-        await supabase.from('alerts').insert(alertPayload);
-      } catch (e) {
-        debugPrint('Alerta não criado (ok): $e');
-      }
-
-      _snackSucesso('Ocorrência registrada e alerta criado!');
+      _snackSucesso('Ocorrência registrada!');
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
