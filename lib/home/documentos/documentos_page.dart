@@ -14,8 +14,8 @@ class _DocumentosPageState extends State<DocumentosPage> {
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> documentos = [];
-  List<Map<String, dynamic>> veiculos = [];
-  List<Map<String, dynamic>> motoristas = [];
+  Map<String, Map<String, dynamic>> veiculosMap = {};
+  Map<String, Map<String, dynamic>> motoristasMap = {};
   bool carregando = true;
   String filtro = 'todos';
 
@@ -26,34 +26,46 @@ class _DocumentosPageState extends State<DocumentosPage> {
   }
 
   Future<void> _carregarDados() async {
+    if (!mounted) return;
     setState(() => carregando = true);
     try {
+      // Queries separadas — sem FK join
       final results = await Future.wait([
         supabase
             .from('documentos')
-            .select('*, vehicles (plate, model), drivers (name)')
+            .select('*')
             .order('data_vencimento', ascending: true),
-        supabase
-            .from('vehicles')
-            .select('id, plate, model')
-            .order('plate'),
+        supabase.from('vehicles').select('id, plate, brand, model, driver_id').order('plate'),
         supabase.from('drivers').select('id, name').order('name'),
       ]);
-      if (mounted) {
-        setState(() {
-          documentos = List<Map<String, dynamic>>.from(results[0]);
-          veiculos = List<Map<String, dynamic>>.from(results[1]);
-          motoristas = List<Map<String, dynamic>>.from(results[2]);
-        });
+
+      final rawDocs = List<Map<String, dynamic>>.from(
+        (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      final vMap = <String, Map<String, dynamic>>{};
+      for (final v in (results[1] as List)) {
+        final row = Map<String, dynamic>.from(v as Map);
+        vMap[row['id'].toString()] = row;
       }
+      final mMap = <String, Map<String, dynamic>>{};
+      for (final m in (results[2] as List)) {
+        final row = Map<String, dynamic>.from(m as Map);
+        mMap[row['id'].toString()] = row;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        documentos = rawDocs;
+        veiculosMap = vMap;
+        motoristasMap = mMap;
+        carregando = false;
+      });
     } catch (e) {
       debugPrint('Erro ao carregar documentos: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => carregando = false);
+      if (!mounted) return;
+      setState(() => carregando = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
     }
   }
 
@@ -66,8 +78,8 @@ class _DocumentosPageState extends State<DocumentosPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => _NovoDocumentoForm(
-        veiculos: veiculos,
-        motoristas: motoristas,
+        veiculosMap: veiculosMap,
+        motoristasMap: motoristasMap,
         onSaved: () {
           Navigator.pop(ctx);
           _carregarDados();
@@ -81,7 +93,11 @@ class _DocumentosPageState extends State<DocumentosPage> {
       context,
       MaterialPageRoute(
         builder: (_) => _DetalheDocumentoPage(
-          documento: doc,
+          documento: {
+            ...doc,
+            '_veiculo_label': _veiculoLabel(doc),
+            '_motorista_label': _motoristaLabel(doc),
+          },
           onAtualizado: _carregarDados,
         ),
       ),
@@ -89,18 +105,38 @@ class _DocumentosPageState extends State<DocumentosPage> {
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
+  String _vid(Map<String, dynamic> d) =>
+      d['vehicle_id']?.toString() ?? d['veiculo_id']?.toString() ?? '';
+
+  String _mid(Map<String, dynamic> d) =>
+      d['driver_id']?.toString() ?? d['motorista_id']?.toString() ?? '';
+
+  String _veiculoLabel(Map<String, dynamic> d) {
+    final vid = _vid(d);
+    if (vid.isEmpty) return '-';
+    final v = veiculosMap[vid];
+    if (v == null) return '-';
+    final plate = v['plate']?.toString() ?? '';
+    final brand = v['brand']?.toString() ?? '';
+    final model = v['model']?.toString() ?? '';
+    final desc = '$brand $model'.trim();
+    return desc.isNotEmpty ? '$plate — $desc' : plate;
+  }
+
+  String _motoristaLabel(Map<String, dynamic> d) {
+    final mid = _mid(d);
+    if (mid.isEmpty) return '-';
+    return motoristasMap[mid]?['name']?.toString() ?? '-';
+  }
+
   List<Map<String, dynamic>> get _filtrados {
     switch (filtro) {
       case 'vencidos':
-        return documentos.where((d) => _isVencido(d)).toList();
+        return documentos.where(_isVencido).toList();
       case 'vencer_30':
-        return documentos
-            .where((d) => _isVencer30(d) && !_isVencido(d))
-            .toList();
+        return documentos.where((d) => _isVencer30(d) && !_isVencido(d)).toList();
       case 'ativos':
-        return documentos
-            .where((d) => !_isVencido(d) && !_isVencer30(d))
-            .toList();
+        return documentos.where((d) => !_isVencido(d) && !_isVencer30(d)).toList();
       default:
         return documentos;
     }
@@ -146,18 +182,6 @@ class _DocumentosPageState extends State<DocumentosPage> {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 
-  String _veiculoLabel(Map<String, dynamic> d) {
-    final vj = d['vehicles'];
-    if (vj != null) return '${vj['plate'] ?? ''} — ${vj['model'] ?? ''}'.trim();
-    return d['veiculo_id']?.toString() ?? '-';
-  }
-
-  String _motoristaLabel(Map<String, dynamic> d) {
-    final dj = d['drivers'];
-    if (dj != null) return dj['name']?.toString() ?? '-';
-    return d['motorista_id']?.toString() ?? '-';
-  }
-
   int _count(String tipo) {
     switch (tipo) {
       case 'vencidos':
@@ -165,9 +189,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
       case 'vencer_30':
         return documentos.where((d) => _isVencer30(d) && !_isVencido(d)).length;
       case 'ativos':
-        return documentos
-            .where((d) => !_isVencido(d) && !_isVencer30(d))
-            .length;
+        return documentos.where((d) => !_isVencido(d) && !_isVencer30(d)).length;
       default:
         return documentos.length;
     }
@@ -200,8 +222,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
         onPressed: _abrirNovoDocumento,
         backgroundColor: const Color(0xFF0ea5e9),
         icon: const Icon(Icons.add, color: Colors.white),
-        label:
-            const Text('Novo Documento', style: TextStyle(color: Colors.white)),
+        label: const Text('Novo Documento', style: TextStyle(color: Colors.white)),
       ),
       body: RefreshIndicator(
         onRefresh: _carregarDados,
@@ -248,8 +269,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
                                         fontWeight: FontWeight.bold)),
                                 Text(
                                   '${_count('vencidos')} vencido(s) · ${_count('vencer_30')} vencendo em breve',
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 12),
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                                 ),
                               ],
                             ),
@@ -262,17 +282,17 @@ class _DocumentosPageState extends State<DocumentosPage> {
                     // KPIs
                     Row(
                       children: [
-                        _kpi('Total', '${documentos.length}',
-                            Icons.description, AppColors.secondary),
+                        _kpi('Total', '${documentos.length}', Icons.description,
+                            AppColors.secondary),
                         const SizedBox(width: 8),
-                        _kpi('Ativos', '${_count('ativos')}',
-                            Icons.check_circle, AppColors.success),
+                        _kpi('Ativos', '${_count('ativos')}', Icons.check_circle,
+                            AppColors.success),
                         const SizedBox(width: 8),
-                        _kpi('Vencer', '${_count('vencer_30')}',
-                            Icons.schedule, AppColors.warning),
+                        _kpi('Vencer', '${_count('vencer_30')}', Icons.schedule,
+                            AppColors.warning),
                         const SizedBox(width: 8),
-                        _kpi('Vencidos', '${_count('vencidos')}',
-                            Icons.warning_amber, AppColors.danger),
+                        _kpi('Vencidos', '${_count('vencidos')}', Icons.warning_amber,
+                            AppColors.danger),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -286,18 +306,15 @@ class _DocumentosPageState extends State<DocumentosPage> {
                           const SizedBox(width: 8),
                           _chip('Ativos', 'ativos', color: AppColors.success),
                           const SizedBox(width: 8),
-                          _chip('Vencer em 30d', 'vencer_30',
-                              color: AppColors.warning),
+                          _chip('Vencer em 30d', 'vencer_30', color: AppColors.warning),
                           const SizedBox(width: 8),
-                          _chip('Vencidos', 'vencidos',
-                              color: AppColors.danger),
+                          _chip('Vencidos', 'vencidos', color: AppColors.danger),
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text('${filtrados.length} documento(s)',
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 12)),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                     const SizedBox(height: 10),
                   ],
                 ),
@@ -305,23 +322,20 @@ class _DocumentosPageState extends State<DocumentosPage> {
             ),
 
             if (carregando)
-              const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
             else if (filtrados.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.folder_open,
-                          size: 64, color: AppColors.textSecondary),
+                      const Icon(Icons.folder_open, size: 64, color: AppColors.textSecondary),
                       const SizedBox(height: 16),
                       Text(
                         documentos.isEmpty
                             ? 'Nenhum documento cadastrado'
                             : 'Nenhum documento neste filtro',
-                        style:
-                            const TextStyle(color: AppColors.textSecondary),
+                        style: const TextStyle(color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton.icon(
@@ -344,12 +358,9 @@ class _DocumentosPageState extends State<DocumentosPage> {
                       final doc = filtrados[i];
                       final cor = _statusColor(doc);
                       final tipo = doc['tipo']?.toString() ?? '-';
-                      final descricao =
-                          doc['descricao']?.toString() ?? '';
-                      final vencimento =
-                          _fmtDate(doc['data_vencimento']);
-                      final emissao =
-                          _fmtDate(doc['data_emissao']);
+                      final descricao = doc['descricao']?.toString() ?? '';
+                      final vencimento = _fmtDate(doc['data_vencimento']);
+                      final emissao = _fmtDate(doc['data_emissao']);
                       final veiculo = _veiculoLabel(doc);
                       final motorista = _motoristaLabel(doc);
 
@@ -362,76 +373,56 @@ class _DocumentosPageState extends State<DocumentosPage> {
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                  color: cor.withOpacity(0.3)),
+                              border: Border.all(color: cor.withOpacity(0.3)),
                               boxShadow: [
                                 BoxShadow(
-                                    color: Colors.black
-                                        .withOpacity(0.08),
+                                    color: Colors.black.withOpacity(0.08),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2)),
                               ],
                             ),
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
                                     Container(
-                                      padding:
-                                          const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color:
-                                            cor.withOpacity(0.15),
-                                        borderRadius:
-                                            BorderRadius.circular(8),
+                                        color: cor.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: Icon(
-                                          Icons.description,
-                                          color: cor,
-                                          size: 18),
+                                      child: Icon(Icons.description, color: cor, size: 18),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(tipo,
                                               style: const TextStyle(
                                                   color: Colors.white,
-                                                  fontWeight:
-                                                      FontWeight.w700,
+                                                  fontWeight: FontWeight.w700,
                                                   fontSize: 14)),
                                           Text(veiculo,
                                               style: const TextStyle(
-                                                  color: AppColors
-                                                      .textSecondary,
-                                                  fontSize: 12)),
+                                                  color: AppColors.textSecondary, fontSize: 12)),
                                         ],
                                       ),
                                     ),
                                     Container(
-                                      padding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: cor.withOpacity(0.13),
-                                        borderRadius:
-                                            BorderRadius.circular(20),
-                                        border: Border.all(
-                                            color:
-                                                cor.withOpacity(0.3)),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: cor.withOpacity(0.3)),
                                       ),
-                                      child: Text(
-                                          _statusLabel(doc),
+                                      child: Text(_statusLabel(doc),
                                           style: TextStyle(
                                               color: cor,
                                               fontSize: 10,
-                                              fontWeight:
-                                                  FontWeight.w700)),
+                                              fontWeight: FontWeight.w700)),
                                     ),
                                   ],
                                 ),
@@ -439,9 +430,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
                                   const SizedBox(height: 6),
                                   Text(descricao,
                                       style: const TextStyle(
-                                          color:
-                                              AppColors.textSecondary,
-                                          fontSize: 12),
+                                          color: AppColors.textSecondary, fontSize: 12),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis),
                                 ],
@@ -451,14 +440,10 @@ class _DocumentosPageState extends State<DocumentosPage> {
                                   runSpacing: 4,
                                   children: [
                                     if (motorista != '-')
-                                      _badge(
-                                          'Motorista: $motorista',
-                                          AppColors.textSecondary),
+                                      _badge('👤 $motorista', AppColors.textSecondary),
                                     if (emissao != '-')
-                                      _badge('Emissão: $emissao',
-                                          AppColors.textSecondary),
-                                    _badge(
-                                        'Vence: $vencimento', cor),
+                                      _badge('Emissão: $emissao', AppColors.textSecondary),
+                                    _badge('Vence: $vencimento', cor),
                                   ],
                                 ),
                               ],
@@ -477,8 +462,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
     );
   }
 
-  Widget _kpi(String label, String value, IconData icon, Color color) =>
-      Expanded(
+  Widget _kpi(String label, String value, IconData icon, Color color) => Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
@@ -492,13 +476,9 @@ class _DocumentosPageState extends State<DocumentosPage> {
               Icon(icon, color: color, size: 15),
               const SizedBox(height: 4),
               Text(value,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold)),
+                  style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
               Text(label,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 9),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 9),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
             ],
@@ -513,53 +493,44 @@ class _DocumentosPageState extends State<DocumentosPage> {
       onTap: () => setState(() => filtro = value),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? c.withOpacity(0.15) : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: selected ? c : AppColors.border,
-              width: selected ? 1.5 : 1),
+          border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.5 : 1),
         ),
         child: Text(label,
             style: TextStyle(
                 color: selected ? c : AppColors.textSecondary,
                 fontSize: 12,
-                fontWeight: selected
-                    ? FontWeight.w700
-                    : FontWeight.normal)),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
       ),
     );
   }
 
   Widget _badge(String text, Color color) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
           color: color.withOpacity(0.12),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(text,
-            style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w600),
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
             maxLines: 1,
             overflow: TextOverflow.ellipsis),
       );
 }
 
-// ─── Formulário novo documento (modal) ───────────────────────────────────────
+// ─── Formulário — carrega veículos e motoristas internamente ──────────────────
 
 class _NovoDocumentoForm extends StatefulWidget {
-  final List<Map<String, dynamic>> veiculos;
-  final List<Map<String, dynamic>> motoristas;
+  final Map<String, Map<String, dynamic>> veiculosMap;
+  final Map<String, Map<String, dynamic>> motoristasMap;
   final VoidCallback onSaved;
 
   const _NovoDocumentoForm({
-    required this.veiculos,
-    required this.motoristas,
+    required this.veiculosMap,
+    required this.motoristasMap,
     required this.onSaved,
   });
 
@@ -571,7 +542,10 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   final supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
   bool isSaving = false;
-  bool buscandoMotorista = false;
+
+  // Listas resolvidas a partir dos maps do pai
+  late List<Map<String, dynamic>> veiculos;
+  late List<Map<String, dynamic>> motoristas;
 
   String? tipoSelecionado;
   String? veiculoId;
@@ -581,8 +555,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   PlatformFile? arquivo;
 
   DateTime? dataEmissao;
-  DateTime dataVencimento =
-      DateTime.now().add(const Duration(days: 365));
+  DateTime dataVencimento = DateTime.now().add(const Duration(days: 365));
   DateTime? dataPagamento;
 
   final descricaoCtrl = TextEditingController();
@@ -599,23 +572,39 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    veiculos = widget.veiculosMap.values.toList()
+      ..sort((a, b) => (a['plate'] ?? '').compareTo(b['plate'] ?? ''));
+    motoristas = widget.motoristasMap.values.toList()
+      ..sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+  }
+
+  @override
   void dispose() {
     descricaoCtrl.dispose();
     super.dispose();
+  }
+
+  String _veiculoLabel(Map<String, dynamic> v) {
+    final plate = v['plate']?.toString() ?? '';
+    final brand = v['brand']?.toString() ?? '';
+    final model = v['model']?.toString() ?? '';
+    final desc = '$brand $model'.trim();
+    return desc.isNotEmpty ? '$plate — $desc' : plate;
   }
 
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   Future<DateTime?> _pickDate({
-    required BuildContext ctx,
     required DateTime initial,
     DateTime? firstDate,
     DateTime? lastDate,
     String helpText = 'Selecionar data',
   }) async {
     return showDatePicker(
-      context: ctx,
+      context: context,
       initialDate: initial,
       firstDate: firstDate ?? DateTime(2015),
       lastDate: lastDate ?? DateTime(2040),
@@ -628,74 +617,62 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
             surface: AppColors.surface,
             onSurface: Colors.white,
           ),
-          dialogTheme: const DialogThemeData(
-              backgroundColor: AppColors.backgroundSoft),
+          dialogTheme: const DialogThemeData(backgroundColor: AppColors.backgroundSoft),
         ),
         child: child!,
       ),
     );
   }
 
-  Future<void> _aoSelecionarVeiculo(String? id) async {
+  void _aoSelecionarVeiculo(String? id) {
     setState(() {
       veiculoId = id;
       motoristaAutoId = null;
       motoristaAutoNome = null;
       motoristaManualId = null;
-      buscandoMotorista = id != null;
     });
 
     if (id == null) return;
 
-    try {
-      final result = await supabase
-          .from('vehicles')
-          .select('driver_id, drivers(id, name)')
-          .eq('id', id)
-          .maybeSingle();
+    // Tenta auto-preencher motorista a partir do veiculos map
+    final v = widget.veiculosMap[id];
+    if (v == null) return;
+    final driverId = v['driver_id']?.toString();
+    if (driverId == null || driverId.isEmpty) return;
 
-      if (result != null && result['drivers'] != null) {
-        final driver = result['drivers'];
-        setState(() {
-          motoristaAutoId = driver['id']?.toString();
-          motoristaAutoNome = driver['name']?.toString();
-        });
-      }
-    } catch (_) {
-      // vehicles.driver_id não existe — mostrará dropdown manual
-    } finally {
-      if (mounted) setState(() => buscandoMotorista = false);
+    final driver = widget.motoristasMap[driverId];
+    if (driver != null) {
+      setState(() {
+        motoristaAutoId = driverId;
+        motoristaAutoNome = driver['name']?.toString();
+      });
     }
   }
 
   Future<void> _selecionarArquivo() async {
-    final resultado =
-        await FilePicker.platform.pickFiles(withData: true);
+    final resultado = await FilePicker.platform.pickFiles(withData: true);
     if (resultado != null && resultado.files.isNotEmpty) {
-      if (mounted) {
-        setState(() => arquivo = resultado.files.single);
-      }
+      if (mounted) setState(() => arquivo = resultado.files.single);
     }
   }
 
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
-
     setState(() => isSaving = true);
     try {
+      // Upload arquivo (silencioso se bucket não existir)
       String? fileUrl;
       if (arquivo != null && arquivo!.bytes != null) {
-        final ext = arquivo!.extension ?? 'pdf';
-        final fileName =
-            'documento_${DateTime.now().millisecondsSinceEpoch}.$ext';
-        await supabase.storage.from('documentos').uploadBinary(
-              fileName,
-              arquivo!.bytes!,
-              fileOptions: const FileOptions(upsert: true),
-            );
-        fileUrl = supabase.storage
-            .from('documentos')
-            .getPublicUrl(fileName);
+        try {
+          final ext = arquivo!.extension ?? 'pdf';
+          final fileName = 'documento_${DateTime.now().millisecondsSinceEpoch}.$ext';
+          await supabase.storage.from('documentos').uploadBinary(
+                fileName,
+                arquivo!.bytes!,
+                fileOptions: const FileOptions(upsert: true),
+              );
+          fileUrl = supabase.storage.from('documentos').getPublicUrl(fileName);
+        } catch (_) {}
       }
 
       final motoristaId = motoristaAutoId ?? motoristaManualId;
@@ -703,18 +680,15 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       final payload = <String, dynamic>{
         'tipo': tipoSelecionado,
         'descricao': descricaoCtrl.text.trim(),
-        'data_vencimento':
-            dataVencimento.toIso8601String().split('T')[0],
+        'data_vencimento': dataVencimento.toIso8601String().split('T')[0],
         'ativo': true,
-        if (veiculoId != null) 'veiculo_id': veiculoId,
-        if (motoristaId != null) 'motorista_id': motoristaId,
+        if (veiculoId != null) 'vehicle_id': veiculoId,
+        if (motoristaId != null) 'driver_id': motoristaId,
         if (fileUrl != null) 'file_url': fileUrl,
         if (dataEmissao != null)
-          'data_emissao':
-              dataEmissao!.toIso8601String().split('T')[0],
+          'data_emissao': dataEmissao!.toIso8601String().split('T')[0],
         if (dataPagamento != null)
-          'data_pagamento':
-              dataPagamento!.toIso8601String().split('T')[0],
+          'data_pagamento': dataPagamento!.toIso8601String().split('T')[0],
       };
 
       await supabase.from('documentos').insert(payload);
@@ -740,9 +714,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
 
   @override
   Widget build(BuildContext context) {
-    final temAutoDriver =
-        motoristaAutoId != null && motoristaAutoNome != null;
-    final mostrarManual = !buscandoMotorista && !temAutoDriver;
+    final temAutoDriver = motoristaAutoId != null && motoristaAutoNome != null;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -765,8 +737,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2)),
+                      color: AppColors.border, borderRadius: BorderRadius.circular(2)),
                 ),
               ),
               Row(
@@ -777,109 +748,80 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                       color: const Color(0xFF0ea5e9).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.folder_special,
-                        color: Color(0xFF0ea5e9), size: 20),
+                    child:
+                        const Icon(Icons.folder_special, color: Color(0xFF0ea5e9), size: 20),
                   ),
                   const SizedBox(width: 10),
                   const Text('Novo Documento',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold)),
+                          color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 20),
 
-              // Tipo
+              // ── Tipo ──────────────────────────────────────────────────────
               DropdownButtonFormField<String>(
                 value: tipoSelecionado,
-                decoration:
-                    _dec('Tipo de Documento *', Icons.category_outlined),
+                decoration: _dec('Tipo de Documento *', Icons.category_outlined),
                 dropdownColor: AppColors.surface,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                isExpanded: true,
+                hint: const Text('Selecione o tipo',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
                 items: tipos
                     .map((t) => DropdownMenuItem(
                           value: t,
-                          child: Text(t,
-                              style:
-                                  const TextStyle(color: Colors.white)),
+                          child: Text(t, style: const TextStyle(color: Colors.white)),
                         ))
                     .toList(),
-                validator: (v) =>
-                    v == null ? 'Selecione o tipo' : null,
+                validator: (v) => v == null ? 'Selecione o tipo' : null,
                 onChanged: (v) => setState(() => tipoSelecionado = v),
               ),
               const SizedBox(height: 14),
 
-              // Veículo
-              DropdownButtonFormField<String>(
-                value: veiculoId,
-                decoration: _dec('Veículo *', Icons.directions_car_outlined),
-                dropdownColor: AppColors.surface,
-                style: const TextStyle(color: Colors.white),
-                items: widget.veiculos
-                    .map((v) => DropdownMenuItem(
-                          value: v['id']?.toString(),
-                          child: Text(
-                            '${v['plate'] ?? ''} — ${v['model'] ?? ''}',
-                            style:
-                                const TextStyle(color: Colors.white),
-                          ),
-                        ))
-                    .toList(),
-                validator: (v) =>
-                    v == null ? 'Selecione um veículo' : null,
-                onChanged: _aoSelecionarVeiculo,
-              ),
+              // ── Veículo ──────────────────────────────────────────────────
+              if (veiculos.isEmpty)
+                _avisoSemDados('Nenhum veículo cadastrado', Icons.directions_car_outlined)
+              else
+                DropdownButtonFormField<String>(
+                  value: veiculoId,
+                  decoration: _dec('Veículo *', Icons.directions_car_outlined),
+                  dropdownColor: AppColors.surface,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  isExpanded: true,
+                  hint: const Text('Selecione o veículo',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                  items: veiculos
+                      .map((v) => DropdownMenuItem<String>(
+                            value: v['id']?.toString(),
+                            child: Text(_veiculoLabel(v),
+                                style: const TextStyle(color: Colors.white),
+                                overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  validator: (v) => v == null ? 'Selecione um veículo' : null,
+                  onChanged: _aoSelecionarVeiculo,
+                ),
               const SizedBox(height: 14),
 
-              // Motorista — auto ou manual
-              if (buscandoMotorista)
+              // ── Motorista — auto detectado ou manual ──────────────────────
+              if (temAutoDriver)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundSoft,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Row(
-                    children: [
-                      SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.secondary)),
-                      SizedBox(width: 12),
-                      Text('Buscando motorista vinculado...',
-                          style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13)),
-                    ],
-                  ),
-                )
-              else if (temAutoDriver)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.success.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppColors.success.withOpacity(0.4)),
+                    border: Border.all(color: AppColors.success.withOpacity(0.4)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.person_pin,
-                          color: AppColors.success, size: 18),
+                      const Icon(Icons.person_pin, color: AppColors.success, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Motorista vinculado',
+                            const Text('Motorista vinculado ao veículo',
                                 style: TextStyle(
                                     color: AppColors.success,
                                     fontSize: 10,
@@ -897,55 +839,58 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                           motoristaAutoId = null;
                           motoristaAutoNome = null;
                         }),
-                        child: const Icon(Icons.edit,
-                            color: AppColors.textSecondary, size: 16),
+                        child: const Icon(Icons.edit, color: AppColors.textSecondary, size: 16),
                       ),
                     ],
                   ),
                 )
-              else if (mostrarManual)
+              else if (motoristas.isEmpty)
+                _avisoSemDados('Nenhum motorista cadastrado (opcional)', Icons.person_outline)
+              else
                 DropdownButtonFormField<String>(
                   value: motoristaManualId,
-                  decoration: _dec(
-                      'Motorista (opcional)', Icons.person_outline),
+                  decoration: _dec('Motorista (opcional)', Icons.person_outline),
                   dropdownColor: AppColors.surface,
-                  style: const TextStyle(color: Colors.white),
-                  items: widget.motoristas
-                      .map((m) => DropdownMenuItem(
-                            value: m['id']?.toString(),
-                            child: Text(m['name'] ?? '-',
-                                style: const TextStyle(
-                                    color: Colors.white)),
-                          ))
-                      .toList(),
-                  onChanged: (v) =>
-                      setState(() => motoristaManualId = v),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  isExpanded: true,
+                  hint: const Text('Selecione o motorista',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Sem motorista',
+                          style: TextStyle(color: AppColors.textSecondary)),
+                    ),
+                    ...motoristas.map((m) => DropdownMenuItem<String>(
+                          value: m['id']?.toString(),
+                          child: Text(m['name']?.toString() ?? '-',
+                              style: const TextStyle(color: Colors.white)),
+                        )),
+                  ],
+                  onChanged: (v) => setState(() => motoristaManualId = v),
                 ),
               const SizedBox(height: 14),
 
-              // Descrição
+              // ── Descrição ─────────────────────────────────────────────────
               TextFormField(
                 controller: descricaoCtrl,
                 style: const TextStyle(color: Colors.white),
                 maxLines: 2,
-                decoration: _dec('Descrição *', Icons.notes_outlined)
-                    .copyWith(alignLabelWithHint: true),
+                decoration:
+                    _dec('Descrição *', Icons.notes_outlined).copyWith(alignLabelWithHint: true),
                 validator: (v) =>
-                    (v == null || v.trim().isEmpty)
-                        ? 'Informe a descrição'
-                        : null,
+                    (v == null || v.trim().isEmpty) ? 'Informe a descrição' : null,
               ),
               const SizedBox(height: 14),
 
-              // Data de Emissão
+              // ── Data de Emissão ───────────────────────────────────────────
               _datePicker(
                 label: 'Data de Emissão',
                 icon: Icons.calendar_today_outlined,
                 value: dataEmissao,
-                placeholder: 'Toque para selecionar',
+                placeholder: 'Toque para selecionar (opcional)',
                 onTap: () async {
                   final d = await _pickDate(
-                    ctx: context,
                     initial: dataEmissao ?? DateTime.now(),
                     lastDate: DateTime.now(),
                     helpText: 'Data de emissão',
@@ -955,7 +900,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Data de Vencimento
+              // ── Data de Vencimento ────────────────────────────────────────
               _datePicker(
                 label: 'Data de Vencimento *',
                 icon: Icons.event_outlined,
@@ -963,7 +908,6 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 required: true,
                 onTap: () async {
                   final d = await _pickDate(
-                    ctx: context,
                     initial: dataVencimento,
                     firstDate: DateTime(2015),
                     lastDate: DateTime(2040),
@@ -974,7 +918,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Data de Pagamento
+              // ── Data de Pagamento ─────────────────────────────────────────
               _datePicker(
                 label: 'Data de Pagamento',
                 icon: Icons.payments_outlined,
@@ -982,7 +926,6 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 placeholder: 'Toque para selecionar (opcional)',
                 onTap: () async {
                   final d = await _pickDate(
-                    ctx: context,
                     initial: dataPagamento ?? DateTime.now(),
                     helpText: 'Data de pagamento',
                   );
@@ -991,12 +934,11 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               ),
               const SizedBox(height: 14),
 
-              // Arquivo
+              // ── Arquivo ───────────────────────────────────────────────────
               GestureDetector(
                 onTap: _selecionarArquivo,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
                     color: arquivo != null
                         ? AppColors.success.withOpacity(0.08)
@@ -1010,23 +952,16 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                   child: Row(
                     children: [
                       Icon(
-                          arquivo != null
-                              ? Icons.attach_file
-                              : Icons.upload_file,
-                          color: arquivo != null
-                              ? AppColors.success
-                              : AppColors.textSecondary,
+                          arquivo != null ? Icons.attach_file : Icons.upload_file,
+                          color:
+                              arquivo != null ? AppColors.success : AppColors.textSecondary,
                           size: 18),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          arquivo != null
-                              ? arquivo!.name
-                              : 'Selecionar arquivo (opcional)',
+                          arquivo != null ? arquivo!.name : 'Selecionar arquivo (opcional)',
                           style: TextStyle(
-                              color: arquivo != null
-                                  ? Colors.white
-                                  : AppColors.textSecondary,
+                              color: arquivo != null ? Colors.white : AppColors.textSecondary,
                               fontSize: 13),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1044,27 +979,23 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               ),
               const SizedBox(height: 24),
 
-              // Botão salvar
+              // ── Botão salvar ──────────────────────────────────────────────
               ElevatedButton(
                 onPressed: isSaving ? null : _salvar,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0ea5e9),
                   minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: isSaving
                     ? const SizedBox(
                         height: 22,
                         width: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5),
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                       )
                     : const Text('Registrar Documento',
                         style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600)),
+                            color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -1073,7 +1004,21 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
     );
   }
 
-  // ── Widgets helpers ──────────────────────────────────────────────────────────
+  Widget _avisoSemDados(String msg, IconData icon) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundSoft,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 18),
+            const SizedBox(width: 10),
+            Text(msg, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          ],
+        ),
+      );
 
   Widget _datePicker({
     required String label,
@@ -1086,8 +1031,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
           color: AppColors.backgroundSoft,
           borderRadius: BorderRadius.circular(12),
@@ -1103,23 +1047,19 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(label,
-                      style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 11)),
+                      style:
+                          const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                   const SizedBox(height: 2),
                   Text(
                     value != null ? _fmt(value) : placeholder,
                     style: TextStyle(
-                        color: value != null
-                            ? Colors.white
-                            : AppColors.textSecondary,
+                        color: value != null ? Colors.white : AppColors.textSecondary,
                         fontSize: 14),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.edit_calendar,
-                color: AppColors.textSecondary, size: 16),
+            const Icon(Icons.edit_calendar, color: AppColors.textSecondary, size: 16),
           ],
         ),
       ),
@@ -1128,28 +1068,22 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
 
   InputDecoration _dec(String label, IconData icon) => InputDecoration(
         labelText: label,
-        labelStyle:
-            const TextStyle(color: AppColors.textSecondary),
-        prefixIcon:
-            Icon(icon, color: AppColors.textSecondary, size: 18),
+        labelStyle: const TextStyle(color: AppColors.textSecondary),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 18),
         filled: true,
         fillColor: AppColors.backgroundSoft,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.border)),
+            borderSide: const BorderSide(color: AppColors.border)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.border)),
+            borderSide: const BorderSide(color: AppColors.border)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: Color(0xFF0ea5e9))),
+            borderSide: const BorderSide(color: Color(0xFF0ea5e9))),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide:
-                const BorderSide(color: AppColors.danger)),
+            borderSide: const BorderSide(color: AppColors.danger)),
       );
 }
 
@@ -1159,12 +1093,10 @@ class _DetalheDocumentoPage extends StatefulWidget {
   final Map<String, dynamic> documento;
   final VoidCallback onAtualizado;
 
-  const _DetalheDocumentoPage(
-      {required this.documento, required this.onAtualizado});
+  const _DetalheDocumentoPage({required this.documento, required this.onAtualizado});
 
   @override
-  State<_DetalheDocumentoPage> createState() =>
-      _DetalheDocumentoPageState();
+  State<_DetalheDocumentoPage> createState() => _DetalheDocumentoPageState();
 }
 
 class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
@@ -1209,31 +1141,24 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
     return 'Ativo';
   }
 
-  String get _veiculo {
-    final vj = widget.documento['vehicles'];
-    if (vj != null) {
-      return '${vj['plate'] ?? ''} — ${vj['model'] ?? ''}'.trim();
-    }
-    return '-';
-  }
+  String get _veiculo =>
+      widget.documento['_veiculo_label']?.toString() ??
+      widget.documento['vehicles']?['plate']?.toString() ??
+      '-';
 
-  String get _motorista {
-    final dj = widget.documento['drivers'];
-    if (dj != null) return dj['name']?.toString() ?? '-';
-    return '-';
-  }
+  String get _motorista =>
+      widget.documento['_motorista_label']?.toString() ??
+      widget.documento['drivers']?['name']?.toString() ??
+      '-';
 
   Future<void> _deletar() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('Excluir Documento?',
-            style: TextStyle(color: Colors.white)),
-        content: const Text(
-            'Esta ação é irreversível. Deseja continuar?',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Excluir Documento?', style: TextStyle(color: Colors.white)),
+        content: const Text('Esta ação é irreversível. Deseja continuar?',
             style: TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
@@ -1243,10 +1168,8 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger),
-            child: const Text('Excluir',
-                style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1255,15 +1178,11 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
     if (ok != true || !mounted) return;
 
     try {
-      await supabase
-          .from('documentos')
-          .delete()
-          .eq('id', widget.documento['id']);
+      await supabase.from('documentos').delete().eq('id', widget.documento['id']);
       widget.onAtualizado();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Documento excluído.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Documento excluído.')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -1292,14 +1211,13 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header card
+            // Header
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
-                border:
-                    Border.all(color: _cor.withOpacity(0.3)),
+                border: Border.all(color: _cor.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
@@ -1309,42 +1227,33 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                       color: _cor.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.description,
-                        color: _cor, size: 24),
+                    child: Icon(Icons.description, color: _cor, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(tipo,
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold)),
+                                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         Text(descricao,
                             style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13),
+                                color: AppColors.textSecondary, fontSize: 13),
                             maxLines: 2),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: _cor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: _cor.withOpacity(0.4)),
+                      border: Border.all(color: _cor.withOpacity(0.4)),
                     ),
                     child: Text(_status,
                         style: TextStyle(
-                            color: _cor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
+                            color: _cor, fontSize: 11, fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
@@ -1353,24 +1262,18 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
 
             // Informações
             _section('Informações', [
-              _infoRow(Icons.directions_car_outlined, 'Veículo',
-                  _veiculo),
-              _infoRow(
-                  Icons.person_outline, 'Motorista', _motorista),
-              _infoRow(Icons.calendar_today_outlined, 'Emissão',
-                  _fmtDate(doc['data_emissao'])),
-              _infoRow(Icons.event_outlined, 'Vencimento',
-                  _fmtDate(doc['data_vencimento'])),
-              _infoRow(Icons.payments_outlined, 'Pagamento',
-                  _fmtDate(doc['data_pagamento'])),
+              _infoRow(Icons.directions_car_outlined, 'Veículo', _veiculo),
+              _infoRow(Icons.person_outline, 'Motorista', _motorista),
+              _infoRow(Icons.calendar_today_outlined, 'Emissão', _fmtDate(doc['data_emissao'])),
+              _infoRow(Icons.event_outlined, 'Vencimento', _fmtDate(doc['data_vencimento'])),
+              _infoRow(Icons.payments_outlined, 'Pagamento', _fmtDate(doc['data_pagamento'])),
             ]),
             const SizedBox(height: 14),
 
             // Arquivo
             if (fileUrl != null && fileUrl.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
@@ -1378,22 +1281,17 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.attach_file,
-                        color: AppColors.secondary, size: 20),
+                    const Icon(Icons.attach_file, color: AppColors.secondary, size: 20),
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text('Arquivo anexado',
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500)),
+                              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color:
-                            AppColors.secondary.withOpacity(0.12),
+                        color: AppColors.secondary.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text('Visualizar',
@@ -1410,17 +1308,13 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
             // Botão excluir
             OutlinedButton.icon(
               onPressed: _deletar,
-              icon: const Icon(Icons.delete_outline,
-                  color: AppColors.danger, size: 18),
+              icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
               label: const Text('Excluir Documento',
-                  style: TextStyle(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w600)),
+                  style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.danger),
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
@@ -1439,8 +1333,7 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(title,
                   style: const TextStyle(
                       color: AppColors.textSecondary,
@@ -1448,35 +1341,26 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.4)),
             ),
-            const Divider(
-                height: 1, color: AppColors.border),
+            const Divider(height: 1, color: AppColors.border),
             ...rows,
           ],
         ),
       );
 
-  Widget _infoRow(
-          IconData icon, String label, String value) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 11),
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
           children: [
-            Icon(icon,
-                color: AppColors.textSecondary, size: 16),
+            Icon(icon, color: AppColors.textSecondary, size: 16),
             const SizedBox(width: 10),
             SizedBox(
                 width: 80,
                 child: Text(label,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13))),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
             Expanded(
                 child: Text(value,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500))),
+                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500))),
           ],
         ),
       );
