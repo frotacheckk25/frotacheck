@@ -145,13 +145,14 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         payload['notes'] = observacoesController.text.trim();
       }
 
-      final result = await supabase.from('oil_changes').insert(payload).select('*, vehicles(plate, model)');
+      final result = await supabase.from('oil_changes').insert(payload).select();
 
       if (!mounted) return;
 
-      // Atualiza histórico imediatamente
+      // Atualiza histórico imediatamente, enriquecendo com dados do veículo já em memória
       if (result.isNotEmpty) {
         final novo = Map<String, dynamic>.from(result.first as Map);
+        novo['vehicles'] = {'plate': veiculo['plate'], 'model': veiculo['model']};
         setState(() => historico = [novo, ...historico]);
       }
 

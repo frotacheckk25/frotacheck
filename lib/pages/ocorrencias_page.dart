@@ -113,29 +113,32 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     if (selectedVehicleId != null) payload['vehicle_id'] = selectedVehicleId;
     if (selectedDriverId != null) payload['driver_id'] = selectedDriverId;
 
+    // Resolve info do veículo/motorista a partir da memória (antes do insert)
+    final veiculo = veiculos.firstWhere(
+      (v) => v['id']?.toString() == selectedVehicleId,
+      orElse: () => {},
+    );
+    final motorista = motoristas.firstWhere(
+      (m) => m['id']?.toString() == selectedDriverId,
+      orElse: () => {},
+    );
+
     try {
       final result = await supabase
           .from('occurrences')
           .insert(payload)
-          .select('*, vehicles(plate, model), drivers(name)');
+          .select();
 
       if (!mounted) return;
 
       Map<String, dynamic>? novaOcorrencia;
       if (result.isNotEmpty) {
         novaOcorrencia = Map<String, dynamic>.from(result.first as Map);
+        // Enriquece com dados já em memória para não depender de FK join
+        novaOcorrencia['vehicles'] = {'plate': veiculo['plate'], 'model': veiculo['model']};
+        novaOcorrencia['drivers']  = {'name': motorista['name']};
         setState(() => ocorrencias = [novaOcorrencia!, ...ocorrencias]);
       }
-
-      // Resolve info para o alerta
-      final veiculo = veiculos.firstWhere(
-        (v) => v['id']?.toString() == selectedVehicleId,
-        orElse: () => {},
-      );
-      final motorista = motoristas.firstWhere(
-        (m) => m['id']?.toString() == selectedDriverId,
-        orElse: () => {},
-      );
       final placa = veiculo['plate']?.toString() ?? '';
       final nomeMotorista = motorista['name']?.toString() ?? '';
       final prioridadeStr = (selectedPriority ?? '').toLowerCase();
