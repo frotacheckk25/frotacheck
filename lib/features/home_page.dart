@@ -221,7 +221,7 @@ class _HomePageState extends State<HomePage> {
   List<String> monthlyFuelLabels = [];
   Map<String, double> custosPorCategoria = {};
 
-  // �"?�"?�"? Mock data fallbacks (shown when Supabase tables are empty) �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+  // ??? Mock data fallbacks (shown when Supabase tables are empty) ????????????
   static const _mockRanking = [
     {'name': 'Marcos Silva', 'score': 98},
     {'name': 'João Santos', 'score': 92},
@@ -411,7 +411,7 @@ class _HomePageState extends State<HomePage> {
         motoristas: motoristas,
       );
 
-      // Carrega ocorr�ncias cr�ticas (Alta prioridade, n�o resolvidas)
+      // Carrega ocorrências críticas (Alta prioridade, não resolvidas)
       List<Map<String, dynamic>> criticas = [];
       try {
         final critRes = await supabase
@@ -577,7 +577,7 @@ class _HomePageState extends State<HomePage> {
           .limit(8);
       final supAlertsList = supAlerts as List;
       if (supAlertsList.isNotEmpty) {
-        // Ordena: error (cr�tico) primeiro, depois warning, depois info
+        // Ordena: error (crítico) primeiro, depois warning, depois info
         final sorted = List<Map<String, dynamic>>.from(
           supAlertsList.map((e) => Map<String, dynamic>.from(e as Map)),
         );
@@ -607,7 +607,7 @@ class _HomePageState extends State<HomePage> {
           o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
       built.add({
         'title': 'Ocorrência: ${tipo.toString()}',
-        'subtitle': '${o['vehicles']?['plate'] ?? ''} �?� ${o['status'] ?? ''}',
+        'subtitle': '${o['vehicles']?['plate'] ?? ''} - ${o['status'] ?? ''}',
       });
     }
 
@@ -1803,7 +1803,7 @@ class _HomePageState extends State<HomePage> {
       _RegistroOption(Icons.local_gas_station, 'Novo Abastecimento', const Color(0xFFeab308), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage())).then((_) => carregarDashboard())),
       _RegistroOption(Icons.receipt_long, 'Nova Multa', const Color(0xFFef4444), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage())).then((_) => carregarDashboard())),
       _RegistroOption(Icons.build, 'Nova Manutenção', const Color(0xFF7C3AED), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage())).then((_) => carregarDashboard())),
-      _RegistroOption(Icons.opacity, 'Nova Troca de �"leo', const Color(0xFF8B5CF6), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrocaOleoPage())).then((_) => carregarDashboard())),
+      _RegistroOption(Icons.opacity, 'Nova Troca de Óleo', const Color(0xFF8B5CF6), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrocaOleoPage())).then((_) => carregarDashboard())),
       _RegistroOption(Icons.warning_amber, 'Nova Ocorrência', const Color(0xFFF97316), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OcorrenciasPage())).then((_) => carregarDashboard())),
       _RegistroOption(Icons.description, 'Novo Documento', const Color(0xFF0ea5e9), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosPage())).then((_) => carregarDashboard())),
       _RegistroOption(Icons.tire_repair, 'Novo Controle de Pneu', const Color(0xFF64748B), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage())).then((_) => carregarDashboard())),
@@ -1876,7 +1876,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Estilo de botão compacto �?" sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
+  // Estilo de botão compacto — sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
   static final _compactBtn = ButtonStyle(
     minimumSize: WidgetStatePropertyAll(const Size(0, 36)),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1924,7 +1924,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(width: 16),
-        // Date range �?" clickable to open date range picker
+        // Date range — clickable to open date range picker
         GestureDetector(
           onTap: _pickDateRange,
           child: Container(
@@ -2325,7 +2325,7 @@ class _HomePageState extends State<HomePage> {
             return {
               'color': _dashboardPieColors[index % _dashboardPieColors.length],
               'label':
-                  '${entry.value.key} �?" ${percent.toStringAsFixed(0)}% �?� R\$ ${value.toStringAsFixed(2)}',
+                  '${entry.value.key} — ${percent.toStringAsFixed(0)}% - R\$ ${value.toStringAsFixed(2)}',
             };
           }).toList()
         : <Map<String, dynamic>>[];
@@ -2514,13 +2514,13 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _panelHeader('Alertas & Ocorr�ncias', Icons.warning_amber_rounded, AppColors.warning, onTap: () async {
+          _panelHeader('Alertas & Ocorrências', Icons.warning_amber_rounded, AppColors.warning, onTap: () async {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
             carregarDashboard();
           }),
           const SizedBox(height: 12),
 
-          // Ocorr�ncias cr�ticas em destaque
+          // Ocorrências críticas em destaque
           if (ocorrenciasCriticasDash.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -2534,7 +2534,7 @@ class _HomePageState extends State<HomePage> {
                   const Icon(Icons.warning_amber, color: AppColors.danger, size: 14),
                   const SizedBox(width: 6),
                   Text(
-                    '${ocorrenciasCriticasDash.length} ocorr�ncia(s) cr�tica(s) em aberto',
+                    '${ocorrenciasCriticasDash.length} ocorrência(s) crítica(s) em aberto',
                     style: const TextStyle(color: AppColors.danger, fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ],
@@ -2542,7 +2542,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
             ...ocorrenciasCriticasDash.take(3).map((o) {
-              final tipo = o['problem_type']?.toString() ?? 'Ocorr�ncia';
+              final tipo = o['problem_type']?.toString() ?? 'Ocorrência';
               final placa = o['_placa']?.toString() ?? '-';
               final local = o['location']?.toString() ?? '';
               return Padding(
@@ -2794,7 +2794,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// �"?�"?�"? Alerts Panel Sheet �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+// ??? Alerts Panel Sheet ??????????????????????????????????????????????????????
 
 class _AlertsPanelSheet extends StatefulWidget {
   final VoidCallback onViewAll;
@@ -2942,7 +2942,7 @@ class _AlertsPanelSheetState extends State<_AlertsPanelSheet> {
   }
 }
 
-// �"?�"?�"? Global Search Dialog �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+// ??? Global Search Dialog ????????????????????????????????????????????????????
 
 class _GlobalSearchDialog extends StatefulWidget {
   final void Function(Widget page) onNavigate;
