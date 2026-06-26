@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../home/abastecimentos/abastecimentos_page.dart';
 import '../home/alertas/alertas_page.dart';
 import '../home/checklists/selecionar_veiculo_checklist.dart';
+import '../home/checklists/historico_checklist_page.dart';
 import '../home/configuracoes/configuracoes_page.dart';
 import '../home/documentos/documentos_page.dart';
 import '../home/manutencoes/manutencoes_page.dart';
@@ -986,6 +987,17 @@ class _HomePageState extends State<HomePage> {
                                         );
                                         carregarDashboard();
                                       },
+                                    ),
+                                    _buildSidebarItem(
+                                      Icons.history,
+                                      'Histórico Checklist',
+                                      () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const HistoricoChecklistPage(),
+                                        ),
+                                      ),
                                     ),
                                     _buildSidebarItem(
                                       Icons.report_gmailerrorred,

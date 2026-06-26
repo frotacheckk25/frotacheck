@@ -5,6 +5,7 @@ import '../../core/models/motorista_model.dart';
 import '../../core/theme/app_theme.dart';
 import './checklist_saida_page.dart';
 import './checklist_retorno_page.dart';
+import './historico_checklist_page.dart';
 
 class SelecionarVeiculoChecklistPage extends StatefulWidget {
   const SelecionarVeiculoChecklistPage({super.key});
@@ -95,6 +96,15 @@ class _SelecionarVeiculoChecklistPageState
         title: const Text('Checklist'),
         backgroundColor: AppColors.surface,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Histórico',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const HistoricoChecklistPage()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _carregarDados,
