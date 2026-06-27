@@ -149,14 +149,32 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
     }
   }
 
+  // Normaliza string para comparação: minúsculas + remove acentos de vogais comuns
+  String _norm(String s) => s
+      .toLowerCase()
+      .trim()
+      .replaceAll('é', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('á', 'a')
+      .replaceAll('â', 'a')
+      .replaceAll('ã', 'a')
+      .replaceAll('ó', 'o')
+      .replaceAll('ô', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('í', 'i')
+      .replaceAll('ç', 'c');
+
   List<Map<String, dynamic>> get filtradas {
     final query = searchController.text.toLowerCase().trim();
     return ocorrencias.where((o) {
       final status = o['status']?.toString() ?? 'Aberto';
       final priority = o['priority']?.toString() ?? '';
 
-      if (statusFiltro != 'Todos' && status != statusFiltro) return false;
-      if (prioridadeFiltro != 'Todos' && priority != prioridadeFiltro) return false;
+      if (statusFiltro != 'Todos' &&
+          _norm(status) != _norm(statusFiltro)) { return false; }
+      if (prioridadeFiltro != 'Todos' &&
+          _norm(priority) != _norm(prioridadeFiltro)) { return false; }
 
       if (query.isNotEmpty) {
         final searchable = [
@@ -175,8 +193,9 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
     }).toList();
   }
 
-  int _count(String status) =>
-      ocorrencias.where((o) => (o['status'] ?? 'Aberto').toString() == status).length;
+  int _count(String status) => ocorrencias
+      .where((o) => _norm((o['status'] ?? 'Aberto').toString()) == _norm(status))
+      .length;
 
   Color _statusColor(String? s) => switch ((s ?? 'Aberto').toLowerCase()) {
         'resolvido' => AppColors.success,

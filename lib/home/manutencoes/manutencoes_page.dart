@@ -1,12 +1,94 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../pages/ocorrencias_page.dart';
 import '../../../pages/lista_ocorrencias_page.dart';
 import '../../../pages/plano_manutencao_page.dart';
 import '../../../pages/troca_oleo_page.dart';
 
-class ManutencoesPage extends StatelessWidget {
+class ManutencoesPage extends StatefulWidget {
   const ManutencoesPage({super.key});
+
+  @override
+  State<ManutencoesPage> createState() => _ManutencoesPageState();
+}
+
+class _ManutencoesPageState extends State<ManutencoesPage> {
+  final supabase = Supabase.instance.client;
+
+  bool carregando = true;
+  int totalServicos = 0;
+  int ocorrenciasAbertas = 0;
+  int proximaTroca = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarStats();
+  }
+
+  Future<void> _carregarStats() async {
+    if (!mounted) return;
+    setState(() => carregando = true);
+    try {
+      final results = await Future.wait([
+        supabase.from('oil_changes').select('id, vehicle_id, next_change_km'),
+        supabase.from('occurrences').select('id, status'),
+        supabase.from('vehicles').select('id, odometer'),
+      ]);
+
+      final trocas = List<Map<String, dynamic>>.from(
+        (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      final ocorr = List<Map<String, dynamic>>.from(
+        (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      final veiculos = List<Map<String, dynamic>>.from(
+        (results[2] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+
+      // Monta mapa de odômetro por vehicle_id
+      final odomMap = <String, int>{};
+      for (final v in veiculos) {
+        final id = v['id']?.toString() ?? '';
+        final km = (v['odometer'] as num?)?.toInt() ?? 0;
+        odomMap[id] = km;
+      }
+
+      // Veículos com próxima troca dentro de 2000 km do odômetro atual
+      // Pega o mais recente por veículo
+      final latestByVehicle = <String, Map<String, dynamic>>{};
+      for (final t in trocas) {
+        final vid = t['vehicle_id']?.toString() ?? '';
+        if (!latestByVehicle.containsKey(vid)) latestByVehicle[vid] = t;
+      }
+
+      int precisamTroca = 0;
+      for (final entry in latestByVehicle.entries) {
+        final vid = entry.key;
+        final nextKm = (entry.value['next_change_km'] as num?)?.toInt() ?? 0;
+        final atualKm = odomMap[vid] ?? 0;
+        if (nextKm > 0 && atualKm >= nextKm - 2000) precisamTroca++;
+      }
+
+      // Ocorrências não resolvidas
+      final abertas = ocorr.where((o) {
+        final s = (o['status'] ?? '').toString().toLowerCase().trim();
+        return s != 'resolvido';
+      }).length;
+
+      if (!mounted) return;
+      setState(() {
+        totalServicos = trocas.length;
+        ocorrenciasAbertas = abertas;
+        proximaTroca = precisamTroca;
+        carregando = false;
+      });
+    } catch (e) {
+      debugPrint('Erro stats manutenções: $e');
+      if (mounted) setState(() => carregando = false);
+    }
+  }
 
   Widget _buildCard(
     BuildContext context,
@@ -79,14 +161,23 @@ class ManutencoesPage extends StatelessWidget {
           children: [
             Text(title, style: TextStyle(color: color.withValues(alpha: 0.88))),
             const SizedBox(height: 10),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            carregando
+                ? SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: color,
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ],
         ),
       ),
@@ -95,8 +186,19 @@ class ManutencoesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trocaLabel = proximaTroca == 1 ? '1 veículo' : '$proximaTroca veículos';
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Manutenções')),
+      appBar: AppBar(
+        title: const Text('Manutenções'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Atualizar',
+            onPressed: _carregarStats,
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -135,20 +237,20 @@ class ManutencoesPage extends StatelessWidget {
             Row(
               children: [
                 _buildStatisticCard(
-                  'Serviços agendados',
-                  '18',
+                  'Serviços registrados',
+                  '$totalServicos',
                   const Color(0xFF0D47A1),
                 ),
                 const SizedBox(width: 12),
                 _buildStatisticCard(
                   'Ocorrências abertas',
-                  '6',
+                  '$ocorrenciasAbertas',
                   const Color(0xFFF59E0B),
                 ),
                 const SizedBox(width: 12),
                 _buildStatisticCard(
                   'Próxima troca',
-                  '2 veículos',
+                  trocaLabel,
                   const Color(0xFF1AA251),
                 ),
               ],
@@ -163,7 +265,7 @@ class ManutencoesPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const TrocaOleoPage()),
-                );
+                ).then((_) => _carregarStats());
               },
               const Color(0xFF0D47A1),
             ),
@@ -176,7 +278,7 @@ class ManutencoesPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const OcorrenciasPage()),
-                );
+                ).then((_) => _carregarStats());
               },
               const Color(0xFFF59E0B),
             ),
@@ -191,7 +293,7 @@ class ManutencoesPage extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => const ListaOcorrenciasPage(),
                   ),
-                );
+                ).then((_) => _carregarStats());
               },
               const Color(0xFF1AA251),
             ),

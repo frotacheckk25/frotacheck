@@ -296,15 +296,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 _buildStats(),
                 const SizedBox(height: 20),
                 if (isWide)
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(width: 400, child: _buildForm()),
-                        const SizedBox(width: 20),
-                        Expanded(child: _buildListaSection()),
-                      ],
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 400, child: _buildForm()),
+                      const SizedBox(width: 20),
+                      Expanded(child: _buildListaSection()),
+                    ],
                   )
                 else ...[
                   _buildForm(),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -18,8 +19,9 @@ import '../home/relatorios/relatorios_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
+// animated_brain_widget removed — conceito de globo substituído pelo painel premium
+import 'kpi_card_widget.dart';
 import '../pages/troca_oleo_page.dart';
-import '../shared/widgets/app_logo.dart';
 import '../shared/widgets/frota_logo.dart';
 import '../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
@@ -221,62 +223,99 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> ocorrenciasCriticasDash = [];
   List<String> monthlyFuelLabels = [];
   Map<String, double> custosPorCategoria = {};
+  int totalMultas = 0;
+  List<Map<String, dynamic>> pneusData = [];
+  List<int> _modulePulseVersions = List.filled(10, 0);
 
-  // ??? Mock data fallbacks (shown when Supabase tables are empty) ????????????
-  static const _mockRanking = [
-    {'name': 'Marcos Silva', 'score': 98},
-    {'name': 'João Santos', 'score': 92},
-    {'name': 'Carlos Lima', 'score': 87},
-    {'name': 'Pedro Oliveira', 'score': 75},
-    {'name': 'Lucas Almeida', 'score': 70},
-  ];
-  static const _mockVehicleCosts = [
-    {'plate': 'ABC-1234', 'value': 8452.00},
-    {'plate': 'DEF-5678', 'value': 7245.30},
-    {'plate': 'GHI-9012', 'value': 6870.20},
-    {'plate': 'JKL-3456', 'value': 6120.10},
-    {'plate': 'MNO-7890', 'value': 5980.40},
-  ];
-  static const _mockAlertas = [
-    {'title': 'Troca de óleo vencida', 'subtitle': '3 veículos'},
-    {'title': 'CNH vencendo em 30 dias', 'subtitle': '5 motoristas'},
-    {'title': 'Licenciamento vencendo', 'subtitle': '2 veículos'},
-    {'title': 'Checklists pendentes', 'subtitle': '7 veículos'},
-    {'title': 'Seguro vencendo em 15 dias', 'subtitle': '4 veículos'},
-  ];
+  // Sparkline state — 6-month buckets, loaded async after main data
+  List<double> sparkVeiculos = [];
+  List<double> sparkMotoristas = [];
+  List<double> sparkManutencoes = [];
+  List<double> sparkOcorrencias = [];
+  List<double> sparkAbastecimentos = [];
+  List<double> sparkMultas = [];
+  List<double> sparkGasto = [];
+  List<double> sparkFleet = [];
+
   static const _rankingColors = [
     Color(0xFF3B82F6), Color(0xFF6366F1), Color(0xFF8B5CF6),
     Color(0xFF10B981), Color(0xFF0EA5E9),
   ];
 
-  bool get _hasRealData => totalVeiculos > 0 || totalMotoristas > 0;
-
-  int get _kpiTotalVeiculos       => _hasRealData ? totalVeiculos : 128;
-  int get _kpiVeiculosAtivos      => _hasRealData ? (totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos) : 96;
-  int get _kpiEmManutencao        => _hasRealData ? totalEmManutencao : 12;
-  int get _kpiMotoristas          => _hasRealData ? totalMotoristas : 78;
-  String get _kpiGastoMensal      => _hasRealData && totalGasto > 0 ? 'R\$ ${_fmt(totalGasto)}' : 'R\$ 98.765,40';
-  int get _kpiOcorrencias         => _hasRealData ? totalOcorrenciasAbertas : 7;
-
-  List<FlSpot> get _chartFuelSpots {
-    if (monthlyFuelSpots.isNotEmpty && monthlyFuelSpots.any((s) => s.y > 0)) return monthlyFuelSpots;
-    return const [
-      FlSpot(0, 2200), FlSpot(1, 2550), FlSpot(2, 2380),
-      FlSpot(3, 2800), FlSpot(4, 3150), FlSpot(5, 3450),
-    ];
+  // ── KPI getters — always show real data; 0 / R$ 0,00 when no records ──────
+  int get _kpiTotalVeiculos  => totalVeiculos;
+  int get _kpiVeiculosAtivos => (totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos);
+  int get _kpiEmManutencao   => totalEmManutencao;
+  int get _kpiMotoristas     => totalMotoristas;
+  String get _kpiGastoMensal => 'R\$ ${_fmt(totalGasto)}';
+  int get _kpiOcorrencias    => totalOcorrenciasAbertas;
+  int get _kpiMultas         => totalMultas;
+  int get _kpiFleetIndex {
+    if (totalVeiculos <= 0) return 0;
+    return ((_kpiVeiculosAtivos / totalVeiculos) * 100).round().clamp(0, 100);
   }
-  List<String> get _chartFuelLabels => monthlyFuelLabels.isNotEmpty ? monthlyFuelLabels : ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-  Map<String, double> get _chartCustos => custosPorCategoria.values.any((v) => v > 0) ? custosPorCategoria : {
-    'Abastecimento': 59125.30, 'Manutenção': 19755.40, 'Pneus': 9876.50, 'Multas': 6172.20, 'Outros': 3704.00,
-  };
-  Map<String, int> get _chartOcorrencias => ocorrenciasPorCategoria.isNotEmpty ? ocorrenciasPorCategoria : {
-    'Acidente': 3, 'Falha Mecânica': 2, 'Pane': 1, 'Multa': 1, 'Outros': 1,
-  };
-  List<Map<String, dynamic>> get _panelRanking => rankingMotoristas.isNotEmpty ? rankingMotoristas : List<Map<String, dynamic>>.from(_mockRanking);
-  List<Map<String, dynamic>> get _panelVehicleCosts => topCostVehicles.isNotEmpty ? topCostVehicles : List<Map<String, dynamic>>.from(_mockVehicleCosts);
-  List<Map<String, String>> get _panelAlertas => alertasImportantes.isNotEmpty ? alertasImportantes : List<Map<String, String>>.from(
-    _mockAlertas.map((e) => Map<String, String>.from(e)),
-  );
+  String get _kpiFleetLabel {
+    final i = _kpiFleetIndex;
+    if (i == 0) return '—';
+    if (i >= 90) return 'Excelente';
+    if (i >= 75) return 'Bom';
+    if (i >= 60) return 'Regular';
+    return 'Atenção';
+  }
+  Color get _kpiFleetColor {
+    final i = _kpiFleetIndex;
+    if (i == 0) return AppColors.textSecondary;
+    if (i >= 90) return AppColors.success;
+    if (i >= 75) return AppColors.secondary;
+    if (i >= 60) return AppColors.warning;
+    return AppColors.danger;
+  }
+
+  // ── Chart getters — return real data, empty collection when no records ─────
+  List<FlSpot> get _chartFuelSpots  => monthlyFuelSpots;
+  List<String> get _chartFuelLabels => monthlyFuelLabels;
+  Map<String, double> get _chartCustos      => custosPorCategoria;
+  Map<String, int>    get _chartOcorrencias => ocorrenciasPorCategoria;
+
+  // ── Panel getters — return real data, empty when no records ───────────────
+  List<Map<String, dynamic>> get _panelRanking      => rankingMotoristas;
+  List<Map<String, dynamic>> get _panelVehicleCosts => topCostVehicles;
+  List<Map<String, String>>  get _panelAlertas      => alertasImportantes;
+
+  // ── Sparkline trend label helpers ──────────────────────────────────────────
+
+  String _sparkTrend(List<double> bins, String unit) {
+    if (bins.length < 2) return '';
+    final last = bins.last;
+    final prev = bins[bins.length - 2];
+    if (prev == 0 && last == 0) return 'sem registros';
+    if (prev == 0) return '+${last.toInt()} $unit(s) este mês';
+    final delta = last - prev;
+    final pct = (delta / prev * 100).round();
+    if (delta == 0) return 'estável vs mês anterior';
+    return '${delta > 0 ? '+' : ''}$pct% vs mês anterior';
+  }
+
+  String _sparkCostTrend(List<double> bins) {
+    if (bins.length < 2) return '';
+    final last = bins.last;
+    final prev = bins[bins.length - 2];
+    if (prev == 0 && last == 0) return 'sem gastos no período';
+    if (prev == 0) return '+R\$ ${_fmt(last)} este mês';
+    final delta = last - prev;
+    final pct = (delta / prev * 100).round().abs();
+    return '${delta > 0 ? '+' : '-'}$pct% vs mês anterior';
+  }
+
+  String _sparkFleetTrend(List<double> bins) {
+    if (bins.length < 2) return '';
+    final last = bins.last;
+    final prev = bins[bins.length - 2];
+    if (prev == 0) return '';
+    final delta = (last - prev).round();
+    if (delta == 0) return 'índice estável';
+    return '${delta > 0 ? '+' : ''}$delta% vs mês anterior';
+  }
 
   String _fmt(double v) {
     final s = v.toStringAsFixed(2).replaceAll('.', ',');
@@ -315,7 +354,195 @@ class _HomePageState extends State<HomePage> {
     if (t.contains('checklist')) return Icons.checklist;
     if (t.contains('seguro')) return Icons.security;
     if (t.contains('pneu')) return Icons.tire_repair;
-    return Icons.warning_amber;
+    if (t.contains('multa')) return Icons.gavel_rounded;
+    if (t.contains('documento')) return Icons.description_rounded;
+    if (t.contains('manutenção') || t.contains('manutencao')) return Icons.build_rounded;
+    if (t.contains('abastecimento')) return Icons.local_gas_station_rounded;
+    return Icons.warning_amber_rounded;
+  }
+
+  String _relTime(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 2) return 'Agora';
+    if (diff.inMinutes < 60) return 'há ${diff.inMinutes}min';
+    if (diff.inHours < 24) return 'há ${diff.inHours}h';
+    if (diff.inDays == 1) return 'ontem';
+    if (diff.inDays < 7) return 'há ${diff.inDays}d';
+    return '${dt.day}/${dt.month}';
+  }
+
+  List<_InsightData> _buildInsights() {
+    final items = <_InsightData>[];
+
+    // ── Ocorrências críticas (prioridade máxima) ──────────────────────────
+    if (ocorrenciasCriticasDash.isNotEmpty) {
+      items.add(_InsightData(
+        icon: Icons.report_problem_rounded,
+        color: AppColors.danger,
+        title: 'Ocorrências Críticas',
+        text:
+            '${ocorrenciasCriticasDash.length} ocorrência(s) de alta prioridade sem resolução. '
+            'Atue imediatamente para evitar riscos.',
+        actionLabel: 'Resolver agora',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AlertasPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 0,
+      ));
+    }
+
+    // ── Documentos e CNH vencendo ─────────────────────────────────────────
+    final docsAlerts = alertasImportantes.where((a) {
+      final t = (a['title'] ?? '').toLowerCase();
+      return t.contains('documento') ||
+          t.contains('cnh') ||
+          t.contains('licenciamento') ||
+          t.contains('seguro');
+    }).toList();
+    if (docsAlerts.isNotEmpty) {
+      items.add(_InsightData(
+        icon: Icons.assignment_late_rounded,
+        color: const Color(0xFFF97316),
+        title: 'Documentos Vencendo',
+        text:
+            '${docsAlerts.length} documento(s) próximo(s) do vencimento. '
+            'Regularize para evitar autuações e multas.',
+        actionLabel: 'Ver documentos',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DocumentosPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 1,
+      ));
+    }
+
+    // ── Pneus que precisam de atenção ─────────────────────────────────────
+    final pneusAtencao =
+        pneusData.where((p) {
+          final s = (p['status'] ?? '').toString().toLowerCase();
+          return s == 'troca' || s == 'revisar';
+        }).toList();
+    if (pneusAtencao.isNotEmpty) {
+      final precisamTroca =
+          pneusData.where((p) => (p['status'] ?? '') == 'troca').length;
+      final precisamRevisar =
+          pneusData.where((p) => (p['status'] ?? '') == 'revisar').length;
+      final color =
+          precisamTroca > 0 ? AppColors.danger : const Color(0xFFF97316);
+      items.add(_InsightData(
+        icon: Icons.tire_repair_rounded,
+        color: color,
+        title: 'Pneus Desgastados',
+        text: '${[
+          if (precisamTroca > 0) '$precisamTroca pneu(s) para troca imediata.',
+          if (precisamRevisar > 0) '$precisamRevisar pneu(s) precisam de revisão.',
+        ].join(' ')} Garanta a segurança da frota.',
+        actionLabel: 'Ver pneus',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PneusPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 1,
+      ));
+    }
+
+    // ── Multas recentes ───────────────────────────────────────────────────
+    if (totalMultas > 0) {
+      items.add(_InsightData(
+        icon: Icons.gavel_rounded,
+        color: AppColors.danger,
+        title: 'Multas no Período',
+        text:
+            '$totalMultas multa(s) registrada(s) no período. '
+            'Analise os motoristas e reforce treinamentos.',
+        actionLabel: 'Ver multas',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MultasPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 2,
+      ));
+    }
+
+    // ── Manutenção preventiva ─────────────────────────────────────────────
+    if (totalEmManutencao > 0) {
+      items.add(_InsightData(
+        icon: Icons.build_rounded,
+        color: const Color(0xFF7C3AED),
+        title: 'Manutenção Preventiva',
+        text:
+            '$totalEmManutencao veículo(s) em manutenção ativa. '
+            'Acompanhe o andamento para minimizar o tempo parado.',
+        actionLabel: 'Ver manutenções',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManutencoesPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 2,
+      ));
+    } else {
+      items.add(_InsightData(
+        icon: Icons.build_rounded,
+        color: AppColors.success,
+        title: 'Manutenção em Dia',
+        text:
+            'Nenhum veículo em manutenção no momento. '
+            'Programe revisões preventivas para manter a disponibilidade.',
+        actionLabel: 'Agendar',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ManutencoesPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 4,
+      ));
+    }
+
+    // ── Economia de combustível ───────────────────────────────────────────
+    if (totalGasto > 0 && totalAbastecimentos > 0) {
+      final media = totalGasto / totalAbastecimentos;
+      final economia = totalGasto * 0.08;
+      items.add(_InsightData(
+        icon: Icons.local_gas_station_rounded,
+        color: const Color(0xFFEAB308),
+        title: 'Economia de Combustível',
+        text:
+            'Custo médio de R\$ ${_fmt(media)}/abastecimento. '
+            'Otimização de rotas pode economizar até R\$ ${_fmt(economia)} no período.',
+        actionLabel: 'Ver abastecimentos',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AbastecimentosPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 3,
+      ));
+    }
+
+    // ── Baixa utilização ──────────────────────────────────────────────────
+    final inativos = _kpiTotalVeiculos - _kpiVeiculosAtivos;
+    if (inativos > 0 && _kpiTotalVeiculos > 0) {
+      final pct = (inativos / _kpiTotalVeiculos * 100).round();
+      items.add(_InsightData(
+        icon: Icons.garage_rounded,
+        color: const Color(0xFF64748B),
+        title: 'Baixa Utilização',
+        text:
+            '$inativos veículo(s) ($pct% da frota) sem atividade no período. '
+            'Avalie remanejo, locação ou alienação desses ativos.',
+        actionLabel: 'Ver relatório',
+        action: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RelatoriosPage()),
+        ).then((_) => carregarDashboard()),
+        priority: 3,
+      ));
+    }
+
+    items.sort((a, b) => a.priority.compareTo(b.priority));
+    return items.take(5).toList();
   }
 
   static const List<Color> _dashboardPieColors = [
@@ -343,6 +570,17 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> carregarDashboard() async {
     setState(() => carregando = true);
+
+    // Snapshot antes do carregamento para detectar mudanças por módulo
+    final prevVeiculos        = totalVeiculos;
+    final prevManutencao      = totalEmManutencao;
+    final prevAbastecimentos  = totalAbastecimentos;
+    final prevGasto           = totalGasto;
+    final prevMotoristas      = totalMotoristas;
+    final prevOcorrencias     = totalOcorrenciasAbertas;
+    final prevMultas          = totalMultas;
+    final prevAlertas         = alertasImportantes.length;
+    final prevCriticas        = ocorrenciasCriticasDash.length;
 
     final dateStart = _filterStart.toIso8601String().split('T')[0];
     final dateEnd = _filterEnd.toIso8601String().split('T')[0];
@@ -417,7 +655,7 @@ class _HomePageState extends State<HomePage> {
       try {
         final critRes = await supabase
             .from('occurrences')
-            .select('id, problem_type, priority, status, location, vehicle_id')
+            .select('id, problem_type, priority, status, location, vehicle_id, created_at')
             .neq('status', 'Resolvido')
             .eq('priority', 'Alta')
             .order('created_at', ascending: false)
@@ -444,6 +682,7 @@ class _HomePageState extends State<HomePage> {
         totalEmManutencao = activeMaintenanceCount;
         totalOcorrenciasAbertas = openOcorrenciasCount;
         totalGasto = dashboardTotalGasto;
+        totalMultas = multas.length;
         recentFuelings = recents;
         monthlyFuelSpots = dashboardMonthlyFuelSpots;
         ocorrenciasPorCategoria = categorias;
@@ -452,7 +691,23 @@ class _HomePageState extends State<HomePage> {
         alertasImportantes = alerts;
         ocorrenciasCriticasDash = criticas;
         custosPorCategoria = costByCategory;
+        pneusData = pneus.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        // Pulso individual por módulo — só dispara se o valor mudou
+        final next = List<int>.from(_modulePulseVersions);
+        if (veiculos.length          != prevVeiculos)        next[0]++;
+        if (activeMaintenanceCount   != prevManutencao)      next[1]++;
+        if (abastecimentos.length    != prevAbastecimentos)  next[2]++;
+        if (dashboardTotalGasto      != prevGasto)           next[3]++;
+        if (motoristas.length        != prevMotoristas)      next[4]++;
+        if (openOcorrenciasCount     != prevOcorrencias)     next[5]++;
+        if (multas.length            != prevMultas)          next[6]++;
+        if (veiculos.length != prevVeiculos || activeMaintenanceCount != prevManutencao) next[7]++;
+        if (alerts.length   != prevAlertas  || criticas.length != prevCriticas)         next[8]++;
+        if (dashboardTotalGasto != prevGasto || openOcorrenciasCount != prevOcorrencias) next[9]++;
+        _modulePulseVersions = next;
       });
+      // Load sparklines independently so they don't delay the main render
+      _loadSparklines(veiculos);
     } catch (e) {
       debugPrint('Erro ao carregar dashboard: ${e.toString()}');
     } finally {
@@ -525,6 +780,137 @@ class _HomePageState extends State<HomePage> {
     return double.tryParse(value.toString()) ?? 0.0;
   }
 
+  // ── Sparkline helpers ─────────────────────────────────────────────────────
+
+  static DateTime _mOff(int back) {
+    final n = DateTime.now();
+    int m = n.month - back, y = n.year;
+    while (m <= 0) { m += 12; y--; }
+    return DateTime(y, m);
+  }
+
+  List<double> _monthCountBins(
+    List<Map<String, dynamic>> items, {
+    String dateField = 'created_at',
+  }) =>
+      List.generate(6, (i) {
+        final mo = _mOff(5 - i);
+        return items.where((e) {
+          final dt = DateTime.tryParse(e[dateField]?.toString() ?? '')?.toLocal();
+          return dt != null && dt.year == mo.year && dt.month == mo.month;
+        }).length.toDouble();
+      });
+
+  List<double> _monthCostBins(
+    List<Map<String, dynamic>> items, {
+    String dateField = 'created_at',
+    List<String> costFields = const ['total_value', 'amount', 'cost', 'valor'],
+  }) =>
+      List.generate(6, (i) {
+        final mo = _mOff(5 - i);
+        double t = 0;
+        for (final e in items) {
+          final dt = DateTime.tryParse(e[dateField]?.toString() ?? '')?.toLocal();
+          if (dt == null || dt.year != mo.year || dt.month != mo.month) continue;
+          for (final f in costFields) {
+            final v = _toDouble(e[f]);
+            if (v > 0) { t += v; break; }
+          }
+        }
+        return t;
+      });
+
+  Future<List<Map<String, dynamic>>> _sparkSelect(
+    String table,
+    String start,
+    String end, {
+    String dateCol = 'created_at',
+    String cols = 'created_at',
+  }) async {
+    try {
+      final r = await supabase
+          .from(table)
+          .select(cols)
+          .gte(dateCol, start)
+          .lte(dateCol, '${end}T23:59:59') as List;
+      return r.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _loadSparklines(List<Map<String, dynamic>> veiculos) async {
+    final now = DateTime.now();
+    final mo = _mOff(5);
+    final start =
+        '${mo.year.toString().padLeft(4, '0')}-${mo.month.toString().padLeft(2, '0')}-01';
+    final end = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    try {
+      final rs = await Future.wait([
+        _sparkSelect('fuelings', start, end,
+            dateCol: 'fuel_date',
+            cols: 'fuel_date,total_value,vehicle_id,driver_id'),
+        _sparkSelect('manutencoes', start, end, cols: 'created_at,cost,valor'),
+        _sparkSelect('occurrences', start, end, cols: 'created_at'),
+        _sparkSelect('multas', start, end, cols: 'created_at,amount,valor'),
+      ]);
+
+      final fuel = rs[0], maint = rs[1], occ = rs[2], mult = rs[3];
+
+      final fuelBins  = _monthCountBins(fuel, dateField: 'fuel_date');
+      final maintBins = _monthCountBins(maint);
+      final occBins   = _monthCountBins(occ);
+      final multBins  = _monthCountBins(mult);
+
+      // Unique active vehicles per month (vehicles with at least 1 fueling)
+      final vBins = List<double>.generate(6, (i) {
+        final mo2 = _mOff(5 - i);
+        return fuel.where((f) {
+          final dt = DateTime.tryParse(f['fuel_date']?.toString() ?? '')?.toLocal();
+          return dt != null && dt.year == mo2.year && dt.month == mo2.month;
+        }).map((f) => f['vehicle_id']).whereType<Object>().toSet().length.toDouble();
+      });
+
+      // Unique active drivers per month
+      final drBins = List<double>.generate(6, (i) {
+        final mo2 = _mOff(5 - i);
+        return fuel.where((f) {
+          final dt = DateTime.tryParse(f['fuel_date']?.toString() ?? '')?.toLocal();
+          return dt != null && dt.year == mo2.year && dt.month == mo2.month;
+        }).map((f) => f['driver_id']).whereType<Object>().toSet().length.toDouble();
+      });
+
+      // Total monthly cost (fuel + maintenance + fines)
+      final fuelCost  = _monthCostBins(fuel,  dateField: 'fuel_date', costFields: ['total_value']);
+      final maintCost = _monthCostBins(maint, costFields: ['cost', 'valor']);
+      final multCost  = _monthCostBins(mult,  costFields: ['amount', 'valor']);
+      final gastoBins = List<double>.generate(6, (i) => fuelCost[i] + maintCost[i] + multCost[i]);
+
+      // Fleet index = (total_vehicles - vehicles_in_maintenance_that_month) / total * 100
+      final vTotal = veiculos.length;
+      final fleetBins = List<double>.generate(6, (i) {
+        if (vTotal == 0) return 0.0;
+        final inMaint = maintBins[i].clamp(0, vTotal.toDouble());
+        return ((vTotal - inMaint) / vTotal * 100).clamp(0.0, 100.0);
+      });
+
+      if (!mounted) return;
+      setState(() {
+        sparkVeiculos       = vBins;
+        sparkMotoristas     = drBins;
+        sparkManutencoes    = maintBins;
+        sparkOcorrencias    = occBins;
+        sparkAbastecimentos = fuelBins;
+        sparkMultas         = multBins;
+        sparkGasto          = gastoBins;
+        sparkFleet          = fleetBins;
+      });
+    } catch (e) {
+      debugPrint('Sparklines error: $e');
+    }
+  }
+
   bool _isOpenStatus(dynamic item) {
     final status = (item['status'] ?? item['estado'] ?? '')
         .toString()
@@ -593,6 +979,7 @@ class _HomePageState extends State<HomePage> {
             'title': (a['title'] ?? a['titulo'] ?? '').toString(),
             'subtitle': (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '').toString(),
             'tipo': (a['tipo'] ?? 'info').toString(),
+            'time': (a['created_at'] ?? '').toString(),
           };
         }).toList();
       }
@@ -609,6 +996,8 @@ class _HomePageState extends State<HomePage> {
       built.add({
         'title': 'Ocorrência: ${tipo.toString()}',
         'subtitle': '${o['vehicles']?['plate'] ?? ''} - ${o['status'] ?? ''}',
+        'time': (o['created_at'] ?? '').toString(),
+        'tipo': 'warning',
       });
     }
 
@@ -888,263 +1277,119 @@ class _HomePageState extends State<HomePage> {
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final showSidebar = constraints.maxWidth > 1200;
+                final showSidebar = constraints.maxWidth > 1100;
                 final width = constraints.maxWidth;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (showSidebar)
-                      Container(
-                        width: 210,
-                        color: AppColors.surface,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 20,
-                          horizontal: 12,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const AppLogo(compact: false),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _buildSidebarItem(
-                                      Icons.dashboard,
-                                      'Dashboard',
-                                      () {},
-                                      active: true,
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.directions_car,
-                                      'Veículos',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const VeiculosPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.person,
-                                      'Motoristas',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const MotoristasPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.local_gas_station,
-                                      'Abastecimentos',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const AbastecimentosPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.build,
-                                      'Manutenções',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const ManutencoesPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.checklist,
-                                      'Checklists',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const SelecionarVeiculoChecklistPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.history,
-                                      'Histórico Checklist',
-                                      () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const HistoricoChecklistPage(),
-                                        ),
+                    if (showSidebar) _buildDesktopSidebar(),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ── Header premium — glass + linha inferior iluminada ─
+                          SizedBox(
+                            height: 64,
+                            child: Stack(
+                              children: [
+                                // Frosted glass — blur vertical discreto
+                                Positioned.fill(
+                                  child: ClipRect(
+                                    child: BackdropFilter(
+                                      filter: ImageFilter.blur(sigmaX: 0, sigmaY: 16),
+                                      child: Container(
+                                        color: const Color(0xFF04080F).withOpacity(0.94),
                                       ),
                                     ),
-                                    _buildSidebarItem(
-                                      Icons.report_gmailerrorred,
-                                      'Ocorrências',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const AlertasPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.tire_repair,
-                                      'Pneus',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const PneusPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.receipt_long,
-                                      'Multas',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const MultasPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.description,
-                                      'Documentos',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const DocumentosPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.bar_chart,
-                                      'Relatórios',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const RelatoriosPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.notification_important,
-                                      'Alertas',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const AlertasPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                    _buildSidebarItem(
-                                      Icons.settings,
-                                      'Configurações',
-                                      () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const ConfiguracoesPage(),
-                                          ),
-                                        );
-                                        carregarDashboard();
-                                      },
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            const Divider(color: AppColors.border, height: 1),
-                            const SizedBox(height: 6),
-                            _buildProfileCard(),
-                          ],
-                        ),
-                      ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                        child: RefreshIndicator(
-                          onRefresh: carregarDashboard,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildHeader(width),
-                                  const SizedBox(height: 16),
-                                  _buildTopKpiRow(width),
-                                  const SizedBox(height: 14),
-                                  _buildChartsRow(width),
-                                  const SizedBox(height: 14),
-                                  _buildBottomPanels(width),
-                                ],
-                              ),
+                                // Conteúdo do header
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  child: _buildHeader(width),
+                                ),
+                                // Inner glow ascendente — luz do fundo que sobe
+                                Positioned(
+                                  bottom: 0, left: 0, right: 0,
+                                  child: Container(
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          const Color(0xFF1E4080).withOpacity(0.045),
+                                        ],
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Linha inferior iluminada — gradiente centrado
+                                Positioned(
+                                  bottom: 0, left: 0, right: 0,
+                                  child: Container(
+                                    height: 1,
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          Color(0xFF0E2650),
+                                          Color(0xFF1A4A96),
+                                          Color(0xFF0E2650),
+                                          Colors.transparent,
+                                        ],
+                                        stops: [0.0, 0.22, 0.50, 0.78, 1.0],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
+                          // ── Main body: premium 3-column grid ────────────
+                          Expanded(
+                            child: RefreshIndicator(
+                              onRefresh: carregarDashboard,
+                              child: _buildV2ContentArea(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 );
               },
             ),
+
+            // ── Loading overlay ──────────────────────────────────────────
             if (carregando)
               Positioned.fill(
-                child: Container(
-                  color: Colors.black.withOpacity(0.32),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.secondary,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                  child: Container(
+                    color: Colors.black.withOpacity(0.40),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0B1528).withOpacity(0.90),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF3B82F6).withOpacity(0.35),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF3B82F6).withOpacity(0.15),
+                              blurRadius: 30,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+                          strokeWidth: 2.5,
+                        ),
                       ),
                     ),
                   ),
@@ -1441,6 +1686,494 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ── V2 Desktop Layout ────────────────────────────────────────────────────
+
+  // ── PREMIUM LAYOUT — 3 colunas: KPI esq | Centro 60% | KPI dir + alertas ──
+
+  Widget _buildV2ContentArea() {
+    return Stack(
+      children: [
+        // ── Base escura ──────────────────────────────────────────────────────
+        Positioned.fill(
+          child: Container(color: const Color(0xFF020810)),
+        ),
+
+        // ── Imagem dos 3 veículos — fundo de todo o dashboard ────────────────
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/frotacheckkk.png',
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            alignment: Alignment.center,
+          ),
+        ),
+
+        // ── Overlay lateral esquerdo — escurece atrás dos KPI cards ──────────
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF020810).withOpacity(0.78),
+                    Colors.transparent,
+                    Colors.transparent,
+                    const Color(0xFF020810).withOpacity(0.78),
+                  ],
+                  stops: const [0.0, 0.24, 0.76, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Overlay superior e inferior — integra com header e rodapé ────────
+        Positioned(
+          top: 0, left: 0, right: 0,
+          child: IgnorePointer(
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF020810),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 0, left: 0, right: 0,
+          child: IgnorePointer(
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF020810),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Colunas de conteúdo — flutuam sobre a imagem ─────────────────────
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(flex: 15, child: _buildLeftKpiColumn()),
+              const SizedBox(width: 24),
+              // Centro transparente — veículos ficam à mostra
+              const Expanded(flex: 45, child: SizedBox()),
+              const SizedBox(width: 24),
+              Expanded(flex: 15, child: _buildRightColumn()),
+              const SizedBox(width: 24),
+              // Painel Alertas + Insights com glass para legibilidade
+              Expanded(
+                flex: 25,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF020810).withOpacity(0.80),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF0E1E33),
+                        width: 1,
+                      ),
+                    ),
+                    child: _buildV2RightPanel(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLeftKpiColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: KpiCard(
+          title: 'Veículos Ativos',
+          value: '$_kpiVeiculosAtivos',
+          icon: Icons.directions_car_rounded,
+          color: const Color(0xFF6366F1),
+          trend: _sparkTrend(sparkVeiculos, 'veículo'),
+          sparkData: sparkVeiculos,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage())).then((_) => carregarDashboard()),
+        )),
+        const SizedBox(height: 24),
+        Expanded(child: KpiCard(
+          title: 'Em Manutenção',
+          value: '$_kpiEmManutencao',
+          icon: Icons.build_rounded,
+          color: const Color(0xFF0EA5E9),
+          trend: _sparkTrend(sparkManutencoes, 'manutenção'),
+          sparkData: sparkManutencoes,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage())).then((_) => carregarDashboard()),
+        )),
+        const SizedBox(height: 24),
+        Expanded(child: KpiCard(
+          title: 'Abastecimentos',
+          value: '$totalAbastecimentos',
+          unit: 'registros no período',
+          icon: Icons.local_gas_station_rounded,
+          color: const Color(0xFFF97316),
+          trend: _sparkTrend(sparkAbastecimentos, 'registro'),
+          sparkData: sparkAbastecimentos,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage())).then((_) => carregarDashboard()),
+        )),
+        const SizedBox(height: 24),
+        Expanded(child: KpiCard(
+          title: 'Gasto do Mês',
+          value: _kpiGastoMensal,
+          unit: 'combustível + manutenção',
+          icon: Icons.account_balance_wallet_rounded,
+          color: const Color(0xFF7C3AED),
+          trend: _sparkCostTrend(sparkGasto),
+          sparkData: sparkGasto,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage())).then((_) => carregarDashboard()),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildRightColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: KpiCard(
+          title: 'Motoristas Ativos',
+          value: '$_kpiMotoristas',
+          icon: Icons.person_rounded,
+          color: const Color(0xFF10B981),
+          trend: _sparkTrend(sparkMotoristas, 'motorista'),
+          sparkData: sparkMotoristas,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage())).then((_) => carregarDashboard()),
+        )),
+        const SizedBox(height: 24),
+        Expanded(child: KpiCard(
+          title: 'Ocorrências',
+          value: '$_kpiOcorrencias',
+          icon: Icons.warning_amber_rounded,
+          color: const Color(0xFFEF4444),
+          badge: _kpiOcorrencias > 0 ? 'Abertas' : null,
+          trend: _sparkTrend(sparkOcorrencias, 'ocorrência'),
+          sparkData: sparkOcorrencias,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage())).then((_) => carregarDashboard()),
+        )),
+        const SizedBox(height: 24),
+        Expanded(child: KpiCard(
+          title: 'Multas',
+          value: '$_kpiMultas',
+          icon: Icons.receipt_long_rounded,
+          color: const Color(0xFFF59E0B),
+          badge: _kpiMultas > 0 ? 'Pendentes' : null,
+          trend: _sparkTrend(sparkMultas, 'multa'),
+          sparkData: sparkMultas,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage())).then((_) => carregarDashboard()),
+        )),
+        const SizedBox(height: 24),
+        Expanded(child: KpiCard(
+          title: 'Índice da Frota',
+          value: '$_kpiFleetIndex%',
+          unit: 'disponibilidade operacional',
+          icon: Icons.speed_rounded,
+          color: _kpiFleetColor,
+          badge: _kpiFleetLabel,
+          badgeColor: _kpiFleetColor,
+          trend: _sparkFleetTrend(sparkFleet),
+          sparkData: sparkFleet,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage())).then((_) => carregarDashboard()),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildV2RightPanel() {
+    // ── Build unified alert list from real data only ────────────────────────
+    final List<_AlertaData> alertas = [
+      // Ocorrências críticas abertas (Alta prioridade)
+      ...ocorrenciasCriticasDash.map((o) => _AlertaData(
+        icon: _alertIcon(o['problem_type']?.toString() ?? ''),
+        title: o['problem_type']?.toString() ?? 'Ocorrência',
+        veiculo: o['_placa']?.toString() ?? '-',
+        horario: _relTime(o['created_at']?.toString()),
+        color: AppColors.danger,
+        prioridade: 'Crítico',
+        pulse: true,
+      )),
+      // Alertas da tabela alerts / alertas sintéticos
+      ...alertasImportantes.map((a) {
+        final tipo = a['tipo'] ?? 'info';
+        final color = tipo == 'error'
+            ? AppColors.danger
+            : tipo == 'warning'
+                ? AppColors.warning
+                : AppColors.secondary;
+        final label = tipo == 'error'
+            ? 'Crítico'
+            : tipo == 'warning'
+                ? 'Atenção'
+                : 'Info';
+        return _AlertaData(
+          icon: _alertIcon(a['title'] ?? ''),
+          title: a['title'] ?? '',
+          veiculo: a['subtitle'] ?? '',
+          horario: _relTime(a['time']),
+          color: color,
+          prioridade: label,
+          pulse: tipo == 'error',
+        );
+      }),
+    ];
+
+    final totalAlertas = alertas.length;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header Alertas Críticos ──────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (ocorrenciasCriticasDash.isNotEmpty) ...[
+                _PulsingDot(color: AppColors.danger),
+                const SizedBox(width: 8),
+              ],
+              const Text(
+                'Alertas Críticos',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const Spacer(),
+              if (totalAlertas > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.danger.withOpacity(0.30)),
+                  ),
+                  child: Text(
+                    '$totalAlertas',
+                    style: const TextStyle(
+                      color: AppColors.danger,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Alert cards ───────────────────────────────────
+          if (alertas.isEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFF060B14),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF1A2A40)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.check_circle_outline_rounded,
+                      color: AppColors.success.withOpacity(0.65), size: 26),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Nenhum alerta ativo',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Frota operando normalmente',
+                    style: TextStyle(
+                      color: Color(0xFF334155),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            ...alertas.take(6).map((a) => _AlertaCriticoCard(data: a)),
+          ],
+
+          const SizedBox(height: 8),
+          // Ver todos link
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AlertasPage()),
+            ).then((_) => carregarDashboard()),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Ver todos os alertas',
+                    style: TextStyle(
+                      color: AppColors.secondary.withOpacity(0.80),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded,
+                      color: AppColors.secondary.withOpacity(0.80), size: 11),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          // Neon gradient section divider
+          Container(
+            height: 1,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Color(0xFF1E3A5F),
+                  Color(0xFF3B82F6),
+                  Color(0xFF1E3A5F),
+                  Colors.transparent,
+                ],
+                stops: [0.0, 0.2, 0.5, 0.8, 1.0],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Insights da IA ──────────────────────────────
+          Builder(builder: (_) {
+            final insights = _buildInsights();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Color(0xFF60A5FA), Color(0xFFA78BFA)],
+                          ).createShader(bounds),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        const Text(
+                          'Insights da IA',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    if (insights.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1D4ED8), Color(0xFF4338CA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF3B82F6).withOpacity(0.25),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          '${insights.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Insight cards
+                if (insights.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 22),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF060B14),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF1A2A40)),
+                    ),
+                    child: const Column(
+                      children: [
+                        Icon(Icons.lightbulb_outline_rounded,
+                            color: Color(0xFF334155), size: 22),
+                        SizedBox(height: 8),
+                        Text(
+                          'Sem recomendações no momento',
+                          style: TextStyle(color: Color(0xFF475569), fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ...insights.map((i) => _InsightCard(data: i)),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ── End V2 Desktop Layout ─────────────────────────────────────────────────
+
   Widget _buildMobileContent(double width) {
     return IndexedStack(
       index: mobileIndex,
@@ -1479,51 +2212,185 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ── Desktop Sidebar ──────────────────────────────────────────────────────────
+
+  Widget _buildDesktopSidebar() {
+    return Container(
+      width: 224,
+      decoration: const BoxDecoration(
+        color: Color(0xFF050C17),
+        border: Border(right: BorderSide(color: Color(0xFF0E1E33), width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Logo area ─────────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF3B82F6).withOpacity(0.40),
+                        blurRadius: 12,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'FrotaCheck',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Text(
+                      'Gestão Inteligente',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.38),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Separator after logo
+          Container(height: 1, color: const Color(0xFF0E1E33)),
+          const SizedBox(height: 10),
+
+          // ── Nav items (scrollable) ─────────────────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ─ Principal ──
+                  _sidebarSection('PRINCIPAL'),
+                  _buildSidebarItem(Icons.dashboard_rounded,    'Dashboard',           () {}, active: true),
+                  const SizedBox(height: 6),
+
+                  // ─ Frota ──
+                  _sidebarSection('FROTA'),
+                  _buildSidebarItem(Icons.directions_car_rounded, 'Veículos', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.person_rounded,       'Motoristas', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.local_gas_station_rounded, 'Abastecimentos', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.build_rounded,        'Manutenções', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage()));
+                    carregarDashboard();
+                  }),
+                  const SizedBox(height: 6),
+
+                  // ─ Operações ──
+                  _sidebarSection('OPERAÇÕES'),
+                  _buildSidebarItem(Icons.checklist_rounded,    'Checklists', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const SelecionarVeiculoChecklistPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.history_rounded,      'Histórico Checklist', () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoricoChecklistPage()));
+                  }),
+                  _buildSidebarItem(Icons.report_problem_rounded, 'Ocorrências', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.tire_repair_rounded,  'Pneus', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.receipt_long_rounded, 'Multas', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.description_rounded,  'Documentos', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosPage()));
+                    carregarDashboard();
+                  }),
+                  const SizedBox(height: 6),
+
+                  // ─ Gestão ──
+                  _sidebarSection('GESTÃO'),
+                  _buildSidebarItem(Icons.bar_chart_rounded,    'Relatórios', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.notifications_active_rounded, 'Alertas', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                    carregarDashboard();
+                  }),
+                  _buildSidebarItem(Icons.settings_rounded,     'Configurações', () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage()));
+                    carregarDashboard();
+                  }),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Bottom: profile + badge ────────────────────────────────────────
+          Container(height: 1, color: const Color(0xFF0E1E33)),
+          _buildProfileCard(),
+          _buildProBadge(),
+        ],
+      ),
+    );
+  }
+
+  Widget _sidebarSection(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 14, 8, 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF2D4A6A),
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.8,
+        ),
+      ),
+    );
+  }
+
   Widget _buildSidebarItem(
     IconData icon,
     String label,
     VoidCallback onTap, {
     bool active = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(9),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(9),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-            decoration: BoxDecoration(
-              color: active ? AppColors.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  color: active ? Colors.white : AppColors.textSecondary,
-                  size: 18,
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: active ? Colors.white : AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    return _SidebarNavItem(icon: icon, label: label, onTap: onTap, active: active);
   }
 
   Widget _buildProfileCard() {
@@ -1533,89 +2400,200 @@ class _HomePageState extends State<HomePage> {
     final displayName = getProfileDisplayName(metadata: metadata, supaEmail: email);
     final initials = _getInitials(displayName);
 
-    return InkWell(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
-        );
-        carregarDashboard();
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppColors.backgroundSoft,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: AppColors.primary,
-              child: Text(
-                initials,
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
+          );
+          carregarDashboard();
+        },
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+          child: Row(
+            children: [
+              // Avatar with neon ring
+              Stack(
                 children: [
-                  Text(
-                    displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF3B82F6).withOpacity(0.45),
+                          blurRadius: 10,
+                          spreadRadius: 0,
+                        ),
+                      ],
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    alignment: Alignment.center,
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                  Text(
-                    email.isNotEmpty ? email : 'Administrador',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11.5,
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF060C18), width: 1.5),
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-            ),
-            const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary, size: 16),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    Text(
+                      email.isNotEmpty ? email : 'Administrador',
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 10,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.unfold_more_rounded, color: Color(0xFF334155), size: 16),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildProBadge() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF070D1A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF0E1E33), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(7),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withOpacity(0.35),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.shield_rounded, color: Colors.white, size: 14),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'FrotaCheck Pro',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                'Versão 3.0.0',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.30),
+                  fontSize: 9,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.30)),
+            ),
+            child: const Text(
+              'ATIVO',
+              style: TextStyle(
+                color: Color(0xFF60A5FA),
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDashboardCard({
     required Widget child,
-    EdgeInsetsGeometry padding = const EdgeInsets.all(20),
+    EdgeInsetsGeometry padding = const EdgeInsets.all(18),
     BorderRadiusGeometry borderRadius = const BorderRadius.all(
-      Radius.circular(14),
+      Radius.circular(12),
     ),
     Color? glowColor,
   }) {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFF070D1A),
         borderRadius: borderRadius,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: const Color(0xFF0E1E33), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.22),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
           if (glowColor != null)
             BoxShadow(
-              color: glowColor.withOpacity(0.08),
-              blurRadius: 20,
-              spreadRadius: 2,
+              color: glowColor.withOpacity(0.06),
+              blurRadius: 24,
+              spreadRadius: 0,
             ),
         ],
       ),
@@ -1889,123 +2867,112 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Estilo de botão compacto — sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
-  static final _compactBtn = ButtonStyle(
-    minimumSize: WidgetStatePropertyAll(const Size(0, 36)),
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    padding: WidgetStatePropertyAll(
-      const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-    ),
-    shape: WidgetStatePropertyAll(
-      RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ),
-    textStyle: WidgetStatePropertyAll(
-      const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-    ),
-    elevation: WidgetStatePropertyAll(0),
-  );
 
   Widget _buildHeader(double width) {
     final compact = width < 900;
+    final user = supabase.auth.currentUser;
+    final meta = user?.userMetadata ?? {};
+    final email = user?.email ?? '';
+    final name = getProfileDisplayName(metadata: meta, supaEmail: email);
+    final initials = _getInitials(name);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // ── Title block ────────────────────────────────────────────────────
         Flexible(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Dashboard',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: compact ? 20 : 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Colors.white, Color(0xFFBAE6FD)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ).createShader(bounds),
+                child: Text(
+                  'Inteligência da Frota',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: compact ? 14 : 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
-              const Text(
-                'Visão geral da frota',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              Text(
+                'Análises e insights em tempo real',
+                style: TextStyle(
+                  color: const Color(0xFF566880),
+                  fontSize: compact ? 10 : 11,
+                  letterSpacing: 0.1,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
-        const SizedBox(width: 16),
-        // Date range — clickable to open date range picker
-        GestureDetector(
-          onTap: _pickDateRange,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
-                const SizedBox(width: 6),
-                Text(
-                  _currentDateRangeLabel(),
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                ),
-              ],
-            ),
+        const SizedBox(width: 20),
+
+        // ── Date picker ───────────────────────────────────────────────────
+        _HeaderDateBtn(label: _currentDateRangeLabel(), onTap: _pickDateRange),
+        const SizedBox(width: 8),
+
+        // ── Filtros ───────────────────────────────────────────────────────
+        if (!compact) ...[
+          _HeaderBtn(
+            icon: Icons.tune_rounded,
+            label: 'Filtros',
+            tooltip: 'Filtrar período',
+            onTap: _pickDateRange,
           ),
+          const SizedBox(width: 10),
+        ],
+
+        // ── + Novo Registro ───────────────────────────────────────────────
+        _HeaderPrimaryBtn(
+          label: compact ? 'Novo' : 'Novo Registro',
+          onPressed: () => _showNovoRegistroMenu(context),
+        ),
+        const SizedBox(width: 12),
+
+        // Separador vertical
+        Container(width: 1, height: 20, color: const Color(0xFF182235)),
+        const SizedBox(width: 12),
+
+        // ── Search ────────────────────────────────────────────────────────
+        _HeaderBtn(
+          icon: Icons.search_rounded,
+          tooltip: 'Busca',
+          onTap: _showSearchDialog,
         ),
         const SizedBox(width: 8),
-        _iconBtn(Icons.search_outlined, 'Busca', onTap: _showSearchDialog),
-        const SizedBox(width: 6),
-        _iconBtn(Icons.notifications_none_outlined, 'Alertas', onTap: _showAlertsPanel),
-        const SizedBox(width: 8),
-        if (!compact) ...[
-          OutlinedButton.icon(
-            onPressed: _pickDateRange,
-            icon: const Icon(Icons.tune, size: 14),
-            label: const Text('Filtros'),
-            style: _compactBtn.copyWith(
-              foregroundColor: const WidgetStatePropertyAll(AppColors.textSecondary),
-              side: const WidgetStatePropertyAll(BorderSide(color: AppColors.border)),
-              backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        ElevatedButton.icon(
-          onPressed: () => _showNovoRegistroMenu(context),
-          icon: const Icon(Icons.add, size: 15),
-          label: const Text('Novo registro'),
-          style: _compactBtn.copyWith(
-            backgroundColor: const WidgetStatePropertyAll(AppColors.secondary),
-            foregroundColor: const WidgetStatePropertyAll(Colors.white),
-          ),
+
+        // ── Notifications ─────────────────────────────────────────────────
+        _HeaderBtn(
+          icon: Icons.notifications_outlined,
+          tooltip: 'Alertas',
+          onTap: _showAlertsPanel,
+          badgeCount: _kpiOcorrencias,
+        ),
+        const SizedBox(width: 10),
+
+        // ── Avatar ────────────────────────────────────────────────────────
+        _HeaderAvatarBtn(
+          initials: initials,
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
+            );
+            carregarDashboard();
+          },
         ),
       ],
-    );
-  }
-
-  Widget _iconBtn(IconData icon, String tooltip, {VoidCallback? onTap}) {
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Icon(icon, color: AppColors.textSecondary, size: 18),
-        ),
-      ),
     );
   }
 
@@ -2410,9 +3377,24 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildOccurrencesBarChart() {
     final categories = _chartOcorrencias.entries.toList();
-    final maxValue = categories.isEmpty
-        ? 5
-        : categories.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    if (categories.isEmpty) {
+      return _buildDashboardCard(
+        padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
+        glowColor: AppColors.secondary,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cardHeader('Ocorrências por Categoria', 'Quantidade registrada', Icons.bar_chart, AppColors.secondary),
+            const Expanded(
+              child: Center(
+                child: Text('Nenhuma ocorrência no período', style: TextStyle(color: AppColors.textSecondary)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final maxValue = categories.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
     final barColors = [
       AppColors.secondary,
@@ -2673,6 +3655,13 @@ class _HomePageState extends State<HomePage> {
             carregarDashboard();
           }),
           const SizedBox(height: 12),
+          if (_panelRanking.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text('Sem abastecimentos no período', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              ),
+            ),
+          if (_panelRanking.isNotEmpty)
           ..._panelRanking.asMap().entries.map((entry) {
             final i = entry.key;
             final driver = entry.value;
@@ -2744,6 +3733,13 @@ class _HomePageState extends State<HomePage> {
             carregarDashboard();
           }),
           const SizedBox(height: 12),
+          if (_panelVehicleCosts.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text('Sem registros no período', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              ),
+            ),
+          if (_panelVehicleCosts.isNotEmpty)
           ..._panelVehicleCosts.asMap().entries.map((entry) {
             final i = entry.key;
             final vehicle = entry.value;
@@ -3215,5 +4211,1411 @@ class _PieLegend extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ── Sidebar Navigation Item ────────────────────────────────────────────────────
+
+class _SidebarNavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool active;
+
+  const _SidebarNavItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
+
+  @override
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<_SidebarNavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.active;
+    final hovered = _hovered && !active;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.only(bottom: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+            color: active
+                ? const Color(0xFF1E3A5F)
+                : hovered
+                    ? const Color(0xFF111C30)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFF3B82F6).withOpacity(0.35)
+                  : Colors.transparent,
+              width: 1,
+            ),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF3B82F6).withOpacity(0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              // Left neon accent bar (active only)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: active ? 3 : 0,
+                height: 18,
+                margin: EdgeInsets.only(right: active ? 8 : 0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF60A5FA),
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: active
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF60A5FA).withOpacity(0.70),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+              // Icon
+              Icon(
+                widget.icon,
+                size: 17,
+                color: active
+                    ? const Color(0xFF93C5FD)
+                    : hovered
+                        ? Colors.white.withOpacity(0.65)
+                        : const Color(0xFF475569),
+              ),
+              const SizedBox(width: 9),
+              // Label
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: active
+                        ? Colors.white
+                        : hovered
+                            ? Colors.white.withOpacity(0.72)
+                            : const Color(0xFF64748B),
+                    fontSize: 12.5,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    letterSpacing: active ? 0.1 : 0,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // Active dot indicator
+              if (active)
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF60A5FA),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF60A5FA).withOpacity(0.80),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Header Widgets ─────────────────────────────────────────────────────────────
+
+/// Date-range picker button with hover glow.
+class _HeaderDateBtn extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _HeaderDateBtn({required this.label, required this.onTap});
+
+  @override
+  State<_HeaderDateBtn> createState() => _HeaderDateBtnState();
+}
+
+class _HeaderDateBtnState extends State<_HeaderDateBtn> {
+  bool _h = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _h = true),
+      onExit:  (_) => setState(() => _h = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          decoration: BoxDecoration(
+            color: _h ? const Color(0xFF0D1A2E) : const Color(0xFF07090F),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _h
+                  ? const Color(0xFF2563EB).withOpacity(0.45)
+                  : const Color(0xFF172030),
+            ),
+            boxShadow: _h
+                ? [BoxShadow(
+                    color: const Color(0xFF2563EB).withOpacity(0.12),
+                    blurRadius: 16,
+                  )]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_today_rounded,
+                  size: 14,
+                  color: _h ? const Color(0xFF60A5FA) : const Color(0xFF4A6070)),
+              const SizedBox(width: 8),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  color: _h
+                      ? Colors.white.withOpacity(0.90)
+                      : const Color(0xFF7A90A8),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: -0.1,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 16,
+                  color: _h ? const Color(0xFF60A5FA) : const Color(0xFF475569)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Generic header button — icon-only or icon + label (Filtros style).
+class _HeaderBtn extends StatefulWidget {
+  final IconData icon;
+  final String? label;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final int badgeCount;
+
+  const _HeaderBtn({
+    required this.icon,
+    this.label,
+    required this.tooltip,
+    this.onTap,
+    this.badgeCount = 0,
+  });
+
+  @override
+  State<_HeaderBtn> createState() => _HeaderBtnState();
+}
+
+class _HeaderBtnState extends State<_HeaderBtn> {
+  bool _h = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLabel = widget.label != null;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _h = true),
+      onExit:  (_) => setState(() => _h = false),
+      child: Tooltip(
+        message: widget.tooltip,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            height: 38,
+            width: hasLabel ? null : 38,
+            padding: hasLabel
+                ? const EdgeInsets.symmetric(horizontal: 14)
+                : EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: _h ? const Color(0xFF0D1A2E) : const Color(0xFF07090F),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _h
+                    ? const Color(0xFF2563EB).withOpacity(0.40)
+                    : const Color(0xFF172030),
+              ),
+              boxShadow: _h
+                  ? [BoxShadow(
+                      color: const Color(0xFF2563EB).withOpacity(0.12),
+                      blurRadius: 16,
+                    )]
+                  : null,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      widget.icon,
+                      size: 18,
+                      color: _h
+                          ? const Color(0xFF93C5FD)
+                          : const Color(0xFF526070),
+                    ),
+                    if (hasLabel) ...[
+                      const SizedBox(width: 7),
+                      Text(
+                        widget.label!,
+                        style: TextStyle(
+                          color: _h
+                              ? Colors.white.withOpacity(0.88)
+                              : const Color(0xFF7A90A8),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                // Badge de notificação
+                if (widget.badgeCount > 0)
+                  Positioned(
+                    right: hasLabel ? 7 : 8,
+                    top: 8,
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: const Color(0xFF07090F), width: 1.3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEF4444).withOpacity(0.55),
+                            blurRadius: 5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gradient primary action button (+ Novo Registro).
+class _HeaderPrimaryBtn extends StatefulWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  const _HeaderPrimaryBtn({required this.label, required this.onPressed});
+
+  @override
+  State<_HeaderPrimaryBtn> createState() => _HeaderPrimaryBtnState();
+}
+
+class _HeaderPrimaryBtnState extends State<_HeaderPrimaryBtn> {
+  bool _h = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _h = true),
+      onExit:  (_) => setState(() => _h = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: _h
+                  ? const [Color(0xFF1D52CE), Color(0xFF4338CA)]
+                  : const [Color(0xFF2563EB), Color(0xFF4F46E5)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3B82F6).withOpacity(_h ? 0.42 : 0.16),
+                blurRadius: _h ? 24 : 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add_rounded, color: Colors.white, size: 17),
+              const SizedBox(width: 7),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Circular avatar button (opens profile/settings).
+class _HeaderAvatarBtn extends StatefulWidget {
+  final String initials;
+  final VoidCallback onTap;
+
+  const _HeaderAvatarBtn({required this.initials, required this.onTap});
+
+  @override
+  State<_HeaderAvatarBtn> createState() => _HeaderAvatarBtnState();
+}
+
+class _HeaderAvatarBtnState extends State<_HeaderAvatarBtn> {
+  bool _h = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _h = true),
+      onExit:  (_) => setState(() => _h = false),
+      child: Tooltip(
+        message: 'Perfil',
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B82F6).withOpacity(_h ? 0.52 : 0.20),
+                  blurRadius: _h ? 24 : 10,
+                ),
+              ],
+              border: Border.all(
+                color: _h
+                    ? Colors.white.withOpacity(0.30)
+                    : Colors.white.withOpacity(0.08),
+                width: 1.5,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              widget.initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Alertas Críticos Widgets ───────────────────────────────────────────────────
+
+/// Data model for a single alert card.
+class _AlertaData {
+  final IconData icon;
+  final String title;
+  final String veiculo;
+  final String horario;
+  final Color color;
+  final String prioridade;
+  final bool pulse;
+
+  const _AlertaData({
+    required this.icon,
+    required this.title,
+    required this.veiculo,
+    required this.horario,
+    required this.color,
+    required this.prioridade,
+    this.pulse = false,
+  });
+}
+
+/// Premium alert card with left accent bar, icon, vehicle, time, priority badge.
+/// Pulses the accent bar and icon glow when [data.pulse] is true.
+class _AlertaCriticoCard extends StatefulWidget {
+  final _AlertaData data;
+  const _AlertaCriticoCard({required this.data});
+
+  @override
+  State<_AlertaCriticoCard> createState() => _AlertaCriticoCardState();
+}
+
+class _AlertaCriticoCardState extends State<_AlertaCriticoCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _glow;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+    _glow = Tween<double>(begin: 0.45, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+    if (widget.data.pulse) _ctrl.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.data;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: AnimatedBuilder(
+        animation: _glow,
+        builder: (context, _) {
+          final glowOpacity = d.pulse ? _glow.value : 1.0;
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF060B14),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: d.color.withOpacity(d.pulse ? _glow.value * 0.38 : 0.20),
+              ),
+              boxShadow: d.pulse
+                  ? [
+                      BoxShadow(
+                        color: d.color.withOpacity(_glow.value * 0.12),
+                        blurRadius: 10,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Left accent bar
+                    Container(
+                      width: 3,
+                      decoration: BoxDecoration(
+                        color: d.color.withOpacity(glowOpacity),
+                        boxShadow: [
+                          BoxShadow(
+                            color: d.color.withOpacity(glowOpacity * 0.55),
+                            blurRadius: 6,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Content
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Icon box
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: d.color.withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(9),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: d.color.withOpacity(glowOpacity * 0.25),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(d.icon, color: d.color, size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            // Text content
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          d.title,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.2,
+                                            letterSpacing: -0.1,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (d.horario.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          d.horario,
+                                          style: const TextStyle(
+                                            color: Color(0xFF475569),
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      if (d.veiculo.isNotEmpty)
+                                        Expanded(
+                                          child: Text(
+                                            d.veiculo,
+                                            style: const TextStyle(
+                                              color: Color(0xFF64748B),
+                                              fontSize: 10.5,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: d.color.withOpacity(0.10),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: d.color.withOpacity(0.30),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          d.prioridade,
+                                          style: TextStyle(
+                                            color: d.color,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Small pulsing dot indicator shown next to "Alertas Críticos" header.
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+  const _PulsingDot({required this.color});
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _scale = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, _) => Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.color.withOpacity(_scale.value),
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withOpacity(_scale.value * 0.6),
+              blurRadius: 6,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Insights da IA Widgets ─────────────────────────────────────────────────────
+
+/// Data model for a single AI insight recommendation.
+class _InsightData {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String text;
+  final String actionLabel;
+  final VoidCallback action;
+  final int priority;
+
+  const _InsightData({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.text,
+    required this.actionLabel,
+    required this.action,
+    required this.priority,
+  });
+}
+
+/// Premium insight card with icon, title, description and action button.
+class _InsightCard extends StatefulWidget {
+  final _InsightData data;
+  const _InsightCard({required this.data});
+
+  @override
+  State<_InsightCard> createState() => _InsightCardState();
+}
+
+class _InsightCardState extends State<_InsightCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.data;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: d.action,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            transform: Matrix4.identity()
+              ..translate(0.0, _hovered ? -2.0 : 0.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF060B14),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _hovered
+                    ? d.color.withOpacity(0.40)
+                    : d.color.withOpacity(0.15),
+              ),
+              boxShadow: _hovered
+                  ? [
+                      BoxShadow(
+                        color: d.color.withOpacity(0.12),
+                        blurRadius: 14,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Left accent bar
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 2.5,
+                      color: d.color.withOpacity(_hovered ? 0.95 : 0.50),
+                    ),
+                    // Content
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(11, 11, 11, 11),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Icon + Title row
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 160),
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: d.color.withOpacity(
+                                        _hovered ? 0.18 : 0.10),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: _hovered
+                                        ? [
+                                            BoxShadow(
+                                              color: d.color.withOpacity(0.28),
+                                              blurRadius: 8,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Icon(d.icon, color: d.color, size: 15),
+                                ),
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Text(
+                                    d.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.2,
+                                      letterSpacing: -0.1,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              d.text,
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11,
+                                height: 1.45,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 9),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _hovered
+                                      ? d.color.withOpacity(0.16)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: d.color.withOpacity(
+                                        _hovered ? 0.60 : 0.28),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      d.actionLabel,
+                                      style: TextStyle(
+                                        color: d.color,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.1,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.arrow_forward_rounded,
+                                        color: d.color, size: 10),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dashboard Animated Background ─────────────────────────────────────────────
+
+/// Subtle mesh-dot grid + slowly pulsing ambient glow orbs.
+/// Drawn behind all content; repaint is cheap (3 radial gradients + dots).
+class _DashboardBackground extends StatefulWidget {
+  const _DashboardBackground();
+
+  @override
+  State<_DashboardBackground> createState() => _DashboardBackgroundState();
+}
+
+class _DashboardBackgroundState extends State<_DashboardBackground>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat(reverse: true);
+    _pulse = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (_, _) => RepaintBoundary(
+        child: CustomPaint(
+          painter: _MeshPainter(pulse: _pulse.value),
+          size: Size.infinite,
+        ),
+      ),
+    );
+  }
+}
+
+class _MeshPainter extends CustomPainter {
+  final double pulse;
+  const _MeshPainter({required this.pulse});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // ── Dot grid ────────────────────────────────────────────────────────────
+    final dotPaint = Paint()
+      ..color = const Color(0xFF1A3050).withOpacity(0.35);
+    const spacing = 30.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 0.75, dotPaint);
+      }
+    }
+
+    // ── Ambient orb 1 — top-left blue ───────────────────────────────────────
+    final r1 = size.width * 0.40;
+    final c1 = Offset(size.width * 0.18, size.height * 0.22);
+    canvas.drawCircle(
+      c1,
+      r1,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF3B82F6).withOpacity(0.10 + pulse * 0.06),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: c1, radius: r1)),
+    );
+
+    // ── Ambient orb 2 — center indigo ───────────────────────────────────────
+    final r2 = size.width * 0.45;
+    final c2 = Offset(size.width * 0.52, size.height * 0.50);
+    canvas.drawCircle(
+      c2,
+      r2,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF6366F1).withOpacity(0.07 + pulse * 0.04),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: c2, radius: r2)),
+    );
+
+    // ── Ambient orb 3 — bottom-right cyan ───────────────────────────────────
+    final r3 = size.width * 0.30;
+    final c3 = Offset(size.width * 0.88, size.height * 0.80);
+    canvas.drawCircle(
+      c3,
+      r3,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF00D4FF).withOpacity(0.06 + pulse * 0.03),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: c3, radius: r3)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MeshPainter old) => old.pulse != pulse;
+}
+
+
+// ── Global Connection Layer — covers full Row (content + right panel) ───────────
+
+class _GlobalConnectionLayer extends StatefulWidget {
+  final List<int> pulseVersions; // 10 values: 8 KPI + Alertas + Insights
+  const _GlobalConnectionLayer({required this.pulseVersions});
+
+  @override
+  State<_GlobalConnectionLayer> createState() => _GlobalConnectionLayerState();
+}
+
+class _GlobalConnectionLayerState extends State<_GlobalConnectionLayer>
+    with TickerProviderStateMixin {
+  late AnimationController _flowCtrl;
+  late AnimationController _heartbeatCtrl;
+  late List<AnimationController> _pulseCtrls; // 10 controllers
+  late List<int> _lastVersions;
+
+  @override
+  void initState() {
+    super.initState();
+    _flowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    )..repeat();
+
+    _heartbeatCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3600),
+    )..repeat(reverse: true);
+
+    _pulseCtrls = List.generate(
+      10,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1500),
+      ),
+    );
+
+    _lastVersions = List<int>.from(widget.pulseVersions);
+  }
+
+  @override
+  void didUpdateWidget(_GlobalConnectionLayer old) {
+    super.didUpdateWidget(old);
+    for (int i = 0; i < 10; i++) {
+      if (widget.pulseVersions[i] != _lastVersions[i]) {
+        _lastVersions[i] = widget.pulseVersions[i];
+        _pulseCtrls[i].forward(from: 0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _flowCtrl.dispose();
+    _heartbeatCtrl.dispose();
+    for (final c in _pulseCtrls) { c.dispose(); }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (_, constraints) {
+      final listenables = <Listenable>[_flowCtrl, _heartbeatCtrl, ..._pulseCtrls];
+      return AnimatedBuilder(
+        animation: Listenable.merge(listenables),
+        builder: (_, _) => CustomPaint(
+          painter: _GlobalConnectionPainter(
+            flow:         _flowCtrl.value,
+            heartbeat:    _heartbeatCtrl.value,
+            modulePulses: List.generate(10, (i) => _pulseCtrls[i].value),
+          ),
+          size: constraints.biggest,
+        ),
+      );
+    });
+  }
+}
+
+// ── Global Connection Painter — 8 KPI + Alertas + Insights ──────────────────────
+
+class _GlobalConnectionPainter extends CustomPainter {
+  final double flow;
+  final double heartbeat;
+  final List<double> modulePulses; // 10 values
+
+  const _GlobalConnectionPainter({
+    required this.flow,
+    required this.heartbeat,
+    required this.modulePulses,
+  });
+
+  static const _panelW = 280.0;
+
+  // Cor única para todos os filamentos — combina com o vórtice central
+  static const _wire = Color(0xFF9B6FFF);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    return; // conexões desativadas — globo holográfico não usa filamentos
+    // ignore: dead_code
+    final W  = size.width;
+    final H  = size.height;
+    final cW = W - _panelW;
+
+    // Pontos de emissão dentro do volume do cérebro neural 3D.
+    // Cérebro centrado em (cW*0.50, H*0.49), range vertical H*0.224–H*0.715.
+    final brainEmitL = [
+      Offset(cW * 0.412, H * 0.280),  // Veículos Ativos
+      Offset(cW * 0.402, H * 0.420),  // Em Manutenção
+      Offset(cW * 0.402, H * 0.560),  // Abastecimentos
+      Offset(cW * 0.412, H * 0.685),  // Gasto do Mês
+    ];
+    final brainEmitR = [
+      Offset(cW * 0.588, H * 0.280),  // Motoristas Ativos
+      Offset(cW * 0.598, H * 0.420),  // Ocorrências
+      Offset(cW * 0.598, H * 0.560),  // Multas
+      Offset(cW * 0.588, H * 0.685),  // Índice da Frota
+    ];
+
+    // Card centers
+    final leftCardX  = cW * 0.132;
+    final rightCardX = cW * 0.868;
+    final cardYs = [H * 0.125, H * 0.375, H * 0.625, H * 0.875];
+
+    // Painel direito
+    final brainAlertasSrc  = Offset(cW * 0.590, H * 0.360);
+    final brainInsightsSrc = Offset(cW * 0.590, H * 0.670);
+    final alertasDst  = Offset(cW + 40, H * 0.285);
+    final insightsDst = Offset(cW + 40, H * 0.702);
+
+    final maxPulse = modulePulses.fold(0.0, (a, b) => a > b ? a : b);
+    _drawBrainGlow(canvas, Offset(cW * 0.5, H * 0.47), cW, maxPulse);
+
+    // 8 filamentos — cor única roxa combinando com o vórtice
+    for (int i = 0; i < 4; i++) {
+      _drawConnection(canvas, brainEmitL[i], Offset(leftCardX,  cardYs[i]), _wire, i,     modulePulses[i],     toLeft: true);
+      _drawConnection(canvas, brainEmitR[i], Offset(rightCardX, cardYs[i]), _wire, i + 4, modulePulses[i + 4], toLeft: false);
+    }
+
+    // Right-panel connections
+    _drawPanelConnection(canvas, brainAlertasSrc, alertasDst,  _wire, 8, modulePulses[8]);
+    _drawPanelConnection(canvas, brainInsightsSrc, insightsDst, _wire, 9, modulePulses[9]);
+
+    // Nós de emissão (origem de cada linha)
+    for (int i = 0; i < 4; i++) {
+      _drawNode(canvas, brainEmitL[i], _wire, 1.8);
+      _drawNode(canvas, brainEmitR[i], _wire, 1.8);
+    }
+    _drawNode(canvas, brainAlertasSrc,  _wire, 1.4);
+    _drawNode(canvas, brainInsightsSrc, _wire, 1.4);
+    // Nós de terminação nos cards e painel
+    for (int i = 0; i < 4; i++) {
+      _drawNode(canvas, Offset(leftCardX,  cardYs[i]), _wire, 0.9);
+      _drawNode(canvas, Offset(rightCardX, cardYs[i]), _wire, 0.9);
+    }
+    _drawNode(canvas, alertasDst,  _wire, 0.9);
+    _drawNode(canvas, insightsDst, _wire, 0.9);
+  }
+
+  // ── Brain glow ───────────────────────────────────────────────────────────────
+
+  void _drawBrainGlow(Canvas canvas, Offset center, double cW, double maxPulse) {
+    canvas.drawCircle(
+      center, cW * 0.120,
+      Paint()
+        ..color = const Color(0xFF00D4FF).withOpacity(0.022 + heartbeat * 0.020 + maxPulse * 0.050)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 50),
+    );
+    canvas.drawCircle(
+      center, cW * 0.055,
+      Paint()
+        ..color = const Color(0xFF6366F1).withOpacity(0.035 + heartbeat * 0.018)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28),
+    );
+    if (maxPulse > 0) {
+      final fade = (1 - maxPulse).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        center, cW * 0.068 * (1 + maxPulse * 0.24),
+        Paint()
+          ..color = const Color(0xFF00D4FF).withOpacity(0.12 * fade)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30),
+      );
+    }
+  }
+
+  // ── KPI connection (card → brain perimeter) ──────────────────────────────────
+
+  void _drawConnection(
+    Canvas canvas, Offset src, Offset dst, Color color, int idx, double pulse,
+    {required bool toLeft}
+  ) {
+    final path   = _buildPath(src, dst, toLeft);
+    final mets   = path.computeMetrics().toList();
+    if (mets.isEmpty) return;
+    final metric = mets.first;
+    final length = metric.length;
+
+    canvas.drawPath(path,
+      Paint()
+        ..color       = color.withOpacity(0.09 + pulse * 0.06)
+        ..strokeWidth = 1.0
+        ..style       = PaintingStyle.stroke
+        ..strokeCap   = StrokeCap.round,
+    );
+    canvas.drawPath(path,
+      Paint()
+        ..color       = color.withOpacity(0.14 + pulse * 0.08)
+        ..strokeWidth = 2.4
+        ..style       = PaintingStyle.stroke
+        ..strokeCap   = StrokeCap.round
+        ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+
+    _drawNode(canvas, src, color, 1.0);
+
+    // Partículas viajam do card (t=1) em direção ao rosto (t=0)
+    final phase = idx * 0.125;
+    for (int p = 0; p < 3; p++) {
+      final t       = 1.0 - (flow + phase + p / 3.0) % 1.0;
+      final tangent = metric.getTangentForOffset((t * length).clamp(0.5, length - 0.5));
+      if (tangent != null) _drawParticle(canvas, tangent.position, color);
+    }
+
+    if (pulse > 0) {
+      final travelT   = 1.0 - (pulse / 0.65).clamp(0.0, 1.0);
+      final pulseTang = metric.getTangentForOffset((travelT * length).clamp(0.5, length - 0.5));
+      if (pulseTang != null) {
+        final intensity = pulse < 0.28
+            ? pulse / 0.28
+            : pulse < 0.65 ? 1.0
+            : (1 - (pulse - 0.65) / 0.35).clamp(0.0, 1.0);
+        _drawPulsePacket(canvas, pulseTang.position, color, intensity);
+      }
+    }
+  }
+
+  // ── Right-panel connection (brain perimeter → panel item) ────────────────────
+
+  void _drawPanelConnection(
+    Canvas canvas, Offset src, Offset dst, Color color, int idx, double pulse,
+  ) {
+    final path   = _buildPanelPath(src, dst);
+    final mets   = path.computeMetrics().toList();
+    if (mets.isEmpty) return;
+    final metric = mets.first;
+    final length = metric.length;
+
+    canvas.drawPath(path,
+      Paint()
+        ..color       = color.withOpacity(0.12 + pulse * 0.08)
+        ..strokeWidth = 1.0
+        ..style       = PaintingStyle.stroke
+        ..strokeCap   = StrokeCap.round,
+    );
+    canvas.drawPath(path,
+      Paint()
+        ..color       = color.withOpacity(0.18 + pulse * 0.10)
+        ..strokeWidth = 2.4
+        ..style       = PaintingStyle.stroke
+        ..strokeCap   = StrokeCap.round
+        ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+
+    // Partículas viajam do painel (t=1) em direção ao rosto (t=0)
+    final phase = idx * 0.125;
+    for (int p = 0; p < 2; p++) {
+      final t       = 1.0 - (flow + phase + p / 2.0) % 1.0;
+      final tangent = metric.getTangentForOffset((t * length).clamp(0.5, length - 0.5));
+      if (tangent != null) _drawParticle(canvas, tangent.position, color);
+    }
+
+    if (pulse > 0) {
+      final travelT   = 1.0 - (pulse / 0.65).clamp(0.0, 1.0);
+      final pulseTang = metric.getTangentForOffset((travelT * length).clamp(0.5, length - 0.5));
+      if (pulseTang != null) {
+        final intensity = pulse < 0.28
+            ? pulse / 0.28
+            : pulse < 0.65 ? 1.0
+            : (1 - (pulse - 0.65) / 0.35).clamp(0.0, 1.0);
+        _drawPulsePacket(canvas, pulseTang.position, color, intensity);
+      }
+    }
+  }
+
+  // ── Drawing primitives ───────────────────────────────────────────────────────
+
+  void _drawParticle(Canvas canvas, Offset pos, Color color) {
+    canvas.drawCircle(pos, 4.0,
+      Paint()
+        ..color      = color.withOpacity(0.15)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawCircle(pos, 1.8,
+      Paint()
+        ..color       = color.withOpacity(0.50)
+        ..style       = PaintingStyle.stroke
+        ..strokeWidth = 0.65,
+    );
+    canvas.drawCircle(pos, 1.2, Paint()..color = color.withOpacity(0.86));
+    canvas.drawCircle(pos, 0.60, Paint()..color = Colors.white.withOpacity(0.76));
+  }
+
+  void _drawPulsePacket(Canvas canvas, Offset pos, Color color, double intensity) {
+    canvas.drawCircle(pos, 12.0,
+      Paint()
+        ..color      = color.withOpacity(0.24 * intensity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+    );
+    canvas.drawCircle(pos, 5.5,
+      Paint()
+        ..color      = color.withOpacity(0.48 * intensity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawCircle(pos, 2.6, Paint()..color = Colors.white.withOpacity(0.95 * intensity));
+  }
+
+  void _drawNode(Canvas canvas, Offset pos, Color color, double scale) {
+    canvas.drawCircle(pos, 4.5 * scale,
+      Paint()
+        ..color      = color.withOpacity(0.18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawCircle(pos, 2.1 * scale,
+      Paint()
+        ..color       = color.withOpacity(0.48)
+        ..style       = PaintingStyle.stroke
+        ..strokeWidth = 0.65,
+    );
+    canvas.drawCircle(pos, 1.3 * scale, Paint()..color = color.withOpacity(0.78));
+  }
+
+  // ── Bezier paths ─────────────────────────────────────────────────────────────
+
+  Path _buildPath(Offset src, Offset dst, bool toLeft) {
+    final dx = (dst.dx - src.dx).abs();
+    final Offset cp1, cp2;
+    if (toLeft) {
+      // Brain left hemisphere → left card (line sweeps left)
+      cp1 = Offset(src.dx - dx * 0.52, src.dy);
+      cp2 = Offset(dst.dx + dx * 0.26, dst.dy);
+    } else {
+      // Brain right hemisphere → right card (line sweeps right)
+      cp1 = Offset(src.dx + dx * 0.52, src.dy);
+      cp2 = Offset(dst.dx - dx * 0.26, dst.dy);
+    }
+    return Path()
+      ..moveTo(src.dx, src.dy)
+      ..cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, dst.dx, dst.dy);
+  }
+
+  Path _buildPanelPath(Offset src, Offset dst) {
+    final dx  = (dst.dx - src.dx).abs();
+    final dyV = dst.dy - src.dy;
+    final cp1 = Offset(src.dx + dx * 0.60, src.dy);
+    final cp2 = Offset(dst.dx - dx * 0.20, dst.dy - dyV * 0.15);
+    return Path()
+      ..moveTo(src.dx, src.dy)
+      ..cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, dst.dx, dst.dy);
+  }
+
+  @override
+  bool shouldRepaint(_GlobalConnectionPainter old) {
+    if (old.flow != flow || old.heartbeat != heartbeat) return true;
+    for (int i = 0; i < 10; i++) {
+      if (old.modulePulses[i] != modulePulses[i]) return true;
+    }
+    return false;
   }
 }

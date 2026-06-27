@@ -294,15 +294,13 @@ class _MotoristasPageState extends State<MotoristasPage> {
                 _buildStats(),
                 const SizedBox(height: 20),
                 if (isWide)
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(width: 400, child: _buildForm()),
-                        const SizedBox(width: 20),
-                        Expanded(child: _buildLista()),
-                      ],
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(width: 400, child: _buildForm()),
+                      const SizedBox(width: 20),
+                      Expanded(child: _buildLista()),
+                    ],
                   )
                 else ...[
                   _buildForm(),

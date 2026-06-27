@@ -35,7 +35,10 @@ class _DocumentosPageState extends State<DocumentosPage> {
             .from('documentos')
             .select('*')
             .order('data_vencimento', ascending: true),
-        supabase.from('vehicles').select('id, plate, brand, model, driver_id').order('plate'),
+        supabase
+            .from('vehicles')
+            .select('id, plate, brand, model, driver_id')
+            .order('plate'),
         supabase.from('drivers').select('id, name').order('name'),
       ]);
 
@@ -64,8 +67,9 @@ class _DocumentosPageState extends State<DocumentosPage> {
       debugPrint('Erro ao carregar documentos: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
     }
   }
 
@@ -134,9 +138,13 @@ class _DocumentosPageState extends State<DocumentosPage> {
       case 'vencidos':
         return documentos.where(_isVencido).toList();
       case 'vencer_30':
-        return documentos.where((d) => _isVencer30(d) && !_isVencido(d)).toList();
+        return documentos
+            .where((d) => _isVencer30(d) && !_isVencido(d))
+            .toList();
       case 'ativos':
-        return documentos.where((d) => !_isVencido(d) && !_isVencer30(d)).toList();
+        return documentos
+            .where((d) => !_isVencido(d) && !_isVencer30(d))
+            .toList();
       default:
         return documentos;
     }
@@ -189,7 +197,9 @@ class _DocumentosPageState extends State<DocumentosPage> {
       case 'vencer_30':
         return documentos.where((d) => _isVencer30(d) && !_isVencido(d)).length;
       case 'ativos':
-        return documentos.where((d) => !_isVencido(d) && !_isVencer30(d)).length;
+        return documentos
+            .where((d) => !_isVencido(d) && !_isVencer30(d))
+            .length;
       default:
         return documentos.length;
     }
@@ -222,7 +232,10 @@ class _DocumentosPageState extends State<DocumentosPage> {
         onPressed: _abrirNovoDocumento,
         backgroundColor: const Color(0xFF0ea5e9),
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Novo Documento', style: TextStyle(color: Colors.white)),
+        label: const Text(
+          'Novo Documento',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _carregarDados,
@@ -254,22 +267,31 @@ class _DocumentosPageState extends State<DocumentosPage> {
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.folder_special,
-                                color: Colors.white, size: 26),
+                            child: const Icon(
+                              Icons.folder_special,
+                              color: Colors.white,
+                              size: 26,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Documentos da Frota',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold)),
+                                const Text(
+                                  'Documentos da Frota',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 Text(
                                   '${_count('vencidos')} vencido(s) · ${_count('vencer_30')} vencendo em breve',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ],
                             ),
@@ -282,17 +304,33 @@ class _DocumentosPageState extends State<DocumentosPage> {
                     // KPIs
                     Row(
                       children: [
-                        _kpi('Total', '${documentos.length}', Icons.description,
-                            AppColors.secondary),
+                        _kpi(
+                          'Total',
+                          '${documentos.length}',
+                          Icons.description,
+                          AppColors.secondary,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Ativos', '${_count('ativos')}', Icons.check_circle,
-                            AppColors.success),
+                        _kpi(
+                          'Ativos',
+                          '${_count('ativos')}',
+                          Icons.check_circle,
+                          AppColors.success,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Vencer', '${_count('vencer_30')}', Icons.schedule,
-                            AppColors.warning),
+                        _kpi(
+                          'Vencer',
+                          '${_count('vencer_30')}',
+                          Icons.schedule,
+                          AppColors.warning,
+                        ),
                         const SizedBox(width: 8),
-                        _kpi('Vencidos', '${_count('vencidos')}', Icons.warning_amber,
-                            AppColors.danger),
+                        _kpi(
+                          'Vencidos',
+                          '${_count('vencidos')}',
+                          Icons.warning_amber,
+                          AppColors.danger,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -306,15 +344,28 @@ class _DocumentosPageState extends State<DocumentosPage> {
                           const SizedBox(width: 8),
                           _chip('Ativos', 'ativos', color: AppColors.success),
                           const SizedBox(width: 8),
-                          _chip('Vencer em 30d', 'vencer_30', color: AppColors.warning),
+                          _chip(
+                            'Vencer em 30d',
+                            'vencer_30',
+                            color: AppColors.warning,
+                          ),
                           const SizedBox(width: 8),
-                          _chip('Vencidos', 'vencidos', color: AppColors.danger),
+                          _chip(
+                            'Vencidos',
+                            'vencidos',
+                            color: AppColors.danger,
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('${filtrados.length} documento(s)',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    Text(
+                      '${filtrados.length} documento(s)',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                   ],
                 ),
@@ -322,14 +373,20 @@ class _DocumentosPageState extends State<DocumentosPage> {
             ),
 
             if (carregando)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
             else if (filtrados.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.folder_open, size: 64, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.folder_open,
+                        size: 64,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         documentos.isEmpty
@@ -343,7 +400,8 @@ class _DocumentosPageState extends State<DocumentosPage> {
                         icon: const Icon(Icons.add),
                         label: const Text('Adicionar Documento'),
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0ea5e9)),
+                          backgroundColor: const Color(0xFF0ea5e9),
+                        ),
                       ),
                     ],
                   ),
@@ -353,107 +411,134 @@ class _DocumentosPageState extends State<DocumentosPage> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
                 sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final doc = filtrados[i];
-                      final cor = _statusColor(doc);
-                      final tipo = doc['tipo']?.toString() ?? '-';
-                      final descricao = doc['descricao']?.toString() ?? '';
-                      final vencimento = _fmtDate(doc['data_vencimento']);
-                      final emissao = _fmtDate(doc['data_emissao']);
-                      final veiculo = _veiculoLabel(doc);
-                      final motorista = _motoristaLabel(doc);
+                  delegate: SliverChildBuilderDelegate((context, i) {
+                    final doc = filtrados[i];
+                    final cor = _statusColor(doc);
+                    final tipo = doc['tipo']?.toString() ?? '-';
+                    final descricao = doc['descricao']?.toString() ?? '';
+                    final vencimento = _fmtDate(doc['data_vencimento']);
+                    final emissao = _fmtDate(doc['data_emissao']);
+                    final veiculo = _veiculoLabel(doc);
+                    final motorista = _motoristaLabel(doc);
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: GestureDetector(
-                          onTap: () => _abrirDetalhe(doc),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: cor.withOpacity(0.3)),
-                              boxShadow: [
-                                BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2)),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: cor.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(Icons.description, color: cor, size: 18),
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: GestureDetector(
+                        onTap: () => _abrirDetalhe(doc),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: cor.withOpacity(0.3)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: cor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(tipo,
-                                              style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 14)),
-                                          Text(veiculo,
-                                              style: const TextStyle(
-                                                  color: AppColors.textSecondary, fontSize: 12)),
-                                        ],
+                                    child: Icon(
+                                      Icons.description,
+                                      color: cor,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          tipo,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          veiculo,
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: cor.withOpacity(0.13),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: cor.withOpacity(0.3),
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: cor.withOpacity(0.13),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: cor.withOpacity(0.3)),
+                                    child: Text(
+                                      _statusLabel(doc),
+                                      style: TextStyle(
+                                        color: cor,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
                                       ),
-                                      child: Text(_statusLabel(doc),
-                                          style: TextStyle(
-                                              color: cor,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w700)),
                                     ),
-                                  ],
-                                ),
-                                if (descricao.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(descricao,
-                                      style: const TextStyle(
-                                          color: AppColors.textSecondary, fontSize: 12),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
+                                  ),
                                 ],
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 4,
-                                  children: [
-                                    if (motorista != '-')
-                                      _badge('👤 $motorista', AppColors.textSecondary),
-                                    if (emissao != '-')
-                                      _badge('Emissão: $emissao', AppColors.textSecondary),
-                                    _badge('Vence: $vencimento', cor),
-                                  ],
+                              ),
+                              if (descricao.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  descricao,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
-                            ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  if (motorista != '-')
+                                    _badge(
+                                      '👤 $motorista',
+                                      AppColors.textSecondary,
+                                    ),
+                                  if (emissao != '-')
+                                    _badge(
+                                      'Emissão: $emissao',
+                                      AppColors.textSecondary,
+                                    ),
+                                  _badge('Vence: $vencimento', cor),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    childCount: filtrados.length,
-                  ),
+                      ),
+                    );
+                  }, childCount: filtrados.length),
                 ),
               ),
           ],
@@ -462,7 +547,8 @@ class _DocumentosPageState extends State<DocumentosPage> {
     );
   }
 
-  Widget _kpi(String label, String value, IconData icon, Color color) => Expanded(
+  Widget _kpi(String label, String value, IconData icon, Color color) =>
+      Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
@@ -475,12 +561,23 @@ class _DocumentosPageState extends State<DocumentosPage> {
             children: [
               Icon(icon, color: color, size: 15),
               const SizedBox(height: 4),
-              Text(value,
-                  style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
-              Text(label,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 9),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 9,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -497,28 +594,36 @@ class _DocumentosPageState extends State<DocumentosPage> {
         decoration: BoxDecoration(
           color: selected ? c.withOpacity(0.15) : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? c : AppColors.border, width: selected ? 1.5 : 1),
+          border: Border.all(
+            color: selected ? c : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? c : AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.normal)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? c : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
 
   Widget _badge(String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(text,
-            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
 }
 
 // ─── Formulário — carrega veículos e motoristas internamente ──────────────────
@@ -617,7 +722,9 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
             surface: AppColors.surface,
             onSurface: Colors.white,
           ),
-          dialogTheme: const DialogThemeData(backgroundColor: AppColors.backgroundSoft),
+          dialogTheme: const DialogThemeData(
+            backgroundColor: AppColors.backgroundSoft,
+          ),
         ),
         child: child!,
       ),
@@ -665,8 +772,11 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       if (arquivo != null && arquivo!.bytes != null) {
         try {
           final ext = arquivo!.extension ?? 'pdf';
-          final fileName = 'documento_${DateTime.now().millisecondsSinceEpoch}.$ext';
-          await supabase.storage.from('documentos').uploadBinary(
+          final fileName =
+              'documento_${DateTime.now().millisecondsSinceEpoch}.$ext';
+          await supabase.storage
+              .from('documentos')
+              .uploadBinary(
                 fileName,
                 arquivo!.bytes!,
                 fileOptions: const FileOptions(upsert: true),
@@ -683,8 +793,8 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
         'data_vencimento': dataVencimento.toIso8601String().split('T')[0],
         'ativo': true,
         if (veiculoId != null) 'vehicle_id': veiculoId,
-        if (motoristaId != null) 'driver_id': motoristaId,
-        if (fileUrl != null) 'file_url': fileUrl,
+        'driver_id': ?motoristaId,
+        'file_url': ?fileUrl,
         if (dataEmissao != null)
           'data_emissao': dataEmissao!.toIso8601String().split('T')[0],
         if (dataPagamento != null)
@@ -704,8 +814,9 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       widget.onSaved();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
       }
     } finally {
       if (mounted) setState(() => isSaving = false);
@@ -737,7 +848,9 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                      color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               Row(
@@ -748,13 +861,21 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                       color: const Color(0xFF0ea5e9).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child:
-                        const Icon(Icons.folder_special, color: Color(0xFF0ea5e9), size: 20),
+                    child: const Icon(
+                      Icons.folder_special,
+                      color: Color(0xFF0ea5e9),
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 10),
-                  const Text('Novo Documento',
-                      style: TextStyle(
-                          color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Novo Documento',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -762,17 +883,30 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               // ── Tipo ──────────────────────────────────────────────────────
               DropdownButtonFormField<String>(
                 value: tipoSelecionado,
-                decoration: _dec('Tipo de Documento *', Icons.category_outlined),
+                decoration: _dec(
+                  'Tipo de Documento *',
+                  Icons.category_outlined,
+                ),
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 isExpanded: true,
-                hint: const Text('Selecione o tipo',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                hint: const Text(
+                  'Selecione o tipo',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
                 items: tipos
-                    .map((t) => DropdownMenuItem(
-                          value: t,
-                          child: Text(t, style: const TextStyle(color: Colors.white)),
-                        ))
+                    .map(
+                      (t) => DropdownMenuItem(
+                        value: t,
+                        child: Text(
+                          t,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    )
                     .toList(),
                 validator: (v) => v == null ? 'Selecione o tipo' : null,
                 onChanged: (v) => setState(() => tipoSelecionado = v),
@@ -781,7 +915,10 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
 
               // ── Veículo ──────────────────────────────────────────────────
               if (veiculos.isEmpty)
-                _avisoSemDados('Nenhum veículo cadastrado', Icons.directions_car_outlined)
+                _avisoSemDados(
+                  'Nenhum veículo cadastrado',
+                  Icons.directions_car_outlined,
+                )
               else
                 DropdownButtonFormField<String>(
                   value: veiculoId,
@@ -789,15 +926,24 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                   dropdownColor: AppColors.surface,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   isExpanded: true,
-                  hint: const Text('Selecione o veículo',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                  hint: const Text(
+                    'Selecione o veículo',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
                   items: veiculos
-                      .map((v) => DropdownMenuItem<String>(
-                            value: v['id']?.toString(),
-                            child: Text(_veiculoLabel(v),
-                                style: const TextStyle(color: Colors.white),
-                                overflow: TextOverflow.ellipsis),
-                          ))
+                      .map(
+                        (v) => DropdownMenuItem<String>(
+                          value: v['id']?.toString(),
+                          child: Text(
+                            _veiculoLabel(v),
+                            style: const TextStyle(color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
                       .toList(),
                   validator: (v) => v == null ? 'Selecione um veículo' : null,
                   onChanged: _aoSelecionarVeiculo,
@@ -807,30 +953,45 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               // ── Motorista — auto detectado ou manual ──────────────────────
               if (temAutoDriver)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.success.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.success.withOpacity(0.4)),
+                    border: Border.all(
+                      color: AppColors.success.withOpacity(0.4),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.person_pin, color: AppColors.success, size: 18),
+                      const Icon(
+                        Icons.person_pin,
+                        color: AppColors.success,
+                        size: 18,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Motorista vinculado ao veículo',
-                                style: TextStyle(
-                                    color: AppColors.success,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600)),
-                            Text(motoristaAutoNome!,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500)),
+                            const Text(
+                              'Motorista vinculado ao veículo',
+                              style: TextStyle(
+                                color: AppColors.success,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              motoristaAutoNome!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -839,33 +1000,54 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                           motoristaAutoId = null;
                           motoristaAutoNome = null;
                         }),
-                        child: const Icon(Icons.edit, color: AppColors.textSecondary, size: 16),
+                        child: const Icon(
+                          Icons.edit,
+                          color: AppColors.textSecondary,
+                          size: 16,
+                        ),
                       ),
                     ],
                   ),
                 )
               else if (motoristas.isEmpty)
-                _avisoSemDados('Nenhum motorista cadastrado (opcional)', Icons.person_outline)
+                _avisoSemDados(
+                  'Nenhum motorista cadastrado (opcional)',
+                  Icons.person_outline,
+                )
               else
                 DropdownButtonFormField<String>(
                   value: motoristaManualId,
-                  decoration: _dec('Motorista (opcional)', Icons.person_outline),
+                  decoration: _dec(
+                    'Motorista (opcional)',
+                    Icons.person_outline,
+                  ),
                   dropdownColor: AppColors.surface,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   isExpanded: true,
-                  hint: const Text('Selecione o motorista',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                  hint: const Text(
+                    'Selecione o motorista',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
                   items: [
                     const DropdownMenuItem<String>(
                       value: null,
-                      child: Text('Sem motorista',
-                          style: TextStyle(color: AppColors.textSecondary)),
+                      child: Text(
+                        'Sem motorista',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
                     ),
-                    ...motoristas.map((m) => DropdownMenuItem<String>(
-                          value: m['id']?.toString(),
-                          child: Text(m['name']?.toString() ?? '-',
-                              style: const TextStyle(color: Colors.white)),
-                        )),
+                    ...motoristas.map(
+                      (m) => DropdownMenuItem<String>(
+                        value: m['id']?.toString(),
+                        child: Text(
+                          m['name']?.toString() ?? '-',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
                   ],
                   onChanged: (v) => setState(() => motoristaManualId = v),
                 ),
@@ -876,10 +1058,13 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 controller: descricaoCtrl,
                 style: const TextStyle(color: Colors.white),
                 maxLines: 2,
-                decoration:
-                    _dec('Descrição *', Icons.notes_outlined).copyWith(alignLabelWithHint: true),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Informe a descrição' : null,
+                decoration: _dec(
+                  'Descrição *',
+                  Icons.notes_outlined,
+                ).copyWith(alignLabelWithHint: true),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Informe a descrição'
+                    : null,
               ),
               const SizedBox(height: 14),
 
@@ -938,31 +1123,42 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
               GestureDetector(
                 onTap: _selecionarArquivo,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: arquivo != null
                         ? AppColors.success.withOpacity(0.08)
                         : AppColors.backgroundSoft,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: arquivo != null
-                            ? AppColors.success.withOpacity(0.4)
-                            : AppColors.border),
+                      color: arquivo != null
+                          ? AppColors.success.withOpacity(0.4)
+                          : AppColors.border,
+                    ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                          arquivo != null ? Icons.attach_file : Icons.upload_file,
-                          color:
-                              arquivo != null ? AppColors.success : AppColors.textSecondary,
-                          size: 18),
+                        arquivo != null ? Icons.attach_file : Icons.upload_file,
+                        color: arquivo != null
+                            ? AppColors.success
+                            : AppColors.textSecondary,
+                        size: 18,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          arquivo != null ? arquivo!.name : 'Selecionar arquivo (opcional)',
+                          arquivo != null
+                              ? arquivo!.name
+                              : 'Selecionar arquivo (opcional)',
                           style: TextStyle(
-                              color: arquivo != null ? Colors.white : AppColors.textSecondary,
-                              fontSize: 13),
+                            color: arquivo != null
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -970,8 +1166,11 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                       if (arquivo != null)
                         GestureDetector(
                           onTap: () => setState(() => arquivo = null),
-                          child: const Icon(Icons.close,
-                              color: AppColors.textSecondary, size: 16),
+                          child: const Icon(
+                            Icons.close,
+                            color: AppColors.textSecondary,
+                            size: 16,
+                          ),
                         ),
                     ],
                   ),
@@ -985,17 +1184,27 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0ea5e9),
                   minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: isSaving
                     ? const SizedBox(
                         height: 22,
                         width: 22,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
                       )
-                    : const Text('Registrar Documento',
+                    : const Text(
+                        'Registrar Documento',
                         style: TextStyle(
-                            color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ],
           ),
@@ -1005,20 +1214,23 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   }
 
   Widget _avisoSemDados(String msg, IconData icon) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.backgroundSoft,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: AppColors.backgroundSoft,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: AppColors.textSecondary, size: 18),
+        const SizedBox(width: 10),
+        Text(
+          msg,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.textSecondary, size: 18),
-            const SizedBox(width: 10),
-            Text(msg, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 
   Widget _datePicker({
     required String label,
@@ -1046,20 +1258,31 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(label,
-                      style:
-                          const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     value != null ? _fmt(value) : placeholder,
                     style: TextStyle(
-                        color: value != null ? Colors.white : AppColors.textSecondary,
-                        fontSize: 14),
+                      color: value != null
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.edit_calendar, color: AppColors.textSecondary, size: 16),
+            const Icon(
+              Icons.edit_calendar,
+              color: AppColors.textSecondary,
+              size: 16,
+            ),
           ],
         ),
       ),
@@ -1067,24 +1290,28 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   }
 
   InputDecoration _dec(String label, IconData icon) => InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
-        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 18),
-        filled: true,
-        fillColor: AppColors.backgroundSoft,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF0ea5e9))),
-        errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.danger)),
-      );
+    labelText: label,
+    labelStyle: const TextStyle(color: AppColors.textSecondary),
+    prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 18),
+    filled: true,
+    fillColor: AppColors.backgroundSoft,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFF0ea5e9)),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.danger),
+    ),
+  );
 }
 
 // ─── Detalhe do documento ─────────────────────────────────────────────────────
@@ -1093,7 +1320,10 @@ class _DetalheDocumentoPage extends StatefulWidget {
   final Map<String, dynamic> documento;
   final VoidCallback onAtualizado;
 
-  const _DetalheDocumentoPage({required this.documento, required this.onAtualizado});
+  const _DetalheDocumentoPage({
+    required this.documento,
+    required this.onAtualizado,
+  });
 
   @override
   State<_DetalheDocumentoPage> createState() => _DetalheDocumentoPageState();
@@ -1157,14 +1387,21 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Excluir Documento?', style: TextStyle(color: Colors.white)),
-        content: const Text('Esta ação é irreversível. Deseja continuar?',
-            style: TextStyle(color: AppColors.textSecondary)),
+        title: const Text(
+          'Excluir Documento?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Esta ação é irreversível. Deseja continuar?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -1194,24 +1431,31 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
         } catch (_) {}
       }
 
-      await supabase.from('documentos').delete().eq('id', widget.documento['id']);
+      await supabase
+          .from('documentos')
+          .delete()
+          .eq('id', widget.documento['id']);
       widget.onAtualizado();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Documento excluído.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Documento excluído.')));
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
       }
     }
   }
 
   void _abrirEdicao() {
     final doc = widget.documento;
-    final descController = TextEditingController(text: doc['descricao']?.toString() ?? '');
+    final descController = TextEditingController(
+      text: doc['descricao']?.toString() ?? '',
+    );
     DateTime? vencimento = _parseDate(doc['data_vencimento']);
     String tipo = doc['tipo']?.toString() ?? 'CNH';
     final tipos = ['CNH', 'CRLV', 'Seguro', 'Licença', 'Outros'];
@@ -1220,38 +1464,70 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => Padding(
           padding: EdgeInsets.only(
-            left: 20, right: 20, top: 20,
+            left: 20,
+            right: 20,
+            top: 20,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(child: Container(width: 40, height: 4,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
-              const Text('Editar Documento',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text(
+                'Editar Documento',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: tipos.contains(tipo) ? tipo : tipos.last,
                 decoration: InputDecoration(
                   labelText: 'Tipo',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
-                  filled: true, fillColor: AppColors.backgroundSoft,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border)),
+                  filled: true,
+                  fillColor: AppColors.backgroundSoft,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
                 ),
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: Colors.white),
-                items: tipos.map((t) => DropdownMenuItem(value: t,
-                    child: Text(t, style: const TextStyle(color: Colors.white)))).toList(),
+                items: tipos
+                    .map(
+                      (t) => DropdownMenuItem(
+                        value: t,
+                        child: Text(
+                          t,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (v) => setLocal(() => tipo = v ?? tipo),
               ),
               const SizedBox(height: 12),
@@ -1262,11 +1538,16 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                 decoration: InputDecoration(
                   labelText: 'Descrição',
                   labelStyle: const TextStyle(color: AppColors.textSecondary),
-                  filled: true, fillColor: AppColors.backgroundSoft,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border)),
+                  filled: true,
+                  fillColor: AppColors.backgroundSoft,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1282,53 +1563,87 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSoft,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Row(children: [
-                    const Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary, size: 18),
-                    const SizedBox(width: 10),
-                    Text(
-                      vencimento != null
-                          ? '${vencimento!.day.toString().padLeft(2, '0')}/${vencimento!.month.toString().padLeft(2, '0')}/${vencimento!.year}'
-                          : 'Vencimento (opcional)',
-                      style: TextStyle(
-                        color: vencimento != null ? Colors.white : AppColors.textSecondary,
-                        fontSize: 14,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        color: AppColors.textSecondary,
+                        size: 18,
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 10),
+                      Text(
+                        vencimento != null
+                            ? '${vencimento!.day.toString().padLeft(2, '0')}/${vencimento!.month.toString().padLeft(2, '0')}/${vencimento!.year}'
+                            : 'Vencimento (opcional)',
+                        style: TextStyle(
+                          color: vencimento != null
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
                   try {
-                    await supabase.from('documentos').update({
-                      'tipo': tipo,
-                      'descricao': descController.text.trim(),
-                      if (vencimento != null) 'data_vencimento': vencimento!.toIso8601String().split('T')[0],
-                    }).eq('id', widget.documento['id']);
+                    await supabase
+                        .from('documentos')
+                        .update({
+                          'tipo': tipo,
+                          'descricao': descController.text.trim(),
+                          if (vencimento != null)
+                            'data_vencimento': vencimento!
+                                .toIso8601String()
+                                .split('T')[0],
+                        })
+                        .eq('id', widget.documento['id']);
                     widget.onAtualizado();
-                    if (ctx.mounted) { Navigator.pop(ctx); }
+                    if (ctx.mounted) {
+                      Navigator.pop(ctx);
+                    }
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Documento atualizado'), backgroundColor: AppColors.success),
+                        const SnackBar(
+                          content: Text('Documento atualizado'),
+                          backgroundColor: AppColors.success,
+                        ),
                       );
                     }
                   } catch (e) {
-                    if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e'))); }
+                    if (mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.secondary,
                   minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('Salvar alterações', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                child: const Text(
+                  'Salvar alterações',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1385,26 +1700,43 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(tipo,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text(descricao,
-                            style: const TextStyle(
-                                color: AppColors.textSecondary, fontSize: 13),
-                            maxLines: 2),
+                        Text(
+                          tipo,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          descricao,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                          maxLines: 2,
+                        ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: _cor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: _cor.withOpacity(0.4)),
                     ),
-                    child: Text(_status,
-                        style: TextStyle(
-                            color: _cor, fontSize: 11, fontWeight: FontWeight.w700)),
+                    child: Text(
+                      _status,
+                      style: TextStyle(
+                        color: _cor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1415,16 +1747,31 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
             _section('Informações', [
               _infoRow(Icons.directions_car_outlined, 'Veículo', _veiculo),
               _infoRow(Icons.person_outline, 'Motorista', _motorista),
-              _infoRow(Icons.calendar_today_outlined, 'Emissão', _fmtDate(doc['data_emissao'])),
-              _infoRow(Icons.event_outlined, 'Vencimento', _fmtDate(doc['data_vencimento'])),
-              _infoRow(Icons.payments_outlined, 'Pagamento', _fmtDate(doc['data_pagamento'])),
+              _infoRow(
+                Icons.calendar_today_outlined,
+                'Emissão',
+                _fmtDate(doc['data_emissao']),
+              ),
+              _infoRow(
+                Icons.event_outlined,
+                'Vencimento',
+                _fmtDate(doc['data_vencimento']),
+              ),
+              _infoRow(
+                Icons.payments_outlined,
+                'Pagamento',
+                _fmtDate(doc['data_pagamento']),
+              ),
             ]),
             const SizedBox(height: 14),
 
             // Arquivo
             if (fileUrl != null && fileUrl.isNotEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(14),
@@ -1432,24 +1779,39 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.attach_file, color: AppColors.secondary, size: 20),
+                    const Icon(
+                      Icons.attach_file,
+                      color: AppColors.secondary,
+                      size: 20,
+                    ),
                     const SizedBox(width: 12),
                     const Expanded(
-                      child: Text('Arquivo anexado',
-                          style: TextStyle(
-                              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+                      child: Text(
+                        'Arquivo anexado',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.secondary.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text('Visualizar',
-                          style: TextStyle(
-                              color: AppColors.secondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Visualizar',
+                        style: TextStyle(
+                          color: AppColors.secondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1459,13 +1821,24 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
             // Botão excluir
             OutlinedButton.icon(
               onPressed: _deletar,
-              icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
-              label: const Text('Excluir Documento',
-                  style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600)),
+              icon: const Icon(
+                Icons.delete_outline,
+                color: AppColors.danger,
+                size: 18,
+              ),
+              label: const Text(
+                'Excluir Documento',
+                style: TextStyle(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.danger),
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -1475,44 +1848,59 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
   }
 
   Widget _section(String title, List<Widget> rows) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Text(title,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4)),
+    decoration: BoxDecoration(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
             ),
-            const Divider(height: 1, color: AppColors.border),
-            ...rows,
-          ],
+          ),
         ),
-      );
+        const Divider(height: 1, color: AppColors.border),
+        ...rows,
+      ],
+    ),
+  );
 
   Widget _infoRow(IconData icon, String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.textSecondary, size: 16),
-            const SizedBox(width: 10),
-            SizedBox(
-                width: 80,
-                child: Text(label,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
-            Expanded(
-                child: Text(value,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500))),
-          ],
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+    child: Row(
+      children: [
+        Icon(icon, color: AppColors.textSecondary, size: 16),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
         ),
-      );
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
