@@ -30,20 +30,16 @@
     };
   </script>
   <script>
-    // Force service worker update on new deploys — clears stale caches from old versions
+    // Unregister all service workers and clear all caches unconditionally.
+    // Flutter's PWA service worker intercepts requests before Cache-Control headers
+    // take effect, causing mobile browsers to serve stale builds indefinitely.
+    // Since this app is not distributed as an installed PWA, offline caching is not needed.
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        // Check if we have a new version by comparing a stored key
-        var deployKey = 'deploy-2026-06-28-v2';
-        if (localStorage.getItem('deployKey') !== deployKey) {
-          localStorage.setItem('deployKey', deployKey);
-          registrations.forEach(function(reg) { reg.update(); });
-          if (registrations.length > 0) {
-            caches.keys().then(function(keys) {
-              keys.forEach(function(key) { caches.delete(key); });
-            });
-          }
-        }
+        registrations.forEach(function(reg) { reg.unregister(); });
+      });
+      caches.keys().then(function(keys) {
+        keys.forEach(function(key) { caches.delete(key); });
       });
     }
   </script>
