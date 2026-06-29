@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../admin/admin_usuarios_page.dart';
 
 class MasterDashboardPage extends StatefulWidget {
   const MasterDashboardPage({super.key});
@@ -232,6 +233,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
           // Nav
           _sidebarItem(Icons.dashboard_rounded, 'Painel Geral', active: true),
+          _sidebarItem(Icons.group_rounded, 'Todos os Usuários', onTap: () {
+            Navigator.push(context, MaterialPageRoute(
+              builder: (_) => const AdminUsuariosPage(),
+            ));
+          }),
           const Spacer(),
 
           // Stats resumidas
@@ -298,8 +304,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     );
   }
 
-  Widget _sidebarItem(IconData icon, String label, {bool active = false}) {
-    return Container(
+  Widget _sidebarItem(IconData icon, String label,
+      {bool active = false, VoidCallback? onTap}) {
+    final container = Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: active
           ? BoxDecoration(
@@ -327,6 +334,15 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         active ? FontWeight.w600 : FontWeight.w400)),
           ],
         ),
+      ),
+    );
+    if (onTap == null) return container;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: container,
       ),
     );
   }

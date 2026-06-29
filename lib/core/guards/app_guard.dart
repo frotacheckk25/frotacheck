@@ -24,7 +24,12 @@ class AppGuard extends StatelessWidget {
     if (auth.isPending)   return const _PendingScreen();
     if (!auth.isAuthenticated) return unauthenticated;
 
-    return authenticated;
+    // Key garante que toda a subárvore é recriada do zero quando
+    // um usuário diferente faz login (userId muda → dispose + initState completo).
+    return KeyedSubtree(
+      key: ValueKey(auth.profile?.userId),
+      child: authenticated,
+    );
   }
 }
 

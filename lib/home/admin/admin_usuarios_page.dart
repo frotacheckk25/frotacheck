@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,19 +34,47 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   List<Map<String, dynamic>> _empresas = [];
   bool _loading = true;
   String? _erro;
+  RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _carregar();
+    _setupRealtime();
+  }
+
+  void _setupRealtime() {
+    _channel = _supabase
+        .channel('admin_usuarios_rt')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'user_profiles',
+          callback: (_) => _carregar(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'empresas',
+          callback: (_) => _carregar(),
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _channel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _carregar() async {
+    if (!mounted) return;
     setState(() { _loading = true; _erro = null; });
     try {
       final auth = context.read<AppAuthProvider>();
 
-      final query = _supabase
+      // MASTER vê todos os usuários; demais papéis veem apenas a própria empresa (RLS garante)
+      var query = _supabase
           .from('user_profiles')
           .select('*, empresas(nome)')
           .order('created_at', ascending: false);
@@ -66,12 +95,14 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
             .toList();
       }
 
+      if (!mounted) return;
       setState(() {
         _usuarios = lista;
         _empresas = empresas;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _erro = e.toString(); _loading = false; });
     }
   }

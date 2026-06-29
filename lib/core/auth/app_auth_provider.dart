@@ -137,6 +137,9 @@ class AppAuthProvider extends ChangeNotifier {
   Future<void> reload() => _loadProfile();
 
   Future<void> signOut() async {
+    // Limpa impersonation antes de sair para não vazar estado entre sessões
+    _impersonatedEmpresaId = null;
+    _impersonatedEmpresaNome = null;
     await _supabase.auth.signOut();
     _profile = null;
     notifyListeners();
