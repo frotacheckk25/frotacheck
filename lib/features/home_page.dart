@@ -631,7 +631,7 @@ class _HomePageState extends State<HomePage> {
       final allTimeOilChanges   = results[10] as List;
       final allTimeOccurrences  = results[11] as List;
       final allTimeOcorrencias  = results[12] as List;
-      final allTimeManutencoes  = results[13] as List;
+      // results[13] = manutencoes all-time (não usada no KPI — dados reais estão em occurrences)
 
       // Período filtrado — gráficos e custo
       final allOcorrencias = [...occurrences, ...ocorrencias];
@@ -664,9 +664,9 @@ class _HomePageState extends State<HomePage> {
           .length;
       // Fleet Index: veículos com manutenção ativa no período (tabela manutencoes filtrada)
       final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
-      // "Em Manutenção": soma oil_changes (serviços registrados via app)
-      //  + manutencoes all-time (registros da tabela manutencoes, qualquer status)
-      final activeMaintenanceCount = allTimeOilChanges.length + allTimeManutencoes.length;
+      // "Em Manutenção": ocorrências não resolvidas (dados em occurrences)
+      //  + serviços registrados em oil_changes (via TrocaOleoPage)
+      final activeMaintenanceCount = openOcorrenciasCount + allTimeOilChanges.length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
