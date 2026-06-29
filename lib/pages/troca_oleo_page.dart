@@ -156,6 +156,21 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         setState(() => historico = [novo, ...historico]);
       }
 
+      // Espelha registro na tabela manutencoes (usada pelo dashboard "Em Manutenção")
+      try {
+        await supabase.from('manutencoes').insert({
+          'vehicle_id': selectedVehicleId,
+          'tipo': selectedServiceType ?? 'Manutenção',
+          'descricao': observacoesController.text.trim().isNotEmpty
+              ? observacoesController.text.trim()
+              : (selectedServiceType ?? 'Manutenção'),
+          'data': dataTroca!.toIso8601String().split('T')[0],
+          'status': 'Aberto',
+          'cost': 0,
+          'valor': 0,
+        });
+      } catch (_) {}
+
       // Cria alerta de próxima troca (silencioso se falhar)
       try {
         await supabase.from('alerts').insert({

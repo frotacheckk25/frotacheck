@@ -609,11 +609,12 @@ class _HomePageState extends State<HomePage> {
             .order('created_at', ascending: false)
             .limit(3), // 9
         _safeSelect('oil_changes'),  // 10 — todos oil_changes
-        // 11 — occurrences all-time: usa filtro de data amplo (RLS bloqueia SELECT sem filtro)
+        // 11 — occurrences all-time (filtro amplo: RLS bloqueia SELECT sem filtro)
         supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-        // 12 — ocorrencias legacy all-time (mesma lógica)
+        // 12 — ocorrencias legacy all-time
         supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-        _safeSelect('manutencoes'), // 13 — manutencoes all-time
+        // 13 — manutencoes all-time (mesma lógica: filtro para contornar RLS)
+        supabase.from('manutencoes').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
       ]);
 
       final veiculos = results[0];
@@ -633,7 +634,7 @@ class _HomePageState extends State<HomePage> {
       final allTimeOilChanges   = results[10] as List;
       final allTimeOccurrences  = results[11] as List;
       final allTimeOcorrencias  = results[12] as List;
-      // results[13] = manutencoes all-time (não usada no KPI — dados reais estão em occurrences)
+      final allTimeManutencoes  = results[13] as List;
 
       // Período filtrado — gráficos e custo
       final allOcorrencias = [...occurrences, ...ocorrencias];
@@ -666,8 +667,8 @@ class _HomePageState extends State<HomePage> {
           .length;
       // Fleet Index: veículos com manutenção ativa no período (tabela manutencoes filtrada)
       final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
-      // "Em Manutenção": total de registros em occurrences + oil_changes
-      final activeMaintenanceCount = totalOcorrenciasCount + allTimeOilChanges.length;
+      // "Em Manutenção": registros em manutencoes (preenchido via TrocaOleoPage) + oil_changes
+      final activeMaintenanceCount = allTimeManutencoes.length + allTimeOilChanges.length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
