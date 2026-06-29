@@ -134,50 +134,52 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     final placa = veiculo['plate']?.toString() ?? '';
 
     try {
-      final payload = <String, dynamic>{
-        'vehicle_id': selectedVehicleId,
-        'current_km': kmAtual,
-        'service_type': selectedServiceType,
-        'oil_change_date': dataTroca!.toIso8601String().split('T')[0],
-        'next_change_km': proximoKm,
-      };
-      if (observacoesController.text.trim().isNotEmpty) {
-        payload['notes'] = observacoesController.text.trim();
-      }
+      final dataStr = dataTroca!.toIso8601String().split('T')[0];
+      final desc = observacoesController.text.trim().isNotEmpty
+          ? observacoesController.text.trim()
+          : (selectedServiceType ?? 'Manutenção');
 
-      final result = await supabase.from('oil_changes').insert(payload).select();
+      // ── PRIMÁRIO: grava em manutencoes (fonte do dashboard "Em Manutenção") ──
+      await supabase.from('manutencoes').insert({
+        'vehicle_id': selectedVehicleId,
+        'tipo'      : selectedServiceType ?? 'Manutenção',
+        'descricao' : desc,
+        'data'      : dataStr,
+        'status'    : 'Aberto',
+        'cost'      : 0,
+        'valor'     : 0,
+      });
 
       if (!mounted) return;
 
-      // Atualiza histórico imediatamente, enriquecendo com dados do veículo já em memória
-      if (result.isNotEmpty) {
-        final novo = Map<String, dynamic>.from(result.first as Map);
-        novo['vehicles'] = {'plate': veiculo['plate'], 'model': veiculo['model']};
-        setState(() => historico = [novo, ...historico]);
-      }
-
-      // Espelha registro na tabela manutencoes (usada pelo dashboard "Em Manutenção")
+      // ── SECUNDÁRIO: grava em oil_changes (km / próxima troca) ──────────────
+      // Isolado: falha aqui não impede o registro principal.
       try {
-        await supabase.from('manutencoes').insert({
-          'vehicle_id': selectedVehicleId,
-          'tipo': selectedServiceType ?? 'Manutenção',
-          'descricao': observacoesController.text.trim().isNotEmpty
-              ? observacoesController.text.trim()
-              : (selectedServiceType ?? 'Manutenção'),
-          'data': dataTroca!.toIso8601String().split('T')[0],
-          'status': 'Aberto',
-          'cost': 0,
-          'valor': 0,
-        });
+        final payload = <String, dynamic>{
+          'vehicle_id'     : selectedVehicleId,
+          'current_km'     : kmAtual,
+          'service_type'   : selectedServiceType,
+          'oil_change_date': dataStr,
+          'next_change_km' : proximoKm,
+        };
+        if (observacoesController.text.trim().isNotEmpty) {
+          payload['notes'] = observacoesController.text.trim();
+        }
+        final result = await supabase.from('oil_changes').insert(payload).select();
+        if (result.isNotEmpty && mounted) {
+          final novo = Map<String, dynamic>.from(result.first as Map);
+          novo['vehicles'] = {'plate': veiculo['plate'], 'model': veiculo['model']};
+          setState(() => historico = [novo, ...historico]);
+        }
       } catch (_) {}
 
-      // Cria alerta de próxima troca (silencioso se falhar)
+      // ── Alerta de próxima troca (silencioso se falhar) ──────────────────────
       try {
         await supabase.from('alerts').insert({
-          'title': 'Próxima Troca de Óleo: $placa',
+          'title'   : 'Próxima Troca de Óleo: $placa',
           'subtitle': '$selectedServiceType — próxima em $proximoKm km',
-          'tipo': 'warning',
-          'status': 'ativo',
+          'tipo'    : 'warning',
+          'status'  : 'ativo',
         });
       } catch (_) {}
 
