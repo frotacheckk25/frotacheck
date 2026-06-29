@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'features/auth/login_page.dart';
 import 'features/home_page.dart';
@@ -156,10 +158,21 @@ class FrotaCheckAppSupabaseError extends StatelessWidget {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => html.window.location.reload(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Tentar Novamente'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     const Text(
-                      'Verifique as env vars: SUPABASE_URL e SUPABASE_KEY (Vercel/Build settings).',
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                      'Se o erro persistir, pressione Ctrl+Shift+R para forçar recarregamento sem cache.',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
                       textAlign: TextAlign.center,
                     ),
                   ],
