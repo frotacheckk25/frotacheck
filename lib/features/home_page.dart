@@ -2784,10 +2784,13 @@ class _HomePageState extends State<HomePage> {
       initialDateRange: DateTimeRange(start: _filterStart, end: _filterEnd),
       locale: const Locale('pt', 'BR'),
       builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme.copyWith(
+        // Usa tema claro explícito — o tema escuro do app tornava o picker invisível
+        data: ThemeData.light(useMaterial3: true).copyWith(
+          colorScheme: const ColorScheme.light().copyWith(
             primary: AppColors.secondary,
             onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Colors.black87,
           ),
         ),
         child: child!,
@@ -2825,6 +2828,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => _AlertsPanelSheet(
+        alertas: alertasImportantes,
         onViewAll: () {
           Navigator.pop(ctx);
           Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()))
@@ -3852,55 +3856,29 @@ class _HomePageState extends State<HomePage> {
 
 // ??? Alerts Panel Sheet ??????????????????????????????????????????????????????
 
-class _AlertsPanelSheet extends StatefulWidget {
+class _AlertsPanelSheet extends StatelessWidget {
   final VoidCallback onViewAll;
-  const _AlertsPanelSheet({required this.onViewAll});
+  final List<Map<String, String>> alertas;
 
-  @override
-  State<_AlertsPanelSheet> createState() => _AlertsPanelSheetState();
-}
-
-class _AlertsPanelSheetState extends State<_AlertsPanelSheet> {
-  final supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> alertas = [];
-  bool loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final res = await supabase
-          .from('alerts')
-          .select()
-          .eq('status', 'ativo')
-          .order('created_at', ascending: false)
-          .limit(8);
-      if (mounted) setState(() { alertas = List<Map<String, dynamic>>.from(res); loading = false; });
-    } catch (_) {
-      if (mounted) setState(() => loading = false);
-    }
-  }
+  const _AlertsPanelSheet({required this.onViewAll, required this.alertas});
 
   Color _color(String? tipo) {
     switch (tipo) {
-      case 'error': return AppColors.danger;
+      case 'error':   return AppColors.danger;
       case 'warning': return AppColors.warning;
-      default: return AppColors.secondary;
+      default:        return AppColors.secondary;
     }
   }
 
   IconData _icon(String? title) {
     final t = (title ?? '').toLowerCase();
     if (t.contains('óleo') || t.contains('oleo')) return Icons.opacity;
-    if (t.contains('cnh')) return Icons.badge;
-    if (t.contains('licen')) return Icons.assignment;
-    if (t.contains('pneu')) return Icons.tire_repair;
+    if (t.contains('cnh'))                        return Icons.badge;
+    if (t.contains('documento'))                  return Icons.description;
+    if (t.contains('pneu'))                       return Icons.tire_repair;
     if (t.contains('ocorrência') || t.contains('ocorr')) return Icons.report_problem;
-    if (t.contains('seguro')) return Icons.security;
+    if (t.contains('seguro'))                     return Icons.security;
+    if (t.contains('multa'))                      return Icons.gavel;
     return Icons.warning_amber;
   }
 
@@ -3923,66 +3901,64 @@ class _AlertsPanelSheetState extends State<_AlertsPanelSheet> {
                 const Icon(Icons.notifications_active, color: AppColors.warning, size: 20),
                 const SizedBox(width: 10),
                 const Expanded(child: Text('Alertas Pendentes', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                if (!loading)
-                  Text('${alertas.length}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                Text('${alertas.length}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
               ],
             ),
           ),
           const SizedBox(height: 10),
           Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : alertas.isEmpty
-                    ? const Center(child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Nenhum alerta pendente', style: TextStyle(color: AppColors.textSecondary)),
-                      ))
-                    : ListView.separated(
-                        controller: controller,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: alertas.length,
-                        separatorBuilder: (context, i) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final a = alertas[i];
-                          final title = a['title'] ?? a['titulo'] ?? 'Alerta';
-                          final sub = a['subtitle'] ?? a['descricao'] ?? '';
-                          final cor = _color(a['tipo']?.toString());
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.backgroundSoft,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: cor.withOpacity(0.3)),
+            child: alertas.isEmpty
+                ? const Center(child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text('Nenhum alerta pendente', style: TextStyle(color: AppColors.textSecondary)),
+                  ))
+                : ListView.separated(
+                    controller: controller,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: alertas.length,
+                    separatorBuilder: (_, i) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final a    = alertas[i];
+                      final title = a['title'] ?? 'Alerta';
+                      final sub   = a['subtitle'] ?? '';
+                      final cor   = _color(a['tipo']);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundSoft,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: cor.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(color: cor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                              child: Icon(_icon(title), color: cor, size: 16),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(color: cor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-                                  child: Icon(_icon(title), color: cor, size: 16),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                                      if (sub.isNotEmpty) Text(sub, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                                  if (sub.isNotEmpty)
+                                    Text(sub, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+                                ],
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: widget.onViewAll,
+                onPressed: onViewAll,
                 icon: const Icon(Icons.open_in_new, size: 16),
                 label: const Text('Ver todos os alertas'),
                 style: OutlinedButton.styleFrom(
