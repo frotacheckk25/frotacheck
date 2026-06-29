@@ -67,21 +67,23 @@ enum AppRole {
           AppPermission.viewUsers,       AppPermission.manageUsers,
         ];
 
-      // ── GESTOR: operacional — leitura ampla, sem config ou usuários ─────────
+      // ── GESTOR: administra a operação — sem gestão de usuários, plano ou config ─
       case AppRole.gestor:
         return const [
           AppPermission.viewDashboard,
-          AppPermission.viewVehicles,
-          AppPermission.viewDrivers,
+          AppPermission.viewVehicles,    AppPermission.manageVehicles,
+          AppPermission.viewDrivers,     AppPermission.manageDrivers,
           AppPermission.viewMaintenance, AppPermission.manageMaintenance,
           AppPermission.viewFuelings,    AppPermission.manageFuelings,
           AppPermission.viewOccurrences, AppPermission.manageOccurrences,
           AppPermission.viewMultas,
-          AppPermission.viewDocuments,
+          AppPermission.viewDocuments,   AppPermission.manageDocuments,
           AppPermission.viewChecklists,  AppPermission.manageChecklists,
           AppPermission.viewTires,
           AppPermission.viewAlerts,
           AppPermission.viewReports,
+          // NÃO tem: manageSettings, viewUsers, manageUsers,
+          //          viewAllCompanies, manageCompanies, manageSystem
         ];
 
       // ── MOTORISTA: restrito ao próprio trabalho diário ────────────────────
