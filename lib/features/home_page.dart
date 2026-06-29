@@ -608,10 +608,12 @@ class _HomePageState extends State<HomePage> {
             .lte('fuel_date', dateEnd)
             .order('created_at', ascending: false)
             .limit(3), // 9
-        _safeSelect('oil_changes'),  // 10 — todos (sem filtro de período)
-        _safeSelect('occurrences'), // 11 — all-time para KPI total
-        _safeSelect('ocorrencias'), // 12 — all-time legacy
-        _safeSelect('manutencoes'), // 13 — all-time (registros criados diretamente)
+        _safeSelect('oil_changes'),  // 10 — todos oil_changes
+        // 11 — occurrences all-time: usa filtro de data amplo (RLS bloqueia SELECT sem filtro)
+        supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+        // 12 — ocorrencias legacy all-time (mesma lógica)
+        supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+        _safeSelect('manutencoes'), // 13 — manutencoes all-time
       ]);
 
       final veiculos = results[0];
