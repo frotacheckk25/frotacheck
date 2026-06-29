@@ -19,6 +19,7 @@ import '../home/relatorios/relatorios_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
+import '../pages/lista_ocorrencias_page.dart';
 // animated_brain_widget removed — conceito de globo substituído pelo painel premium
 import 'kpi_card_widget.dart';
 import '../pages/troca_oleo_page.dart';
@@ -630,7 +631,7 @@ class _HomePageState extends State<HomePage> {
       final allTimeOilChanges   = results[10] as List;
       final allTimeOccurrences  = results[11] as List;
       final allTimeOcorrencias  = results[12] as List;
-      final allTimeManutencoes  = results[13] as List;
+      // results[13] = manutencoes all-time (reservado para uso futuro se necessário)
 
       // Período filtrado — gráficos e custo
       final allOcorrencias = [...occurrences, ...ocorrencias];
@@ -655,16 +656,17 @@ class _HomePageState extends State<HomePage> {
         pneus,
         multas,
       );
-      // Total geral de ocorrências (abertas + andamento + resolvidas)
+      // Total geral de ocorrências (todas as situações)
       final totalOcorrenciasCount = allTimeAllOcorrencias.length;
-      // Subconjunto abertas — usado para badge e insights
+      // Ocorrências não resolvidas — base do card "Em Manutenção" e badge
       final openOcorrenciasCount = allTimeAllOcorrencias
           .where((e) => _isOpenStatus(e))
           .length;
       // Fleet Index usa contagem de manutencoes com status ativo
       final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
-      // Total de registros de manutenção: oil_changes + manutencoes diretas
-      final activeMaintenanceCount = allTimeOilChanges.length + allTimeManutencoes.length;
+      // "Em Manutenção" = ocorrências não resolvidas + trocas de óleo cadastradas
+      // (os registros do módulo Manutenções ficam na tabela occurrences)
+      final activeMaintenanceCount = openOcorrenciasCount + allTimeOilChanges.length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
@@ -1902,7 +1904,7 @@ class _HomePageState extends State<HomePage> {
           badge: _ocorrenciasAbertasCount > 0 ? 'Abertas' : null,
           trend: _sparkTrend(sparkOcorrencias, 'ocorrência'),
           sparkData: sparkOcorrencias,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage())).then((_) => carregarDashboard()),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage())).then((_) => carregarDashboard()),
         )),
         const SizedBox(height: 24),
         Expanded(child: KpiCard(
