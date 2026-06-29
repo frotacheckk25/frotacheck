@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 
 import 'features/auth/login_page.dart';
+import 'features/home_page.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
+import 'core/auth/app_auth_provider.dart';
+import 'core/guards/app_guard.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,11 +72,17 @@ class FrotaCheckApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'FrotaCheck',
-      theme: AppTheme.darkTheme,
-      home: const LoginPage(),
+    return ChangeNotifierProvider(
+      create: (_) => AppAuthProvider()..initialize(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'FrotaCheck',
+        theme: AppTheme.darkTheme,
+        home: AppGuard(
+          authenticated: const HomePage(),
+          unauthenticated: const LoginPage(),
+        ),
+      ),
     );
   }
 }
