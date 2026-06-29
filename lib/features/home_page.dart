@@ -631,7 +631,7 @@ class _HomePageState extends State<HomePage> {
       final allTimeOilChanges   = results[10] as List;
       final allTimeOccurrences  = results[11] as List;
       final allTimeOcorrencias  = results[12] as List;
-      // results[13] = manutencoes all-time (reservado para uso futuro se necessário)
+      final allTimeManutencoes  = results[13] as List;
 
       // Período filtrado — gráficos e custo
       final allOcorrencias = [...occurrences, ...ocorrencias];
@@ -662,11 +662,11 @@ class _HomePageState extends State<HomePage> {
       final openOcorrenciasCount = allTimeAllOcorrencias
           .where((e) => _isOpenStatus(e))
           .length;
-      // Fleet Index usa contagem de manutencoes com status ativo
+      // Fleet Index: veículos com manutenção ativa no período (tabela manutencoes filtrada)
       final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
-      // "Em Manutenção" = ocorrências não resolvidas + trocas de óleo cadastradas
-      // (os registros do módulo Manutenções ficam na tabela occurrences)
-      final activeMaintenanceCount = openOcorrenciasCount + allTimeOilChanges.length;
+      // "Em Manutenção": soma oil_changes (serviços registrados via app)
+      //  + manutencoes all-time (registros da tabela manutencoes, qualquer status)
+      final activeMaintenanceCount = allTimeOilChanges.length + allTimeManutencoes.length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
@@ -937,27 +937,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // Denylist: tudo que NÃO é explicitamente concluído/cancelado é considerado aberto.
+  // Cobre status com maiúscula, acentos, variações de digitação.
   bool _isOpenStatus(dynamic item) {
-    final status = (item['status'] ?? item['estado'] ?? '')
+    final s = (item['status'] ?? item['estado'] ?? 'aberto')
         .toString()
-        .toLowerCase();
-    return status == 'aberto' ||
-        status == 'open' ||
-        status == 'em andamento' ||
-        status == 'pendente';
+        .toLowerCase()
+        .trim();
+    return s != 'resolvido' && s != 'resolved' &&
+           s != 'concluido' && s != 'concluído' &&
+           s != 'fechado'   && s != 'closed'    &&
+           s != 'cancelado' && s != 'canceled';
   }
 
+  // Conta registros ativos na tabela manutencoes usando a mesma denylist.
   int _countActiveMaintenance(List<Map<String, dynamic>> manutencoes) {
-    final active = manutencoes.where((item) {
-      final status = (item['status'] ?? item['estado'] ?? '')
-          .toString()
-          .toLowerCase();
-      return status == 'aberto' ||
-          status == 'em andamento' ||
-          status == 'pendente' ||
-          status == 'ativo';
-    }).length;
-    return active > 0 ? active : 0;
+    return manutencoes.where(_isOpenStatus).length;
   }
 
   double _calculateTotalCost(
