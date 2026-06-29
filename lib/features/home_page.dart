@@ -599,23 +599,32 @@ class _HomePageState extends State<HomePage> {
         _safeSelectFiltered('occurrences', dateStart, dateEnd), // 6
         _safeSelectFiltered('ocorrencias', dateStart, dateEnd), // 7
         _safeSelect('documentos'), // 8
-        supabase
-            .from('fuelings')
-            .select(
-              'id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)',
-            )
-            .gte('fuel_date', dateStart)
-            .lte('fuel_date', dateEnd)
-            .order('created_at', ascending: false)
-            .limit(3), // 9
-        // 10 — oil_changes all-time (filtro amplo: RLS bloqueia SELECT sem filtro de data)
-        supabase.from('oil_changes').select('id,service_type,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-        // 11 — occurrences all-time (mesma lógica)
-        supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-        // 12 — ocorrencias legacy all-time
-        supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-        // 13 — manutencoes all-time (reservado; tabela usada em fluxos futuros)
-        supabase.from('manutencoes').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+        _safeQueryDirect(
+          supabase
+              .from('fuelings')
+              .select('id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)')
+              .gte('fuel_date', dateStart)
+              .lte('fuel_date', dateEnd)
+              .order('created_at', ascending: false)
+              .limit(3),
+          'fuelings-recent',
+        ), // 9
+        _safeQueryDirect(
+          supabase.from('oil_changes').select('id,service_type,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          'oil_changes-alltime',
+        ), // 10
+        _safeQueryDirect(
+          supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          'occurrences-alltime',
+        ), // 11
+        _safeQueryDirect(
+          supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          'ocorrencias-alltime',
+        ), // 12
+        _safeQueryDirect(
+          supabase.from('manutencoes').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          'manutencoes-alltime',
+        ), // 13
       ]);
 
       final veiculos = results[0];
@@ -632,9 +641,9 @@ class _HomePageState extends State<HomePage> {
       final recents = results[9]
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
-      final allTimeOilChanges   = results[10] as List;
-      final allTimeOccurrences  = results[11] as List;
-      final allTimeOcorrencias  = results[12] as List;
+      final allTimeOilChanges  = results[10];
+      final allTimeOccurrences = results[11];
+      final allTimeOcorrencias = results[12];
 
 
       // Período filtrado — gráficos e custo
@@ -754,6 +763,17 @@ class _HomePageState extends State<HomePage> {
       debugPrint('Falha ao carregar $table: $e');
     }
     return [];
+  }
+
+  // Envolve qualquer Future direta em try/catch para não derrubar o Future.wait
+  Future<List<Map<String, dynamic>>> _safeQueryDirect(Future<dynamic> query, String label) async {
+    try {
+      final r = await query;
+      return (r as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (e) {
+      debugPrint('Dashboard [$label] erro: $e');
+      return [];
+    }
   }
 
   Future<List<Map<String, dynamic>>> _fuelingsInRange(
