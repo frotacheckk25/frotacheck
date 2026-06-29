@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 class AbastecimentosPage extends StatefulWidget {
@@ -455,6 +457,8 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
 
+    // captura inject antes dos awaits para evitar uso de context após gap assíncrono
+    final injetar = context.read<AppAuthProvider>().inject;
     setState(() => isSaving = true);
     try {
       final odometroUrl = await _upload(odometroPhoto, 'fuelings');
@@ -474,7 +478,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
       if (bombaUrl != null) payload['pump_photo'] = bombaUrl;
       if (cupomUrl != null) payload['receipt_photo'] = cupomUrl;
 
-      await supabase.from('fuelings').insert(payload);
+      await supabase.from('fuelings').insert(injetar(payload));
       widget.onSaved();
     } catch (e) {
       if (mounted) {

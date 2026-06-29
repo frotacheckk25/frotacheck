@@ -67,11 +67,13 @@ $$;
 -- empresas: MASTER vê tudo; ADMIN_EMPRESA vê só a própria
 ALTER TABLE public.empresas ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "empresas_master_all" ON public.empresas;
 CREATE POLICY "empresas_master_all" ON public.empresas
   FOR ALL TO authenticated
   USING  (get_my_role() = 'MASTER')
   WITH CHECK (get_my_role() = 'MASTER');
 
+DROP POLICY IF EXISTS "empresas_admin_own" ON public.empresas;
 CREATE POLICY "empresas_admin_own" ON public.empresas
   FOR SELECT TO authenticated
   USING (id = get_my_empresa_id());
@@ -79,16 +81,19 @@ CREATE POLICY "empresas_admin_own" ON public.empresas
 -- user_profiles: usuário vê/edita o próprio; ADMIN_EMPRESA vê da empresa
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "profiles_own" ON public.user_profiles;
 CREATE POLICY "profiles_own" ON public.user_profiles
   FOR ALL TO authenticated
   USING  (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "profiles_admin_empresa" ON public.user_profiles;
 CREATE POLICY "profiles_admin_empresa" ON public.user_profiles
   FOR SELECT TO authenticated
   USING (empresa_id = get_my_empresa_id()
          AND get_my_role() IN ('MASTER','ADMIN_EMPRESA'));
 
+DROP POLICY IF EXISTS "profiles_master_all" ON public.user_profiles;
 CREATE POLICY "profiles_master_all" ON public.user_profiles
   FOR ALL TO authenticated
   USING  (get_my_role() = 'MASTER')
@@ -133,6 +138,10 @@ EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.viagens    ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.manutencoes ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
 EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
 -- ─── 6. RLS DE ISOLAMENTO POR EMPRESA EM TABELAS DE DADOS ────────────────────
@@ -222,7 +231,39 @@ CREATE POLICY "empresa_isolation" ON public.checklists
   USING  (empresa_id IS NULL OR empresa_id = get_my_empresa_id() OR get_my_role() = 'MASTER')
   WITH CHECK (empresa_id = get_my_empresa_id() OR get_my_role() = 'MASTER');
 
--- ─── 7. CRIAR EMPRESA INICIAL E VINCULAR USUÁRIO ADMIN ───────────────────────
+-- viagens (RLS opcional — tabela pode não existir)
+DO $$ BEGIN
+  ALTER TABLE public.viagens ENABLE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS "empresa_isolation" ON public.viagens;
+  CREATE POLICY "empresa_isolation" ON public.viagens
+    FOR ALL TO authenticated
+    USING  (empresa_id IS NULL OR empresa_id = get_my_empresa_id() OR get_my_role() = 'MASTER')
+    WITH CHECK (empresa_id = get_my_empresa_id() OR get_my_role() = 'MASTER');
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
+
+-- alerts
+DO $$ BEGIN
+  ALTER TABLE public.alerts ENABLE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS "empresa_isolation" ON public.alerts;
+  CREATE POLICY "empresa_isolation" ON public.alerts
+    FOR ALL TO authenticated
+    USING  (empresa_id IS NULL OR empresa_id = get_my_empresa_id() OR get_my_role() = 'MASTER')
+    WITH CHECK (empresa_id = get_my_empresa_id() OR get_my_role() = 'MASTER');
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
+
+-- ─── 8. ÍNDICES DE DESEMPENHO (isolamento por empresa) ───────────────────────
+-- Aceleram queries WHERE empresa_id = ...
+CREATE INDEX IF NOT EXISTS idx_vehicles_empresa    ON public.vehicles(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_drivers_empresa     ON public.drivers(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_fuelings_empresa    ON public.fuelings(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_oil_changes_empresa ON public.oil_changes(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_multas_empresa      ON public.multas(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_occurrences_empresa ON public.occurrences(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_empresa  ON public.documentos(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_pneus_empresa       ON public.pneus(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_checklists_empresa  ON public.checklists(empresa_id);
+
+-- ─── 9. CRIAR EMPRESA INICIAL E VINCULAR USUÁRIO ADMIN ───────────────────────
 -- ATENÇÃO: Substitua o email abaixo pelo email do usuário administrador.
 -- Execute esta seção separadamente após criar a empresa.
 

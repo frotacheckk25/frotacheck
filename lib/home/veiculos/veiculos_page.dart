@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 
 class VeiculosPage extends StatefulWidget {
@@ -111,7 +113,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
 
       if (isNew) {
         // Insert e retorna a linha criada para atualizar a lista imediatamente
-        final result = await supabase.from('vehicles').insert(payload).select();
+        final result = await supabase
+            .from('vehicles')
+            .insert(context.read<AppAuthProvider>().inject(payload))
+            .select();
         if (!mounted) return;
         if (result.isNotEmpty) {
           final novoVeiculo = Map<String, dynamic>.from(result.first as Map);

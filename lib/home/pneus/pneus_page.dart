@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 class PneusPage extends StatefulWidget {
@@ -610,6 +612,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
     if (_formKey.currentState?.validate() != true) return;
 
     setState(() => isSaving = true);
+    final injetar = context.read<AppAuthProvider>().inject;
     try {
       final payload = <String, dynamic>{
         'vehicle_id': veiculoSelecionado,
@@ -626,7 +629,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
           'observacoes': observacoesController.text.trim(),
       };
 
-      await supabase.from('pneus').insert(payload);
+      await supabase.from('pneus').insert(injetar(payload));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

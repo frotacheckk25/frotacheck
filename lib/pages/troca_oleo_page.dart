@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 
 class TrocaOleoPage extends StatefulWidget {
@@ -122,6 +124,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     }
 
     setState(() => isSaving = true);
+    final injetar = context.read<AppAuthProvider>().inject;
 
     final kmAtual = int.tryParse(kmController.text.trim()) ?? 0;
     final intervalo = int.tryParse(selectedInterval) ?? 10000;
@@ -140,7 +143,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
           : (selectedServiceType ?? 'Manutenção');
 
       // ── PRIMÁRIO: grava em manutencoes (fonte do dashboard "Em Manutenção") ──
-      await supabase.from('manutencoes').insert({
+      await supabase.from('manutencoes').insert(injetar({
         'vehicle_id': selectedVehicleId,
         'tipo'      : selectedServiceType ?? 'Manutenção',
         'descricao' : desc,
@@ -148,7 +151,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         'status'    : 'Aberto',
         'cost'      : 0,
         'valor'     : 0,
-      });
+      }));
 
       if (!mounted) return;
 
@@ -165,7 +168,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         if (observacoesController.text.trim().isNotEmpty) {
           payload['notes'] = observacoesController.text.trim();
         }
-        final result = await supabase.from('oil_changes').insert(payload).select();
+        final result = await supabase.from('oil_changes').insert(injetar(payload)).select();
         if (result.isNotEmpty && mounted) {
           final novo = Map<String, dynamic>.from(result.first as Map);
           novo['vehicles'] = {'plate': veiculo['plate'], 'model': veiculo['model']};
@@ -175,12 +178,12 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
 
       // ── Alerta de próxima troca (silencioso se falhar) ──────────────────────
       try {
-        await supabase.from('alerts').insert({
+        await supabase.from('alerts').insert(injetar({
           'title'   : 'Próxima Troca de Óleo: $placa',
           'subtitle': '$selectedServiceType — próxima em $proximoKm km',
           'tipo'    : 'warning',
           'status'  : 'ativo',
-        });
+        }));
       } catch (_) {}
 
       _snackSucesso('Troca registrada! Próxima em $proximoKm km');

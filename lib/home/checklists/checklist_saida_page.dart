@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -90,6 +92,7 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
     }
 
     setState(() => isLoading = true);
+    final injetar = context.read<AppAuthProvider>().inject;
 
     try {
       // Tenta fazer upload das fotos — falha silenciosa se o bucket não existir
@@ -115,7 +118,7 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
         }
       }
 
-      await supabase.from('checklists').insert({
+      await supabase.from('checklists').insert(injetar({
         'veiculo_id': widget.veiculoId,
         'motorista_id': widget.motoristaId,
         'tipo': 'saida',
@@ -123,7 +126,7 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
         'itens': itensVerificados,
         'foto_urls': fotoUrls,
         'aprovado': _totalMarcados == Checklist.itensChecklist.length,
-      });
+      }));
 
       if (!mounted) return;
       if (uploadFalhou) {

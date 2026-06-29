@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 
 class MotoristasPage extends StatefulWidget {
@@ -85,7 +87,10 @@ class _MotoristasPageState extends State<MotoristasPage> {
     try {
       final isNew = editingId == null;
       if (isNew) {
-        final result = await supabase.from('drivers').insert(payload).select();
+        final result = await supabase
+            .from('drivers')
+            .insert(context.read<AppAuthProvider>().inject(payload))
+            .select();
         if (!mounted) return;
         if (result.isNotEmpty) {
           final novo = Map<String, dynamic>.from(result.first as Map);

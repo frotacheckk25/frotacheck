@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -104,6 +106,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
     }
 
     setState(() => isLoading = true);
+    final injetar = context.read<AppAuthProvider>().inject;
 
     try {
       // Tenta fazer upload das fotos — falha silenciosa se o bucket não existir
@@ -129,7 +132,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         }
       }
 
-      await supabase.from('checklists').insert({
+      await supabase.from('checklists').insert(injetar({
         'veiculo_id': widget.veiculoId,
         'motorista_id': widget.motoristaId,
         'tipo': 'retorno',
@@ -140,7 +143,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         'km_final': int.tryParse(kmFinalController.text.trim()) ?? 0,
         if (observacoesController.text.trim().isNotEmpty)
           'observacoes': observacoesController.text.trim(),
-      });
+      }));
 
       if (!mounted) return;
       if (uploadFalhou) {

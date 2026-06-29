@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/auth/app_auth_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -766,6 +768,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
     setState(() => isSaving = true);
+    final injetar = context.read<AppAuthProvider>().inject;
     try {
       // Upload arquivo (silencioso se bucket não existir)
       String? fileUrl;
@@ -801,7 +804,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
           'data_pagamento': dataPagamento!.toIso8601String().split('T')[0],
       };
 
-      await supabase.from('documentos').insert(payload);
+      await supabase.from('documentos').insert(injetar(payload));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

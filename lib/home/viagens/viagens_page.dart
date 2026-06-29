@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 class ViagensPage extends StatefulWidget {
@@ -345,8 +347,9 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
     }
 
     setState(() => isLoading = true);
+    final injetar = context.read<AppAuthProvider>().inject;
     try {
-      await supabase.from('viagens').insert({
+      await supabase.from('viagens').insert(injetar({
         'veiculo_id': veiculoId,
         'motorista_id': motoristaId,
         'data_inicio': DateTime.now().toIso8601String(),
@@ -355,7 +358,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
         'quilometragem_inicio': double.parse(kmInicioCtrl.text),
         'status': 'em_progresso',
         'fotos_rota': [],
-      });
+      }));
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

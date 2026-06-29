@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/auth/app_auth_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -746,6 +748,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
     setState(() => isSaving = true);
+    final injetar = context.read<AppAuthProvider>().inject;
     try {
       // Upload foto (silencioso se bucket não existir)
       String? fotoUrl;
@@ -776,7 +779,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         'foto_url': ?fotoUrl,
       };
 
-      await supabase.from('multas').insert(payload);
+      await supabase.from('multas').insert(injetar(payload));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

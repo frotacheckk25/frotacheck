@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 
 class OcorrenciasPage extends StatefulWidget {
@@ -101,6 +103,7 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => isSaving = true);
+    final injetar = context.read<AppAuthProvider>().inject;
 
     // Monta payload apenas com colunas que existem na tabela occurrences
     final payload = <String, dynamic>{
@@ -126,7 +129,7 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     try {
       final result = await supabase
           .from('occurrences')
-          .insert(payload)
+          .insert(injetar(payload))
           .select();
 
       if (!mounted) return;

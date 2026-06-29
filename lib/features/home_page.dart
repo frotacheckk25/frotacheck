@@ -27,6 +27,10 @@ import '../shared/widgets/frota_logo.dart';
 import '../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import 'package:provider/provider.dart';
+import '../core/auth/app_auth_provider.dart';
+import '../core/enums/app_permission.dart';
+import '../home/admin/admin_usuarios_page.dart';
 
 // Utilities extracted for testing and reuse
 String getProfileDisplayName({
@@ -1262,6 +1266,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<AppAuthProvider>(); // rebuild on role/status change
     final width = MediaQuery.of(context).size.width;
 
     if (width <= 760) {
@@ -2321,82 +2326,130 @@ class _HomePageState extends State<HomePage> {
           Container(height: 1, color: const Color(0xFF0E1E33)),
           const SizedBox(height: 10),
 
-          // ── Nav items (scrollable) ─────────────────────────────────────────
+          // ── Nav items (scrollable) — guarded by AppAuthProvider ──────────
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // ─ Principal ──
-                  _sidebarSection('PRINCIPAL'),
-                  _buildSidebarItem(Icons.dashboard_rounded,    'Dashboard',           () {}, active: true),
-                  const SizedBox(height: 6),
+              child: Builder(builder: (ctx) {
+                final auth = ctx.read<AppAuthProvider>();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ─ Principal ──────────────────────────────────────────
+                    _sidebarSection('PRINCIPAL'),
+                    _buildSidebarItem(Icons.dashboard_rounded, 'Dashboard', () {}, active: true),
+                    const SizedBox(height: 6),
 
-                  // ─ Frota ──
-                  _sidebarSection('FROTA'),
-                  _buildSidebarItem(Icons.directions_car_rounded, 'Veículos', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.person_rounded,       'Motoristas', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.local_gas_station_rounded, 'Abastecimentos', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.build_rounded,        'Manutenções', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage()));
-                    carregarDashboard();
-                  }),
-                  const SizedBox(height: 6),
+                    // ─ Frota ──────────────────────────────────────────────
+                    if (auth.can(AppPermission.viewVehicles) ||
+                        auth.can(AppPermission.viewDrivers) ||
+                        auth.can(AppPermission.viewFuelings) ||
+                        auth.can(AppPermission.viewMaintenance)) ...[
+                      _sidebarSection('FROTA'),
+                      if (auth.can(AppPermission.viewVehicles))
+                        _buildSidebarItem(Icons.directions_car_rounded, 'Veículos', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewDrivers))
+                        _buildSidebarItem(Icons.person_rounded, 'Motoristas', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewFuelings))
+                        _buildSidebarItem(Icons.local_gas_station_rounded, 'Abastecimentos', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewMaintenance))
+                        _buildSidebarItem(Icons.build_rounded, 'Manutenções', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage()));
+                          carregarDashboard();
+                        }),
+                      const SizedBox(height: 6),
+                    ],
 
-                  // ─ Operações ──
-                  _sidebarSection('OPERAÇÕES'),
-                  _buildSidebarItem(Icons.checklist_rounded,    'Checklists', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const SelecionarVeiculoChecklistPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.history_rounded,      'Histórico Checklist', () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoricoChecklistPage()));
-                  }),
-                  _buildSidebarItem(Icons.report_problem_rounded, 'Ocorrências', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.tire_repair_rounded,  'Pneus', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.receipt_long_rounded, 'Multas', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.description_rounded,  'Documentos', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosPage()));
-                    carregarDashboard();
-                  }),
-                  const SizedBox(height: 6),
+                    // ─ Operações ──────────────────────────────────────────
+                    if (auth.can(AppPermission.viewChecklists) ||
+                        auth.can(AppPermission.viewOccurrences) ||
+                        auth.can(AppPermission.viewMultas) ||
+                        auth.can(AppPermission.viewDocuments)) ...[
+                      _sidebarSection('OPERAÇÕES'),
+                      if (auth.can(AppPermission.viewChecklists)) ...[
+                        _buildSidebarItem(Icons.checklist_rounded, 'Checklists', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const SelecionarVeiculoChecklistPage()));
+                          carregarDashboard();
+                        }),
+                        _buildSidebarItem(Icons.history_rounded, 'Histórico Checklist', () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoricoChecklistPage()));
+                        }),
+                      ],
+                      if (auth.can(AppPermission.viewOccurrences))
+                        _buildSidebarItem(Icons.report_problem_rounded, 'Ocorrências', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage()));
+                          carregarDashboard();
+                        }),
+                      _buildSidebarItem(Icons.tire_repair_rounded, 'Pneus', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage()));
+                        carregarDashboard();
+                      }),
+                      if (auth.can(AppPermission.viewMultas))
+                        _buildSidebarItem(Icons.receipt_long_rounded, 'Multas', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewDocuments))
+                        _buildSidebarItem(Icons.description_rounded, 'Documentos', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosPage()));
+                          carregarDashboard();
+                        }),
+                      _buildSidebarItem(Icons.directions_rounded, 'Viagens', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ViagensPage()));
+                        carregarDashboard();
+                      }),
+                      const SizedBox(height: 6),
+                    ],
 
-                  // ─ Gestão ──
-                  _sidebarSection('GESTÃO'),
-                  _buildSidebarItem(Icons.bar_chart_rounded,    'Relatórios', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.notifications_active_rounded, 'Alertas', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
-                    carregarDashboard();
-                  }),
-                  _buildSidebarItem(Icons.settings_rounded,     'Configurações', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage()));
-                    carregarDashboard();
-                  }),
-                  const SizedBox(height: 12),
-                ],
-              ),
+                    // ─ Gestão ─────────────────────────────────────────────
+                    if (auth.can(AppPermission.viewReports)) ...[
+                      _sidebarSection('GESTÃO'),
+                      _buildSidebarItem(Icons.bar_chart_rounded, 'Relatórios', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
+                        carregarDashboard();
+                      }),
+                      _buildSidebarItem(Icons.notifications_active_rounded, 'Alertas', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                        carregarDashboard();
+                      }),
+                      _buildSidebarItem(Icons.settings_rounded, 'Configurações', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage()));
+                        carregarDashboard();
+                      }),
+                      const SizedBox(height: 6),
+                    ],
+
+                    // ─ Administração — ADMIN_EMPRESA+ ──────────────────────
+                    if (auth.can(AppPermission.viewUsers)) ...[
+                      _sidebarSection('ADMINISTRAÇÃO'),
+                      _buildSidebarItem(Icons.group_rounded, 'Usuários', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsuariosPage()));
+                        carregarDashboard();
+                      }),
+                      const SizedBox(height: 6),
+                    ],
+
+                    // ─ Master ─────────────────────────────────────────────
+                    if (auth.isMaster) ...[
+                      _sidebarSection('MASTER'),
+                      _buildSidebarItem(Icons.business_rounded, 'Todas as Empresas', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsuariosPage()));
+                        carregarDashboard();
+                      }),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                );
+              }),
             ),
           ),
 
@@ -2434,11 +2487,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProfileCard() {
-    final user = supabase.auth.currentUser;
-    final metadata = user?.userMetadata ?? {};
-    final email = user?.email ?? '';
-    final displayName = getProfileDisplayName(metadata: metadata, supaEmail: email);
+    final auth = context.read<AppAuthProvider>();
+    final profile = auth.profile;
+    final email = profile?.email ?? supabase.auth.currentUser?.email ?? '';
+    final displayName = profile?.nome ?? getProfileDisplayName(supaEmail: email);
     final initials = _getInitials(displayName);
+    final role = profile?.role;
+    final avatarColor = role?.color ?? const Color(0xFF3B82F6);
 
     return Material(
       color: Colors.transparent,
@@ -2454,7 +2509,7 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
           child: Row(
             children: [
-              // Avatar with neon ring
+              // Avatar com cor do papel
               Stack(
                 children: [
                   Container(
@@ -2462,15 +2517,12 @@ class _HomePageState extends State<HomePage> {
                     height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: avatarColor.withOpacity(0.18),
+                      border: Border.all(color: avatarColor.withOpacity(0.45), width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF3B82F6).withOpacity(0.45),
-                          blurRadius: 10,
+                          color: avatarColor.withOpacity(0.35),
+                          blurRadius: 8,
                           spreadRadius: 0,
                         ),
                       ],
@@ -2478,8 +2530,8 @@ class _HomePageState extends State<HomePage> {
                     alignment: Alignment.center,
                     child: Text(
                       initials,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: avatarColor,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -2515,15 +2567,33 @@ class _HomePageState extends State<HomePage> {
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
-                    Text(
-                      email.isNotEmpty ? email : 'Administrador',
-                      style: const TextStyle(
-                        color: Color(0xFF475569),
-                        fontSize: 10,
+                    // Badge do papel
+                    if (role != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: role.color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: role.color.withOpacity(0.30)),
+                        ),
+                        child: Text(
+                          role.label,
+                          style: TextStyle(
+                            color: role.color,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        email.isNotEmpty ? email : 'Administrador',
+                        style: const TextStyle(color: Color(0xFF475569), fontSize: 10),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
                   ],
                 ),
               ),
@@ -2536,6 +2606,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProBadge() {
+    final auth = context.read<AppAuthProvider>();
+    final empresaNome = auth.empresaNome ?? 'FrotaCheck';
+    final isMaster = auth.isMaster;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2550,43 +2624,54 @@ class _HomePageState extends State<HomePage> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+              gradient: LinearGradient(
+                colors: isMaster
+                    ? [const Color(0xFFEF4444), const Color(0xFF7C3AED)]
+                    : [const Color(0xFF3B82F6), const Color(0xFF8B5CF6)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(7),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF3B82F6).withOpacity(0.35),
+                  color: (isMaster
+                    ? const Color(0xFFEF4444)
+                    : const Color(0xFF3B82F6)).withOpacity(0.35),
                   blurRadius: 8,
                 ),
               ],
             ),
-            child: const Icon(Icons.shield_rounded, color: Colors.white, size: 14),
+            child: Icon(
+              isMaster ? Icons.admin_panel_settings_rounded : Icons.business_rounded,
+              color: Colors.white,
+              size: 14,
+            ),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'FrotaCheck Pro',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isMaster ? 'FrotaCheck MASTER' : empresaNome,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-              ),
-              Text(
-                'Versão 3.0.0',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.30),
-                  fontSize: 9,
+                Text(
+                  isMaster ? 'Superadmin global' : 'Versão 3.0.0',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.30),
+                    fontSize: 9,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
             decoration: BoxDecoration(
@@ -2914,10 +2999,11 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildHeader(double width) {
     final compact = width < 900;
-    final user = supabase.auth.currentUser;
-    final meta = user?.userMetadata ?? {};
-    final email = user?.email ?? '';
-    final name = getProfileDisplayName(metadata: meta, supaEmail: email);
+    final auth = context.read<AppAuthProvider>();
+    final profile = auth.profile;
+    final name = profile?.nome ?? getProfileDisplayName(
+      supaEmail: supabase.auth.currentUser?.email,
+    );
     final initials = _getInitials(name);
 
     return Row(
