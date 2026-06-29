@@ -664,9 +664,8 @@ class _HomePageState extends State<HomePage> {
           .length;
       // Fleet Index: veículos com manutenção ativa no período (tabela manutencoes filtrada)
       final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
-      // "Em Manutenção": ocorrências não resolvidas (dados em occurrences)
-      //  + serviços registrados em oil_changes (via TrocaOleoPage)
-      final activeMaintenanceCount = openOcorrenciasCount + allTimeOilChanges.length;
+      // "Em Manutenção": total de registros em occurrences + oil_changes
+      final activeMaintenanceCount = totalOcorrenciasCount + allTimeOilChanges.length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
@@ -1575,7 +1574,7 @@ class _HomePageState extends State<HomePage> {
           onTap: () async {
             await Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AlertasPage()),
+              MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage()),
             );
             carregarDashboard();
           },
@@ -2348,7 +2347,7 @@ class _HomePageState extends State<HomePage> {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoricoChecklistPage()));
                   }),
                   _buildSidebarItem(Icons.report_problem_rounded, 'Ocorrências', () async {
-                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage()));
                     carregarDashboard();
                   }),
                   _buildSidebarItem(Icons.tire_repair_rounded,  'Pneus', () async {
