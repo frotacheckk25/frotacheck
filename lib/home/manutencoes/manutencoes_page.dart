@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/theme/app_theme.dart';
 
 import '../../../pages/ocorrencias_page.dart';
 import '../../../pages/lista_ocorrencias_page.dart';
@@ -98,9 +99,13 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
     VoidCallback onTap,
     Color color,
   ) {
-    return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(24),
@@ -126,12 +131,13 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: Colors.black54),
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -139,7 +145,7 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
               const Icon(
                 Icons.arrow_forward_ios,
                 size: 18,
-                color: Colors.black54,
+                color: AppColors.textSecondary,
               ),
             ],
           ),
@@ -189,8 +195,10 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
     final trocaLabel = proximaTroca == 1 ? '1 veículo' : '$proximaTroca veículos';
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Manutenções'),
+        backgroundColor: AppColors.surface,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

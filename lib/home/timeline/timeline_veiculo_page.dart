@@ -36,12 +36,12 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
           .eq('vehicle_id', widget.veiculoId)
           .order('created_at', ascending: false);
 
-      // Carregar manutenções
+      // Carregar trocas de óleo
       final manutencoes = await supabase
-          .from('manutencoes')
+          .from('oil_changes')
           .select()
-          .eq('veiculo_id', widget.veiculoId)
-          .order('data_manutencao', ascending: false);
+          .eq('vehicle_id', widget.veiculoId)
+          .order('created_at', ascending: false);
 
       // Carregar checklists
       final checklists = await supabase
@@ -76,18 +76,20 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
         );
       }
 
-      // Processar manutenções
+      // Processar trocas de óleo
       for (var item in manutencoes) {
+        final oilType = item['oil_type']?.toString() ?? 'Óleo';
+        final nextKm = item['next_change_km']?.toString() ?? '?';
         eventos.add(
           TimelineEvent(
             data: DateTime.parse(
-              item['data_manutencao'] ?? DateTime.now().toString(),
+              item['created_at'] ?? DateTime.now().toString(),
             ),
-            tipo: 'manutencao',
-            titulo: 'Manutenção',
-            descricao: item['descricao'] ?? 'Sem descrição',
-            icone: Icons.build,
-            cor: Colors.purple,
+            tipo: 'troca_oleo',
+            titulo: 'Troca de Óleo',
+            descricao: '$oilType · Próxima em $nextKm km',
+            icone: Icons.oil_barrel,
+            cor: AppColors.secondary,
           ),
         );
       }
@@ -146,8 +148,9 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Timeline - ${widget.veiculoPlaca}'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.surface,
       ),
+      backgroundColor: AppColors.background,
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : eventos.isEmpty
@@ -221,11 +224,9 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.surface,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.grey.withOpacity(0.2),
-                            ),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,13 +240,14 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 14,
+                                      color: Colors.white,
                                     ),
                                   ),
                                   Text(
                                     _formatarData(evento.data),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey.shade600,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -255,7 +257,7 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
                                 evento.descricao,
                                 style: const TextStyle(
                                   fontSize: 13,
-                                  color: Colors.grey,
+                                  color: AppColors.textSecondary,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,

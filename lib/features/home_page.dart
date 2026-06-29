@@ -1272,19 +1272,11 @@ class _HomePageState extends State<HomePage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.search),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Busca ativada (ambiente de teste)')),
-                );
-              },
+              onPressed: () {},
             ),
             IconButton(
               icon: const Icon(Icons.notifications_none),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notificações (ambiente de teste)')),
-                );
-              },
+              onPressed: () {},
             ),
           ],
           elevation: 0,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frotacheck/home/abastecimentos/detalhe_abastecimento_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/theme/app_theme.dart';
 
 class ListaAbastecimentosPage extends StatefulWidget {
   const ListaAbastecimentosPage({super.key});
@@ -14,7 +15,7 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
   final supabase = Supabase.instance.client;
   final searchController = TextEditingController();
 
-  List<dynamic> abastecimentos = [];
+  List<Map<String, dynamic>> abastecimentos = [];
   bool carregando = true;
   String periodoFiltro = 'Este mês';
 
@@ -25,37 +26,30 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
   }
 
   Future<void> carregarAbastecimentos() async {
-    setState(() {
-      carregando = true;
-    });
-
+    setState(() => carregando = true);
     try {
       final dados = await supabase
           .from('fuelings')
           .select('''
             *,
-            vehicles (
-              plate
-            ),
-            drivers (
-              name
-            )
+            vehicles (plate),
+            drivers (name)
           ''')
           .order('created_at', ascending: false);
 
       setState(() {
-        abastecimentos = dados;
+        abastecimentos = List<Map<String, dynamic>>.from(
+          (dados as List).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
       });
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint('Erro ao carregar abastecimentos: $e');
     } finally {
-      setState(() {
-        carregando = false;
-      });
+      if (mounted) setState(() => carregando = false);
     }
   }
 
-  List<dynamic> get filteredAbastecimentos {
+  List<Map<String, dynamic>> get filteredAbastecimentos {
     final query = searchController.text.toLowerCase();
     final hoje = DateTime.now();
 
@@ -78,84 +72,51 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
       }
       if (periodoFiltro == 'Este mês') {
         final data = DateTime.tryParse(item['fuel_date'] ?? '');
-        return data != null &&
-            data.year == hoje.year &&
-            data.month == hoje.month;
+        return data != null && data.year == hoje.year && data.month == hoje.month;
       }
       return true;
     }).toList();
   }
 
-  double get totalLitros {
-    return filteredAbastecimentos.fold(
-      0.0,
-      (sum, item) => sum + (item['liters'] ?? 0).toDouble(),
-    );
-  }
+  double get totalLitros => filteredAbastecimentos.fold(
+        0.0, (sum, item) => sum + (item['liters'] as num? ?? 0).toDouble());
 
-  double get totalValor {
-    return filteredAbastecimentos.fold(
-      0.0,
-      (sum, item) => sum + (item['total_value'] ?? 0).toDouble(),
-    );
-  }
+  double get totalValor => filteredAbastecimentos.fold(
+        0.0, (sum, item) => sum + (item['total_value'] as num? ?? 0).toDouble());
 
-  int get veiculosUnicos {
-    return filteredAbastecimentos
-        .map((item) => item['vehicles']?['plate'] ?? '')
-        .toSet()
-        .length;
-  }
+  int get veiculosUnicos => filteredAbastecimentos
+      .map((item) => item['vehicles']?['plate'] ?? '')
+      .toSet()
+      .length;
 
   Widget _cardsResumo() {
     return Row(
       children: [
-        Expanded(
-          child: _infoCard(
-            'Total de litros',
-            '${totalLitros.toStringAsFixed(0)} L',
-            Colors.blue,
-          ),
-        ),
+        Expanded(child: _infoCard('Total de litros', '${totalLitros.toStringAsFixed(0)} L', AppColors.info)),
         const SizedBox(width: 12),
-        Expanded(
-          child: _infoCard(
-            'Total gasto',
-            'R\$ ${totalValor.toStringAsFixed(2)}',
-            Colors.green,
-          ),
-        ),
+        Expanded(child: _infoCard('Total gasto', 'R\$ ${totalValor.toStringAsFixed(2)}', AppColors.success)),
         const SizedBox(width: 12),
-        Expanded(
-          child: _infoCard(
-            'Veículos usados',
-            '$veiculosUnicos',
-            Colors.deepPurple,
-          ),
-        ),
+        Expanded(child: _infoCard('Veículos usados', '$veiculosUnicos', AppColors.secondary)),
       ],
     );
   }
 
   Widget _infoCard(String title, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(22),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: color.withOpacity(0.88))),
-          const SizedBox(height: 10),
+          Text(title, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 12)),
+          const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ],
       ),
@@ -164,23 +125,33 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
 
   Widget _buildFiltroChip(String label) {
     final selected = periodoFiltro == label;
-    return ChoiceChip(
+    return FilterChip(
       label: Text(label),
       selected: selected,
-      onSelected: (value) {
-        if (value) {
-          setState(() {
-            periodoFiltro = label;
-          });
-        }
-      },
+      onSelected: (_) => setState(() => periodoFiltro = label),
+      selectedColor: AppColors.secondary.withValues(alpha: 0.25),
+      backgroundColor: AppColors.surface,
+      checkmarkColor: AppColors.secondary,
+      labelStyle: TextStyle(
+        color: selected ? AppColors.secondary : AppColors.textSecondary,
+        fontSize: 13,
+      ),
+      side: BorderSide(color: selected ? AppColors.secondary : AppColors.border),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = filteredAbastecimentos;
     return Scaffold(
-      appBar: AppBar(title: const Text('Histórico de Abastecimentos')),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Histórico de Abastecimentos'),
+        backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: carregarAbastecimentos),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: carregarAbastecimentos,
         child: carregando
@@ -194,9 +165,21 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
                     const SizedBox(height: 20),
                     TextField(
                       controller: searchController,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
                         labelText: 'Pesquisar por veículo, motorista ou data',
-                        prefixIcon: Icon(Icons.search),
+                        labelStyle: const TextStyle(color: AppColors.textSecondary),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.secondary),
+                        ),
+                        filled: true,
+                        fillColor: AppColors.surface,
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -213,68 +196,65 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
                     ),
                     const SizedBox(height: 16),
                     Expanded(
-                      child: filteredAbastecimentos.isEmpty
-                          ? const Center(
-                              child: Text('Nenhum abastecimento encontrado.'),
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Nenhum abastecimento encontrado.',
+                                style: TextStyle(color: AppColors.textSecondary),
+                              ),
                             )
                           : ListView.builder(
-                              itemCount: filteredAbastecimentos.length,
+                              itemCount: filtered.length,
                               itemBuilder: (context, index) {
-                                final item = filteredAbastecimentos[index];
-                                final motorista =
-                                    item['drivers']?['name'] ?? 'Não informado';
-                                final veiculo =
-                                    item['vehicles']?['plate'] ?? 'Sem placa';
-                                return Card(
-                                  elevation: 4,
-                                  margin: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: ListTile(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              DetalheAbastecimentoPage(
-                                                abastecimento: item,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                    leading: CircleAvatar(
-                                      backgroundColor: Colors.blue.withOpacity(
-                                        0.18,
-                                      ),
-                                      child: const Icon(
-                                        Icons.local_gas_station,
-                                        color: Colors.blue,
-                                      ),
+                                final item = filtered[index];
+                                final motorista = item['drivers']?['name']?.toString() ?? 'Não informado';
+                                final veiculo = item['vehicles']?['plate']?.toString() ?? 'Sem placa';
+                                return GestureDetector(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => DetalheAbastecimentoPage(abastecimento: item),
                                     ),
-                                    title: Text(
-                                      '${item['liters']} L · R\$ ${item['total_value']}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  ),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: AppColors.border),
                                     ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                    child: Row(
                                       children: [
-                                        const SizedBox(height: 6),
-                                        Text('Veículo: $veiculo'),
-                                        Text('Motorista: $motorista'),
-                                        Text(
-                                          'Data: ${item['fuel_date'] ?? '--'} • ${item['fuel_time'] ?? '--'}',
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.info.withValues(alpha: 0.15),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.local_gas_station, color: AppColors.info, size: 22),
                                         ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '${item['liters']} L · R\$ ${item['total_value']}',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text('Veículo: $veiculo', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                              Text('Motorista: $motorista', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                              Text(
+                                                'Data: ${item['fuel_date'] ?? '--'} · ${item['fuel_time'] ?? '--'}',
+                                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
                                       ],
-                                    ),
-                                    trailing: const Icon(
-                                      Icons.arrow_forward_ios,
-                                      size: 18,
                                     ),
                                   ),
                                 );

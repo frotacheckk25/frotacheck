@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/models/viagem_model.dart';
-import '../../core/models/veiculo_model.dart';
-import '../../core/models/motorista_model.dart';
 import '../../core/theme/app_theme.dart';
 
 class ViagensPage extends StatefulWidget {
@@ -14,46 +11,12 @@ class ViagensPage extends StatefulWidget {
 
 class _ViagensPageState extends State<ViagensPage> {
   final supabase = Supabase.instance.client;
-  List<Viagem> viagens = [];
-  List<Veiculo> veiculos = [];
-  List<Motorista> motoristas = [];
+
+  List<Map<String, dynamic>> viagens = [];
+  Map<String, Map<String, dynamic>> veiculosMap = {};
+  Map<String, Map<String, dynamic>> motoristasMap = {};
   bool isLoading = true;
   String filtroStatus = 'todas';
-
-  static final List<Viagem> viagensMock = [
-    Viagem(
-      id: 'v1',
-      veiculoId: '1',
-      motoristaId: '1',
-      origem: 'São Paulo',
-      destino: 'Rio de Janeiro',
-      quilometragemInicio: 50000,
-      dataInicio: DateTime.now().subtract(const Duration(days: 2)),
-      status: 'em_progresso',
-      fotosRota: [],
-    ),
-    Viagem(
-      id: 'v2',
-      veiculoId: '2',
-      motoristaId: '2',
-      origem: 'Curitiba',
-      destino: 'Florianópolis',
-      quilometragemInicio: 30000,
-      dataInicio: DateTime.now().subtract(const Duration(days: 5)),
-      status: 'concluida',
-      fotosRota: [],
-    ),
-  ];
-
-  static final List<Veiculo> veiculosMock = [
-    Veiculo(id: '1', placa: 'ABC-1234', modelo: 'Fiesta'),
-    Veiculo(id: '2', placa: 'XYZ-9999', modelo: 'Civic'),
-  ];
-
-  static final List<Motorista> motoristasMock = [
-    Motorista(id: '1', nome: 'João Silva'),
-    Motorista(id: '2', nome: 'Maria Oliveira'),
-  ];
 
   @override
   void initState() {
@@ -62,90 +25,84 @@ class _ViagensPageState extends State<ViagensPage> {
   }
 
   Future<void> _carregarDados() async {
+    if (!mounted) return;
+    setState(() => isLoading = true);
     try {
-      final viagensResponse = await supabase
-          .from('viagens')
-          .select()
-          .order('data_inicio', ascending: false);
+      final results = await Future.wait([
+        supabase.from('vehicles').select('id, plate, brand, model').order('plate'),
+        supabase.from('drivers').select('id, name').order('name'),
+      ]);
 
-      final veiculosResponse = await supabase.from('veiculos').select();
-      final motoristasResponse = await supabase.from('motoristas').select();
+      final vMap = <String, Map<String, dynamic>>{};
+      for (final v in (results[0] as List)) {
+        final row = Map<String, dynamic>.from(v as Map);
+        vMap[row['id'].toString()] = row;
+      }
+      final mMap = <String, Map<String, dynamic>>{};
+      for (final m in (results[1] as List)) {
+        final row = Map<String, dynamic>.from(m as Map);
+        mMap[row['id'].toString()] = row;
+      }
+
+      List<Map<String, dynamic>> viaList = [];
+      try {
+        final viaResp = await supabase
+            .from('viagens')
+            .select()
+            .order('data_inicio', ascending: false);
+        viaList = List<Map<String, dynamic>>.from(
+          (viaResp as List).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+      } catch (_) {
+        // tabela viagens não existe ainda
+      }
 
       if (!mounted) return;
       setState(() {
-        viagens = (viagensResponse as List).isEmpty
-            ? viagensMock
-            : (viagensResponse)
-                .map((e) => Viagem.fromJson(e))
-                .toList();
-        veiculos = (veiculosResponse as List).isEmpty
-            ? veiculosMock
-            : (veiculosResponse)
-                .map((e) => Veiculo.fromJson(e))
-                .toList();
-        motoristas = (motoristasResponse as List).isEmpty
-            ? motoristasMock
-            : (motoristasResponse)
-                .map((e) => Motorista.fromJson(e))
-                .toList();
+        viagens = viaList;
+        veiculosMap = vMap;
+        motoristasMap = mMap;
         isLoading = false;
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao carregar viagens: $e - usando dados mock')));
-      }
-      if (mounted) {
-        setState(() {
-          viagens = viagensMock;
-          veiculos = veiculosMock;
-          motoristas = motoristasMock;
-          isLoading = false;
-        });
-      }
+      debugPrint('Erro ao carregar viagens: $e');
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
-  List<Viagem> _aplicarFiltro() {
-    if (filtroStatus == 'todas') {
-      return viagens;
-    }
-    return viagens.where((v) => v.status == filtroStatus).toList();
+  List<Map<String, dynamic>> _filtradas() {
+    if (filtroStatus == 'todas') return viagens;
+    return viagens.where((v) => v['status'] == filtroStatus).toList();
   }
 
-  String _getNomeVeiculo(String? id) {
-    if (id == null) return 'N/A';
-    try {
-      return veiculos.firstWhere((v) => v.id == id).placa ?? 'Desconhecido';
-    } catch (e) {
-      return 'Desconhecido';
-    }
+  String _veiculoLabel(String? id) {
+    if (id == null || id.isEmpty) return 'N/A';
+    final v = veiculosMap[id];
+    if (v == null) return 'Desconhecido';
+    final plate = v['plate']?.toString() ?? '';
+    final desc = '${v['brand'] ?? ''} ${v['model'] ?? ''}'.trim();
+    return desc.isNotEmpty ? '$plate — $desc' : plate;
   }
 
-  String _getNomeMotorista(String? id) {
-    if (id == null) return 'N/A';
-    try {
-      return motoristas.firstWhere((m) => m.id == id).nome ?? 'Desconhecido';
-    } catch (e) {
-      return 'Desconhecido';
-    }
+  String _motoristaLabel(String? id) {
+    if (id == null || id.isEmpty) return 'N/A';
+    return motoristasMap[id]?['name']?.toString() ?? 'Desconhecido';
   }
 
-  Color _getStatusColor(String status) {
+  Color _statusColor(String status) {
     switch (status) {
       case 'em_progresso':
-        return Colors.blue;
+        return AppColors.info;
       case 'concluida':
-        return Colors.green;
+        return AppColors.success;
       case 'cancelada':
-        return Colors.red;
+        return AppColors.danger;
       default:
-        return Colors.grey;
+        return AppColors.textSecondary;
     }
   }
 
-  String _getStatusLabel(String status) {
+  String _statusLabel(String status) {
     switch (status) {
       case 'em_progresso':
         return 'Em Progresso';
@@ -160,68 +117,69 @@ class _ViagensPageState extends State<ViagensPage> {
 
   @override
   Widget build(BuildContext context) {
-    final viagensFiltradas = _aplicarFiltro();
-
+    final lista = _filtradas();
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Controle de Viagens'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.surface,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _carregarDados),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _abrirNovaViagem(),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _abrirNovaViagem,
+        backgroundColor: AppColors.secondary,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Nova Viagem', style: TextStyle(color: Colors.white)),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Filtros
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      _buildFilterChip('Todas', 'todas'),
+                      _chip('Todas', 'todas'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Em Progresso', 'em_progresso'),
+                      _chip('Em Progresso', 'em_progresso'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Concluídas', 'concluida'),
+                      _chip('Concluídas', 'concluida'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Canceladas', 'cancelada'),
+                      _chip('Canceladas', 'cancelada'),
                     ],
                   ),
                 ),
-
-                // Lista de viagens
                 Expanded(
-                  child: viagensFiltradas.isEmpty
+                  child: lista.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.directions,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
+                              const Icon(Icons.directions, size: 64, color: AppColors.textSecondary),
                               const SizedBox(height: 16),
-                              const Text('Nenhuma viagem encontrada'),
+                              const Text(
+                                'Nenhuma viagem encontrada',
+                                style: TextStyle(color: AppColors.textSecondary),
+                              ),
                               const SizedBox(height: 24),
                               ElevatedButton(
-                                onPressed: () => _abrirNovaViagem(),
-                                child: const Text('Registrar Viagem'),
+                                onPressed: _abrirNovaViagem,
+                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+                                child: const Text('Registrar Viagem', style: TextStyle(color: Colors.white)),
                               ),
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: viagensFiltradas.length,
-                          itemBuilder: (context, index) {
-                            final viagem = viagensFiltradas[index];
-                            return _buildViagemCard(viagem);
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _carregarDados,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                            itemCount: lista.length,
+                            itemBuilder: (_, i) => _buildCard(lista[i]),
+                          ),
                         ),
                 ),
               ],
@@ -229,61 +187,83 @@ class _ViagensPageState extends State<ViagensPage> {
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
+  Widget _chip(String label, String value) {
+    final sel = filtroStatus == value;
     return FilterChip(
       label: Text(label),
-      selected: filtroStatus == value,
-      onSelected: (selected) {
-        setState(() => filtroStatus = value);
-      },
-      selectedColor: AppColors.primary,
+      selected: sel,
+      onSelected: (_) => setState(() => filtroStatus = value),
+      selectedColor: AppColors.secondary.withValues(alpha: 0.25),
+      backgroundColor: AppColors.surface,
+      checkmarkColor: AppColors.secondary,
+      labelStyle: TextStyle(
+        color: sel ? AppColors.secondary : AppColors.textSecondary,
+        fontSize: 13,
+      ),
+      side: BorderSide(color: sel ? AppColors.secondary : AppColors.border),
     );
   }
 
-  Widget _buildViagemCard(Viagem viagem) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: _getStatusColor(viagem.status).withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(Icons.directions, color: _getStatusColor(viagem.status)),
+  Widget _buildCard(Map<String, dynamic> v) {
+    final status = v['status']?.toString() ?? 'desconhecido';
+    final cor = _statusColor(status);
+    final kmPerc = (v['quilometragem_percorrida'] as num?)?.toDouble();
+
+    return GestureDetector(
+      onTap: () => _abrirDetalhe(v),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
         ),
-        title: Text(
-          '${viagem.origem} → ${viagem.destino}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
-            Text('Veículo: ${_getNomeVeiculo(viagem.veiculoId)}'),
-            Text('Motorista: ${_getNomeMotorista(viagem.motoristaId)}'),
-            if (viagem.quilometragemPercorrida != null)
-              Text(
-                'KM: ${viagem.quilometragemPercorrida!.toStringAsFixed(1)} km',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: cor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: Icon(Icons.directions, color: cor, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${v['origem'] ?? '-'} → ${v['destino'] ?? '-'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Veículo: ${_veiculoLabel(v['veiculo_id']?.toString())}',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  Text(
+                    'Motorista: ${_motoristaLabel(v['motorista_id']?.toString())}',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  if (kmPerc != null)
+                    Text(
+                      'KM percorrido: ${kmPerc.toStringAsFixed(1)} km',
+                      style: const TextStyle(color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                ],
+              ),
+            ),
+            Chip(
+              label: Text(_statusLabel(status), style: const TextStyle(fontSize: 11)),
+              backgroundColor: cor.withValues(alpha: 0.15),
+              labelStyle: TextStyle(color: cor, fontWeight: FontWeight.bold),
+              padding: EdgeInsets.zero,
+            ),
           ],
         ),
-        trailing: Chip(
-          label: Text(_getStatusLabel(viagem.status)),
-          backgroundColor: _getStatusColor(
-            viagem.status,
-          ).withValues(alpha: 0.3),
-          labelStyle: TextStyle(
-            color: _getStatusColor(viagem.status),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        onTap: () => _abrirDetalheViagem(viagem),
       ),
     );
   }
@@ -292,71 +272,72 @@ class _ViagensPageState extends State<ViagensPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => NovaViagemPage(
-          veiculos: veiculos,
-          motoristas: motoristas,
-          onViagemSalva: () => _carregarDados(),
+        builder: (_) => _NovaViagemPage(
+          veiculosMap: veiculosMap,
+          motoristasMap: motoristasMap,
+          onSalva: _carregarDados,
         ),
       ),
     );
   }
 
-  void _abrirDetalheViagem(Viagem viagem) {
+  void _abrirDetalhe(Map<String, dynamic> viagem) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DetalheViagemPage(
+        builder: (_) => _DetalheViagemPage(
           viagem: viagem,
-          nomeVeiculo: _getNomeVeiculo(viagem.veiculoId),
-          nomeMotorista: _getNomeMotorista(viagem.motoristaId),
-          onViagemAtualizada: () => _carregarDados(),
+          veiculoLabel: _veiculoLabel(viagem['veiculo_id']?.toString()),
+          motoristaLabel: _motoristaLabel(viagem['motorista_id']?.toString()),
+          onAtualizada: _carregarDados,
         ),
       ),
     );
   }
 }
 
-class NovaViagemPage extends StatefulWidget {
-  final List<Veiculo> veiculos;
-  final List<Motorista> motoristas;
-  final VoidCallback onViagemSalva;
+// ── Nova Viagem ────────────────────────────────────────────────────────────────
 
-  const NovaViagemPage({
-    required this.veiculos,
-    required this.motoristas,
-    required this.onViagemSalva,
-    super.key,
+class _NovaViagemPage extends StatefulWidget {
+  final Map<String, Map<String, dynamic>> veiculosMap;
+  final Map<String, Map<String, dynamic>> motoristasMap;
+  final VoidCallback onSalva;
+
+  const _NovaViagemPage({
+    required this.veiculosMap,
+    required this.motoristasMap,
+    required this.onSalva,
   });
 
   @override
-  State<NovaViagemPage> createState() => _NovaViagemPageState();
+  State<_NovaViagemPage> createState() => _NovaViagemPageState();
 }
 
-class _NovaViagemPageState extends State<NovaViagemPage> {
+class _NovaViagemPageState extends State<_NovaViagemPage> {
   final supabase = Supabase.instance.client;
 
-  String? veiculoSelecionado;
-  String? motoristaSelecioando;
+  String? veiculoId;
+  String? motoristaId;
   bool isLoading = false;
 
-  final origemController = TextEditingController();
-  final destinoController = TextEditingController();
-  final quilometragemInicioController = TextEditingController();
+  final origemCtrl = TextEditingController();
+  final destinoCtrl = TextEditingController();
+  final kmInicioCtrl = TextEditingController();
 
   @override
   void dispose() {
-    origemController.dispose();
-    destinoController.dispose();
-    quilometragemInicioController.dispose();
+    origemCtrl.dispose();
+    destinoCtrl.dispose();
+    kmInicioCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _salvarViagem() async {
-    if (veiculoSelecionado == null ||
-        motoristaSelecioando == null ||
-        origemController.text.isEmpty ||
-        destinoController.text.isEmpty ||
-        quilometragemInicioController.text.isEmpty) {
+  Future<void> _salvar() async {
+    if (veiculoId == null ||
+        motoristaId == null ||
+        origemCtrl.text.isEmpty ||
+        destinoCtrl.text.isEmpty ||
+        kmInicioCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Preencha todos os campos obrigatórios')),
       );
@@ -364,36 +345,29 @@ class _NovaViagemPageState extends State<NovaViagemPage> {
     }
 
     setState(() => isLoading = true);
-
     try {
-      final viagemData = {
-        'veiculo_id': veiculoSelecionado,
-        'motorista_id': motoristaSelecioando,
+      await supabase.from('viagens').insert({
+        'veiculo_id': veiculoId,
+        'motorista_id': motoristaId,
         'data_inicio': DateTime.now().toIso8601String(),
-        'origem': origemController.text,
-        'destino': destinoController.text,
-        'quilometragem_inicio': double.parse(
-          quilometragemInicioController.text,
-        ),
+        'origem': origemCtrl.text.trim(),
+        'destino': destinoCtrl.text.trim(),
+        'quilometragem_inicio': double.parse(kmInicioCtrl.text),
         'status': 'em_progresso',
         'fotos_rota': [],
-        'criado_em': DateTime.now().toIso8601String(),
-      };
-
-      await supabase.from('viagens').insert(viagemData);
+      });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Viagem iniciada com sucesso!')),
       );
-
-      widget.onViagemSalva();
+      widget.onSalva();
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao salvar viagem: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao salvar viagem: $e')),
+      );
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -401,114 +375,101 @@ class _NovaViagemPageState extends State<NovaViagemPage> {
 
   @override
   Widget build(BuildContext context) {
+    final veiculos = widget.veiculosMap.entries.toList();
+    final motoristas = widget.motoristasMap.entries.toList();
+
+    InputDecoration field(String label, IconData icon) => InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: AppColors.textSecondary),
+          prefixIcon: Icon(icon, color: AppColors.textSecondary),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.secondary),
+          ),
+          filled: true,
+          fillColor: AppColors.backgroundSoft,
+        );
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Nova Viagem'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.surface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Veículo
             DropdownButtonFormField<String>(
-              initialValue: veiculoSelecionado,
-              decoration: InputDecoration(
-                labelText: 'Veículo *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.directions_car),
-              ),
-              items: widget.veiculos
-                  .map(
-                    (v) => DropdownMenuItem(
-                      value: v.id ?? '',
-                      child: Text(v.placa ?? ''),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                setState(() => veiculoSelecionado = value);
-              },
+              value: veiculoId,
+              dropdownColor: AppColors.surface,
+              style: const TextStyle(color: Colors.white),
+              decoration: field('Veículo *', Icons.directions_car),
+              items: veiculos.map((e) {
+                final v = e.value;
+                final plate = v['plate']?.toString() ?? '';
+                final desc = '${v['brand'] ?? ''} ${v['model'] ?? ''}'.trim();
+                return DropdownMenuItem(
+                  value: e.key,
+                  child: Text('$plate${desc.isNotEmpty ? ' — $desc' : ''}'),
+                );
+              }).toList(),
+              onChanged: (val) => setState(() => veiculoId = val),
             ),
             const SizedBox(height: 16),
-
-            // Motorista
             DropdownButtonFormField<String>(
-              initialValue: motoristaSelecioando,
-              decoration: InputDecoration(
-                labelText: 'Motorista *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.person),
-              ),
-              items: widget.motoristas
-                  .map(
-                    (m) => DropdownMenuItem(
-                      value: m.id ?? '',
-                      child: Text(m.nome ?? ''),
-                    ),
-                  )
+              value: motoristaId,
+              dropdownColor: AppColors.surface,
+              style: const TextStyle(color: Colors.white),
+              decoration: field('Motorista *', Icons.person),
+              items: motoristas
+                  .map((e) => DropdownMenuItem(
+                        value: e.key,
+                        child: Text(e.value['name']?.toString() ?? ''),
+                      ))
                   .toList(),
-              onChanged: (value) {
-                setState(() => motoristaSelecioando = value);
-              },
+              onChanged: (val) => setState(() => motoristaId = val),
             ),
             const SizedBox(height: 16),
-
-            // Origem
             TextField(
-              controller: origemController,
-              decoration: InputDecoration(
-                labelText: 'Origem *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.location_on),
-              ),
+              controller: origemCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: field('Origem *', Icons.location_on),
             ),
             const SizedBox(height: 16),
-
-            // Destino
             TextField(
-              controller: destinoController,
-              decoration: InputDecoration(
-                labelText: 'Destino *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.location_on),
-              ),
+              controller: destinoCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: field('Destino *', Icons.flag),
             ),
             const SizedBox(height: 16),
-
-            // Quilometragem Inicial
             TextField(
-              controller: quilometragemInicioController,
+              controller: kmInicioCtrl,
               keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Quilometragem Inicial (KM) *',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: Icon(Icons.speed),
-              ),
+              style: const TextStyle(color: Colors.white),
+              decoration: field('Quilometragem Inicial (KM) *', Icons.speed),
             ),
             const SizedBox(height: 24),
-
-            // Botão Salvar
             ElevatedButton(
-              onPressed: isLoading ? null : _salvarViagem,
+              onPressed: isLoading ? null : _salvar,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               child: isLoading
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Iniciar Viagem'),
+                  : const Text('Iniciar Viagem',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             ),
           ],
         ),
@@ -517,108 +478,136 @@ class _NovaViagemPageState extends State<NovaViagemPage> {
   }
 }
 
-class DetalheViagemPage extends StatefulWidget {
-  final Viagem viagem;
-  final String nomeVeiculo;
-  final String nomeMotorista;
-  final VoidCallback onViagemAtualizada;
+// ── Detalhe Viagem ─────────────────────────────────────────────────────────────
 
-  const DetalheViagemPage({
+class _DetalheViagemPage extends StatefulWidget {
+  final Map<String, dynamic> viagem;
+  final String veiculoLabel;
+  final String motoristaLabel;
+  final VoidCallback onAtualizada;
+
+  const _DetalheViagemPage({
     required this.viagem,
-    required this.nomeVeiculo,
-    required this.nomeMotorista,
-    required this.onViagemAtualizada,
-    super.key,
+    required this.veiculoLabel,
+    required this.motoristaLabel,
+    required this.onAtualizada,
   });
 
   @override
-  State<DetalheViagemPage> createState() => _DetalheViagemPageState();
+  State<_DetalheViagemPage> createState() => _DetalheViagemPageState();
 }
 
-class _DetalheViagemPageState extends State<DetalheViagemPage> {
+class _DetalheViagemPageState extends State<_DetalheViagemPage> {
   final supabase = Supabase.instance.client;
   bool isLoading = false;
 
-  final quilometragemFimController = TextEditingController();
-  final observacoesController = TextEditingController();
+  final kmFimCtrl = TextEditingController();
+  final obsCtrl = TextEditingController();
 
   @override
   void dispose() {
-    quilometragemFimController.dispose();
-    observacoesController.dispose();
+    kmFimCtrl.dispose();
+    obsCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _concluirViagem() async {
-    if (quilometragemFimController.text.isEmpty) {
+  Future<void> _concluir() async {
+    if (kmFimCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Informe a quilometragem final')),
       );
       return;
     }
-
     setState(() => isLoading = true);
-
     try {
-      final quilometragemFim = double.parse(quilometragemFimController.text);
-      final quilometragemPercorrida =
-          quilometragemFim - widget.viagem.quilometragemInicio;
+      final kmFim = double.parse(kmFimCtrl.text);
+      final kmInicio = (widget.viagem['quilometragem_inicio'] as num?)?.toDouble() ?? 0;
+      final kmPerc = kmFim - kmInicio;
 
-      await supabase
-          .from('viagens')
-          .update({
-            'data_fim': DateTime.now().toIso8601String(),
-            'quilometragem_fim': quilometragemFim,
-            'status': 'concluida',
-            'observacoes': observacoesController.text,
-            'atualizado_em': DateTime.now().toIso8601String(),
-          })
-          .eq('id', widget.viagem.id);
+      await supabase.from('viagens').update({
+        'data_fim': DateTime.now().toIso8601String(),
+        'quilometragem_fim': kmFim,
+        'quilometragem_percorrida': kmPerc,
+        'status': 'concluida',
+        'observacoes': obsCtrl.text,
+      }).eq('id', widget.viagem['id']);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Viagem concluída! $quilometragemPercorrida km percorridos.',
-          ),
-        ),
+        SnackBar(content: Text('Viagem concluída! ${kmPerc.toStringAsFixed(1)} km percorridos.')),
       );
-
-      widget.onViagemAtualizada();
+      widget.onAtualizada();
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao concluir viagem: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao concluir viagem: $e')),
+      );
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
+  String _fmt(String? iso) {
+    if (iso == null) return '--';
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'em_progresso':
+        return AppColors.info;
+      case 'concluida':
+        return AppColors.success;
+      case 'cancelada':
+        return AppColors.danger;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final v = widget.viagem;
+    final status = v['status']?.toString() ?? 'desconhecido';
+    final kmPerc = (v['quilometragem_percorrida'] as num?)?.toDouble();
+
+    InputDecoration field(String label, IconData icon) => InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: AppColors.textSecondary),
+          prefixIcon: Icon(icon, color: AppColors.textSecondary),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.secondary),
+          ),
+          filled: true,
+          fillColor: AppColors.backgroundSoft,
+        );
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Detalhe da Viagem'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.surface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                  ),
-                ],
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,90 +615,79 @@ class _DetalheViagemPageState extends State<DetalheViagemPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${widget.viagem.origem} → ${widget.viagem.destino}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          '${v['origem'] ?? '-'} → ${v['destino'] ?? '-'}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
                       Chip(
-                        label: Text(widget.viagem.status.toUpperCase()),
-                        backgroundColor: Colors.blue.withOpacity(0.3),
+                        label: Text(status.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        backgroundColor: _statusColor(status).withValues(alpha: 0.15),
+                        labelStyle: TextStyle(color: _statusColor(status)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildInfo('Veículo', widget.nomeVeiculo),
-                  _buildInfo('Motorista', widget.nomeMotorista),
-                  _buildInfo(
-                    'Início',
-                    widget.viagem.dataInicio.toString().split('.')[0],
-                  ),
-                  _buildInfo(
-                    'KM Inicial',
-                    '${widget.viagem.quilometragemInicio.toStringAsFixed(1)} km',
-                  ),
-                  if (widget.viagem.quilometragemPercorrida != null)
-                    _buildInfo(
-                      'KM Percorrido',
-                      '${widget.viagem.quilometragemPercorrida!.toStringAsFixed(1)} km',
-                    ),
+                  _infoRow('Veículo', widget.veiculoLabel),
+                  _infoRow('Motorista', widget.motoristaLabel),
+                  _infoRow('Início', _fmt(v['data_inicio']?.toString())),
+                  _infoRow('KM Inicial',
+                      '${(v['quilometragem_inicio'] as num?)?.toStringAsFixed(1) ?? '--'} km'),
+                  if (kmPerc != null)
+                    _infoRow('KM Percorrido', '${kmPerc.toStringAsFixed(1)} km',
+                        color: AppColors.secondary),
+                  if (v['data_fim'] != null) _infoRow('Fim', _fmt(v['data_fim']?.toString())),
+                  if (v['observacoes'] != null && v['observacoes'].toString().isNotEmpty)
+                    _infoRow('Observações', v['observacoes'].toString()),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            if (widget.viagem.status == 'em_progresso') ...[
+            if (status == 'em_progresso') ...[
+              const SizedBox(height: 24),
               Container(
-                padding: const EdgeInsets.all(16),
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8,
-                    ),
-                  ],
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const Text('Concluir Viagem',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 16),
                     TextField(
-                      controller: quilometragemFimController,
+                      controller: kmFimCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Quilometragem Final (KM) *',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        prefixIcon: Icon(Icons.speed),
-                      ),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Quilometragem Final (KM) *', Icons.speed),
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      controller: observacoesController,
+                      controller: obsCtrl,
                       maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: 'Observações',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Observações', Icons.notes),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: isLoading ? null : _concluirViagem,
+                      onPressed: isLoading ? null : _concluir,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Concluir Viagem'),
+                          : const Text('Concluir Viagem',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -721,14 +699,16 @@ class _DetalheViagemPageState extends State<DetalheViagemPage> {
     );
   }
 
-  Widget _buildInfo(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Text(value, style: const TextStyle(fontSize: 14)),
-        const SizedBox(height: 12),
-      ],
+  Widget _infoRow(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(value, style: TextStyle(fontSize: 14, color: color ?? Colors.white)),
+        ],
+      ),
     );
   }
 }
