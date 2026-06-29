@@ -1,27 +1,31 @@
-// Kill-switch service worker: immediately clears all caches, serves network-only,
-// then unregisters itself so future visits load fresh content without any SW.
-self.addEventListener('install', function() {
+'use strict';
+
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys()
-      .then(function(keys) {
-        return Promise.all(keys.map(function(key) { return caches.delete(key); }));
-      })
-      .then(function() { return self.clients.claim(); })
-      .then(function() { return self.registration.unregister(); })
-      .then(function() { return self.clients.matchAll({ type: 'window' }); })
-      .then(function(clients) {
-        clients.forEach(function(client) {
-          if ('navigate' in client) client.navigate(client.url);
-        });
-      })
-  );
-});
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        await self.registration.unregister();
+      } catch (e) {
+        console.warn('Failed to unregister the service worker:', e);
+      }
 
-// Serve everything from network while active — never from cache
-self.addEventListener('fetch', function(e) {
-  e.respondWith(fetch(e.request));
+      try {
+        const clients = await self.clients.matchAll({
+          type: 'window',
+        });
+        // Reload clients to ensure they are not using the old service worker.
+        clients.forEach((client) => {
+          if (client.url && 'navigate' in client) {
+            client.navigate(client.url);
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to navigate some service worker clients:', e);
+      }
+    })()
+  );
 });
