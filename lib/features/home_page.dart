@@ -212,7 +212,9 @@ class _HomePageState extends State<HomePage> {
   int totalMotoristas = 0;
   int totalAbastecimentos = 0;
   int totalEmManutencao = 0;
-  int totalOcorrenciasAbertas = 0;
+  int _veiculosEmManutencaoAtiva = 0;
+  int totalOcorrenciasAbertas = 0; // total geral (mostra no KPI)
+  int _ocorrenciasAbertasCount = 0; // só as não resolvidas (badge + insights)
   double totalGasto = 0;
   List<Map<String, dynamic>> recentFuelings = [];
   List<FlSpot> monthlyFuelSpots = [];
@@ -244,7 +246,7 @@ class _HomePageState extends State<HomePage> {
 
   // ── KPI getters — always show real data; 0 / R$ 0,00 when no records ──────
   int get _kpiTotalVeiculos  => totalVeiculos;
-  int get _kpiVeiculosAtivos => (totalVeiculos - totalEmManutencao).clamp(0, totalVeiculos);
+  int get _kpiVeiculosAtivos => (totalVeiculos - _veiculosEmManutencaoAtiva).clamp(0, totalVeiculos);
   int get _kpiEmManutencao   => totalEmManutencao;
   int get _kpiMotoristas     => totalMotoristas;
   String get _kpiGastoMensal => 'R\$ ${_fmt(totalGasto)}';
@@ -475,7 +477,7 @@ class _HomePageState extends State<HomePage> {
         color: const Color(0xFF7C3AED),
         title: 'Manutenção Preventiva',
         text:
-            '$totalEmManutencao veículo(s) em manutenção ativa. '
+            '$totalEmManutencao serviço(s) de manutenção registrado(s). '
             'Acompanhe o andamento para minimizar o tempo parado.',
         actionLabel: 'Ver manutenções',
         action: () => Navigator.push(
@@ -490,9 +492,9 @@ class _HomePageState extends State<HomePage> {
         color: AppColors.success,
         title: 'Manutenção em Dia',
         text:
-            'Nenhum veículo em manutenção no momento. '
+            'Nenhum serviço de manutenção registrado. '
             'Programe revisões preventivas para manter a disponibilidade.',
-        actionLabel: 'Agendar',
+        actionLabel: 'Registrar',
         action: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ManutencoesPage()),
@@ -557,7 +559,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     carregarDashboard();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted) carregarDashboard();
     });
   }
@@ -605,6 +607,10 @@ class _HomePageState extends State<HomePage> {
             .lte('fuel_date', dateEnd)
             .order('created_at', ascending: false)
             .limit(3), // 9
+        _safeSelect('oil_changes'),  // 10 — todos (sem filtro de período)
+        _safeSelect('occurrences'), // 11 — all-time para KPI total
+        _safeSelect('ocorrencias'), // 12 — all-time legacy
+        _safeSelect('manutencoes'), // 13 — all-time (registros criados diretamente)
       ]);
 
       final veiculos = results[0];
@@ -621,8 +627,16 @@ class _HomePageState extends State<HomePage> {
       final recents = results[9]
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
+      final allTimeOilChanges   = results[10] as List;
+      final allTimeOccurrences  = results[11] as List;
+      final allTimeOcorrencias  = results[12] as List;
+      final allTimeManutencoes  = results[13] as List;
 
+      // Período filtrado — gráficos e custo
       final allOcorrencias = [...occurrences, ...ocorrencias];
+
+      // All-time — KPI cards (sem recorte de data)
+      final allTimeAllOcorrencias = [...allTimeOccurrences, ...allTimeOcorrencias];
 
       final dashboardTotalGasto = _calculateTotalCost(
         abastecimentos,
@@ -641,8 +655,16 @@ class _HomePageState extends State<HomePage> {
         pneus,
         multas,
       );
-      final openOcorrenciasCount = allOcorrencias.where(_isOpenStatus).length;
-      final activeMaintenanceCount = _countActiveMaintenance(manutencoes);
+      // Total geral de ocorrências (abertas + andamento + resolvidas)
+      final totalOcorrenciasCount = allTimeAllOcorrencias.length;
+      // Subconjunto abertas — usado para badge e insights
+      final openOcorrenciasCount = allTimeAllOcorrencias
+          .where((e) => _isOpenStatus(e))
+          .length;
+      // Fleet Index usa contagem de manutencoes com status ativo
+      final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
+      // Total de registros de manutenção: oil_changes + manutencoes diretas
+      final activeMaintenanceCount = allTimeOilChanges.length + allTimeManutencoes.length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
@@ -680,7 +702,9 @@ class _HomePageState extends State<HomePage> {
         totalMotoristas = motoristas.length;
         totalAbastecimentos = abastecimentos.length;
         totalEmManutencao = activeMaintenanceCount;
-        totalOcorrenciasAbertas = openOcorrenciasCount;
+        _veiculosEmManutencaoAtiva = veiculosEmManutencaoCount;
+        totalOcorrenciasAbertas = totalOcorrenciasCount;
+        _ocorrenciasAbertasCount = openOcorrenciasCount;
         totalGasto = dashboardTotalGasto;
         totalMultas = multas.length;
         recentFuelings = recents;
@@ -1820,9 +1844,10 @@ class _HomePageState extends State<HomePage> {
         Expanded(child: KpiCard(
           title: 'Em Manutenção',
           value: '$_kpiEmManutencao',
+          unit: 'serviços registrados',
           icon: Icons.build_rounded,
           color: const Color(0xFF0EA5E9),
-          trend: _sparkTrend(sparkManutencoes, 'manutenção'),
+          trend: _sparkTrend(sparkManutencoes, 'serviço'),
           sparkData: sparkManutencoes,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage())).then((_) => carregarDashboard()),
         )),
@@ -1869,9 +1894,12 @@ class _HomePageState extends State<HomePage> {
         Expanded(child: KpiCard(
           title: 'Ocorrências',
           value: '$_kpiOcorrencias',
+          unit: _ocorrenciasAbertasCount > 0
+              ? '$_ocorrenciasAbertasCount em aberto'
+              : 'total de registros',
           icon: Icons.warning_amber_rounded,
           color: const Color(0xFFEF4444),
-          badge: _kpiOcorrencias > 0 ? 'Abertas' : null,
+          badge: _ocorrenciasAbertasCount > 0 ? 'Abertas' : null,
           trend: _sparkTrend(sparkOcorrencias, 'ocorrência'),
           sparkData: sparkOcorrencias,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage())).then((_) => carregarDashboard()),
