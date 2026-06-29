@@ -2455,6 +2455,8 @@ class _HomePageState extends State<HomePage> {
 
           // ── Bottom: profile + badge ────────────────────────────────────────
           Container(height: 1, color: const Color(0xFF0E1E33)),
+          _buildSairButton(),
+          Container(height: 1, color: const Color(0xFF0E1E33)),
           _buildProfileCard(),
           _buildProBadge(),
         ],
@@ -2598,6 +2600,54 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const Icon(Icons.unfold_more_rounded, color: Color(0xFF334155), size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSairButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Finalizar Sessão'),
+              content: const Text('Deseja realmente sair da sua conta?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                  child: const Text('Sair'),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true && mounted) {
+            await context.read<AppAuthProvider>().signOut();
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: const [
+              Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+              SizedBox(width: 10),
+              Text(
+                'Sair',
+                style: TextStyle(
+                  color: Color(0xFFEF4444),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),

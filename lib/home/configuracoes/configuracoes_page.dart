@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 
 class ConfiguracoesPage extends StatefulWidget {
   const ConfiguracoesPage({super.key});
@@ -333,6 +335,38 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
               onTap: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Alterar senha — em breve.')),
               ),
+            ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444)),
+              title: const Text(
+                'Finalizar Sessão',
+                style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text('Sair da conta e voltar à tela de login.'),
+              onTap: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Finalizar Sessão'),
+                    content: const Text('Deseja realmente sair da sua conta?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancelar'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                        child: const Text('Sair'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && mounted) {
+                  await context.read<AppAuthProvider>().signOut();
+                }
+              },
             ),
           ],
         ),
