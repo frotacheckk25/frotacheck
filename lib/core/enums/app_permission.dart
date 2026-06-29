@@ -34,9 +34,20 @@ enum AppPermission {
   viewChecklists,
   manageChecklists,
 
+  // Pneus
+  viewTires,
+  manageTires,
+
+  // Alertas
+  viewAlerts,
+  manageAlerts,
+
   // Relatórios
   viewReports,
   exportReports,
+
+  // Configurações da empresa
+  manageSettings,
 
   // Usuários e empresa (ADMIN_EMPRESA+)
   viewUsers,

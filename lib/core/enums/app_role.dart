@@ -3,9 +3,9 @@ import 'app_permission.dart';
 
 enum AppRole {
   master,        // FrotaCheck superadmin — acessa todas as empresas
-  adminEmpresa,  // Controle total de uma empresa
-  gestor,        // Operacional — sem gestão de usuários
-  motorista;     // Acesso restrito
+  adminEmpresa,  // Dono da empresa — controle total dentro da empresa
+  gestor,        // Operacional — sem gestão de usuários ou configurações
+  motorista;     // Acesso restrito ao próprio trabalho
 
   String get label {
     switch (this) {
@@ -47,6 +47,8 @@ enum AppRole {
     switch (this) {
       case AppRole.master:
         return AppPermission.values;
+
+      // ── ADMIN_EMPRESA: controle total da empresa, sem acesso multi-tenant ──
       case AppRole.adminEmpresa:
         return const [
           AppPermission.viewDashboard,
@@ -58,9 +60,14 @@ enum AppRole {
           AppPermission.viewMultas,      AppPermission.manageMultas,
           AppPermission.viewDocuments,   AppPermission.manageDocuments,
           AppPermission.viewChecklists,  AppPermission.manageChecklists,
+          AppPermission.viewTires,       AppPermission.manageTires,
+          AppPermission.viewAlerts,      AppPermission.manageAlerts,
           AppPermission.viewReports,     AppPermission.exportReports,
+          AppPermission.manageSettings,
           AppPermission.viewUsers,       AppPermission.manageUsers,
         ];
+
+      // ── GESTOR: operacional — leitura ampla, sem config ou usuários ─────────
       case AppRole.gestor:
         return const [
           AppPermission.viewDashboard,
@@ -72,8 +79,12 @@ enum AppRole {
           AppPermission.viewMultas,
           AppPermission.viewDocuments,
           AppPermission.viewChecklists,  AppPermission.manageChecklists,
+          AppPermission.viewTires,
+          AppPermission.viewAlerts,
           AppPermission.viewReports,
         ];
+
+      // ── MOTORISTA: restrito ao próprio trabalho diário ────────────────────
       case AppRole.motorista:
         return const [
           AppPermission.viewDashboard,

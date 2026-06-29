@@ -2423,7 +2423,8 @@ class _HomePageState extends State<HomePage> {
                     if (auth.can(AppPermission.viewChecklists) ||
                         auth.can(AppPermission.viewOccurrences) ||
                         auth.can(AppPermission.viewMultas) ||
-                        auth.can(AppPermission.viewDocuments)) ...[
+                        auth.can(AppPermission.viewDocuments) ||
+                        auth.can(AppPermission.viewTires)) ...[
                       _sidebarSection('OPERAÇÕES'),
                       if (auth.can(AppPermission.viewChecklists)) ...[
                         _buildSidebarItem(Icons.checklist_rounded, 'Checklists', () async {
@@ -2439,10 +2440,11 @@ class _HomePageState extends State<HomePage> {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage()));
                           carregarDashboard();
                         }),
-                      _buildSidebarItem(Icons.tire_repair_rounded, 'Pneus', () async {
-                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage()));
-                        carregarDashboard();
-                      }),
+                      if (auth.can(AppPermission.viewTires))
+                        _buildSidebarItem(Icons.tire_repair_rounded, 'Pneus', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage()));
+                          carregarDashboard();
+                        }),
                       if (auth.can(AppPermission.viewMultas))
                         _buildSidebarItem(Icons.receipt_long_rounded, 'Multas', () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage()));
@@ -2461,20 +2463,25 @@ class _HomePageState extends State<HomePage> {
                     ],
 
                     // ─ Gestão ─────────────────────────────────────────────
-                    if (auth.can(AppPermission.viewReports)) ...[
+                    if (auth.can(AppPermission.viewReports) ||
+                        auth.can(AppPermission.viewAlerts) ||
+                        auth.can(AppPermission.manageSettings)) ...[
                       _sidebarSection('GESTÃO'),
-                      _buildSidebarItem(Icons.bar_chart_rounded, 'Relatórios', () async {
-                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
-                        carregarDashboard();
-                      }),
-                      _buildSidebarItem(Icons.notifications_active_rounded, 'Alertas', () async {
-                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
-                        carregarDashboard();
-                      }),
-                      _buildSidebarItem(Icons.settings_rounded, 'Configurações', () async {
-                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage()));
-                        carregarDashboard();
-                      }),
+                      if (auth.can(AppPermission.viewReports))
+                        _buildSidebarItem(Icons.bar_chart_rounded, 'Relatórios', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewAlerts))
+                        _buildSidebarItem(Icons.notifications_active_rounded, 'Alertas', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.manageSettings))
+                        _buildSidebarItem(Icons.settings_rounded, 'Configurações', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage()));
+                          carregarDashboard();
+                        }),
                       const SizedBox(height: 6),
                     ],
 
