@@ -7,6 +7,7 @@ import 'dart:html' as html;
 
 import 'features/auth/login_page.dart';
 import 'features/home_page.dart';
+import 'home/master/master_dashboard_page.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/auth/app_auth_provider.dart';
@@ -81,11 +82,24 @@ class FrotaCheckApp extends StatelessWidget {
         title: 'FrotaCheck',
         theme: AppTheme.darkTheme,
         home: AppGuard(
-          authenticated: const HomePage(),
+          authenticated: const _MasterAwareRouter(),
           unauthenticated: const LoginPage(),
         ),
       ),
     );
+  }
+}
+
+class _MasterAwareRouter extends StatelessWidget {
+  const _MasterAwareRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AppAuthProvider>();
+    if (auth.isMaster && !auth.isImpersonating) {
+      return const MasterDashboardPage();
+    }
+    return const HomePage();
   }
 }
 

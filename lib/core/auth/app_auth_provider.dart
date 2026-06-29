@@ -25,6 +25,26 @@ class AppAuthProvider extends ChangeNotifier {
   AppRole? get role          => _profile?.role;
   bool   get isMaster        => _profile?.role == AppRole.master;
 
+  // ── Impersonation (MASTER visualizando como empresa) ─────────────────────
+  String? _impersonatedEmpresaId;
+  String? _impersonatedEmpresaNome;
+
+  bool    get isImpersonating        => _impersonatedEmpresaId != null;
+  String? get impersonatedEmpresaId  => _impersonatedEmpresaId;
+  String? get impersonatedEmpresaNome => _impersonatedEmpresaNome;
+
+  void enterAsEmpresa(String empresaId, String empresaNome) {
+    _impersonatedEmpresaId = empresaId;
+    _impersonatedEmpresaNome = empresaNome;
+    notifyListeners();
+  }
+
+  void exitEmpresa() {
+    _impersonatedEmpresaId = null;
+    _impersonatedEmpresaNome = null;
+    notifyListeners();
+  }
+
   // ── Verificações de permissão centralizadas ──────────────────────────────
 
   bool can(AppPermission permission)       => _profile?.can(permission) ?? false;
@@ -32,8 +52,9 @@ class AppAuthProvider extends ChangeNotifier {
   bool hasAnyRole(List<AppRole> roles)     => _profile?.hasAnyRole(roles) ?? false;
 
   /// Injeta empresa_id em um payload antes de um insert/update.
-  /// MASTER não injeta (pode inserir em qualquer empresa explicitamente).
+  /// MASTER impersonando injeta a empresa impersonada; caso contrário não injeta.
   Map<String, dynamic> inject(Map<String, dynamic> data) {
+    if (isImpersonating) return {...data, 'empresa_id': _impersonatedEmpresaId!};
     if (isMaster || empresaId == null) return data;
     return {...data, 'empresa_id': empresaId};
   }
