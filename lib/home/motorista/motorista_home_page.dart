@@ -53,8 +53,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     // Busca driver_id sempre do banco para capturar vínculos feitos pelo admin
     // após o login (o AppAuthProvider cacheia o perfil na sessão).
     String? driverId = auth.profile?.driverId;
+    final userId = _supabase.auth.currentUser?.id;
     try {
-      final userId = _supabase.auth.currentUser?.id;
       if (userId != null) {
         final fresh = await _supabase
             .from('user_profiles')
@@ -64,6 +64,30 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         if (fresh != null) driverId = fresh['driver_id']?.toString();
       }
     } catch (_) {}
+
+    // Fallback: se user_profiles.driver_id é null, tenta via drivers.user_id.
+    // Isso cobre o caso onde o Gestor vinculou o veículo ao motorista
+    // mas o admin ainda não vinculou o usuário ao driver em Gestão de Usuários.
+    if (driverId == null && userId != null) {
+      try {
+        final driverRow = await _supabase
+            .from('drivers')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        final fallbackId = driverRow?['id']?.toString();
+        if (fallbackId != null) {
+          driverId = fallbackId;
+          // Auto-corrige user_profiles.driver_id para que próximos loads usem
+          // o caminho rápido e o RBAC/RLS funcionem corretamente.
+          await _supabase
+              .from('user_profiles')
+              .update({'driver_id': fallbackId})
+              .eq('user_id', userId)
+              .catchError((_) => null);
+        }
+      } catch (_) {}
+    }
 
     try {
       final hoje = DateTime.now();
@@ -75,7 +99,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         veiculo = await _supabase
             .from('vehicles')
             .select('id, plate, model, year, brand, status')
-            .eq('empresa_id', empresaId)
             .eq('driver_id', driverId)
             .limit(1)
             .maybeSingle()

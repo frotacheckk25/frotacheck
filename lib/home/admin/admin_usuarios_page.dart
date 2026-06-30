@@ -235,6 +235,19 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .from('user_profiles')
           .update({'driver_id': driverId})
           .eq('user_id', userId);
+      // Mantém drivers.user_id em sincronia para o fallback de lookup do motorista
+      if (driverId != null) {
+        await _supabase
+            .from('drivers')
+            .update({'user_id': userId})
+            .eq('id', driverId);
+      } else {
+        // Remove qualquer driver anteriormente vinculado a este usuário
+        await _supabase
+            .from('drivers')
+            .update({'user_id': null})
+            .eq('user_id', userId);
+      }
       await _carregar();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

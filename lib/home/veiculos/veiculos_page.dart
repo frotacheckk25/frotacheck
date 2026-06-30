@@ -145,6 +145,28 @@ class _VeiculosPageState extends State<VeiculosPage> {
         });
       }
 
+      // Sincroniza user_profiles.driver_id quando um motorista é vinculado ao veículo.
+      // Garante que o motorista veja o veículo mesmo que o admin ainda não tenha
+      // feito o vínculo manualmente em Gestão de Usuários.
+      final newDriverId = motoristaSelecionado;
+      if (newDriverId != null) {
+        try {
+          final driverRow = await supabase
+              .from('drivers')
+              .select('user_id')
+              .eq('id', newDriverId)
+              .maybeSingle();
+          final driverUserId = driverRow?['user_id']?.toString();
+          if (driverUserId != null) {
+            await supabase
+                .from('user_profiles')
+                .update({'driver_id': newDriverId})
+                .eq('user_id', driverUserId)
+                .catchError((_) => null);
+          }
+        } catch (_) {}
+      }
+
       if (!mounted) return;
       _mostrarSucesso(isNew ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado!');
       _limparFormulario();
