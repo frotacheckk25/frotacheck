@@ -32,6 +32,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _usuarios = [];
   List<Map<String, dynamic>> _empresas = [];
+  List<Map<String, dynamic>> _drivers = [];
   bool _loading = true;
   String? _erro;
   RealtimeChannel? _channel;
@@ -69,7 +70,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
   Future<void> _carregar() async {
     if (!mounted) return;
-    setState(() { _loading = true; _erro = null; });
+    setState(() {
+      _loading = true;
+      _erro = null;
+    });
     try {
       final auth = context.read<AppAuthProvider>();
 
@@ -95,15 +99,33 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
             .toList();
       }
 
+      // Carrega motoristas (drivers) da empresa — para vinculação
+      List<Map<String, dynamic>> drivers = [];
+      try {
+        var driversQuery = _supabase
+            .from('drivers')
+            .select('id, name')
+            .order('name');
+        // RLS restringe ao empresa_id automaticamente; MASTER vê todos
+        final drRes = await driversQuery;
+        drivers = (drRes as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } catch (_) {}
+
       if (!mounted) return;
       setState(() {
         _usuarios = lista;
         _empresas = empresas;
+        _drivers = drivers;
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _erro = e.toString(); _loading = false; });
+      setState(() {
+        _erro = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -117,7 +139,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     }
@@ -133,7 +158,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: AppColors.danger,
+          ),
         );
       }
     }
@@ -150,6 +178,32 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _vincularDriver(String userId, String? driverId) async {
+    try {
+      await _supabase
+          .from('user_profiles')
+          .update({'driver_id': driverId})
+          .eq('user_id', userId);
+      await _carregar();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(driverId != null
+                ? 'Motorista vinculado com sucesso!'
+                : 'Vínculo removido.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao vincular: $e'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -176,34 +230,41 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.secondary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.secondary),
+            )
           : _erro != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(_erro!, style: const TextStyle(color: AppColors.danger)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _carregar, child: const Text('Tentar novamente')),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_erro!, style: const TextStyle(color: AppColors.danger)),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: _carregar,
+                    child: const Text('Tentar novamente'),
                   ),
-                )
-              : _buildLista(auth, canManage),
+                ],
+              ),
+            )
+          : _buildLista(auth, canManage),
     );
   }
 
   Widget _buildLista(AppAuthProvider auth, bool canManage) {
     if (_usuarios.isEmpty) {
       return const Center(
-        child: Text('Nenhum usuário encontrado.',
-            style: TextStyle(color: AppColors.textSecondary)),
+        child: Text(
+          'Nenhum usuário encontrado.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _usuarios.length,
-      itemBuilder: (_, i) => _buildCard(_usuarios[i], auth, canManage),
+      itemBuilder: (_, i) => _buildCard(_usuarios[i], auth, canManage, _drivers),
     );
   }
 
@@ -211,6 +272,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     Map<String, dynamic> u,
     AppAuthProvider auth,
     bool canManage,
+    List<Map<String, dynamic>> drivers,
   ) {
     final userId = u['user_id']?.toString() ?? '';
     final nome = u['nome']?.toString() ?? u['email']?.toString() ?? 'Sem nome';
@@ -304,7 +366,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                           if (isMe) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.secondary.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(8),
@@ -335,7 +400,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                 ),
                 // Status badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -399,7 +467,12 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                     child: _ActionDropdown<String>(
                       label: 'Status',
                       value: status,
-                      items: const ['ativo', 'pendente', 'bloqueado', 'inativo'],
+                      items: const [
+                        'ativo',
+                        'pendente',
+                        'bloqueado',
+                        'inativo',
+                      ],
                       itemLabel: (s) => s,
                       onChanged: (s) => _alterarStatus(userId, s),
                     ),
@@ -417,6 +490,15 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                   ],
                 ],
               ),
+              // Vinculação de motorista (apenas para role MOTORISTA)
+              if (role == AppRole.motorista && drivers.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _DriverDropdown(
+                  drivers: drivers,
+                  currentDriverId: u['driver_id']?.toString(),
+                  onChanged: (id) => _vincularDriver(userId, id),
+                ),
+              ],
             ],
           ],
         ),
@@ -439,7 +521,11 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
@@ -447,7 +533,8 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   String _initials(String name) {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    if (parts.isNotEmpty && parts[0].isNotEmpty) return parts[0][0].toUpperCase();
+    if (parts.isNotEmpty && parts[0].isNotEmpty)
+      return parts[0][0].toUpperCase();
     return '?';
   }
 
@@ -485,15 +572,28 @@ class _ActionDropdown<T> extends StatelessWidget {
         child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          hint: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          hint: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
           dropdownColor: const Color(0xFF0B1528),
           style: const TextStyle(color: Colors.white, fontSize: 12),
-          icon: const Icon(Icons.unfold_more_rounded, color: AppColors.textSecondary, size: 14),
-          items: items.map((t) => DropdownMenuItem<T>(
-            value: t,
-            child: Text(itemLabel(t)),
-          )).toList(),
-          onChanged: (v) { if (v != null) onChanged(v); },
+          icon: const Icon(
+            Icons.unfold_more_rounded,
+            color: AppColors.textSecondary,
+            size: 14,
+          ),
+          items: items
+              .map(
+                (t) => DropdownMenuItem<T>(value: t, child: Text(itemLabel(t))),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
         ),
       ),
     );
@@ -528,16 +628,103 @@ class _EmpresaDropdown extends StatelessWidget {
         child: DropdownButton<String>(
           value: validId,
           isExpanded: true,
-          hint: const Text('Empresa', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          hint: const Text(
+            'Empresa',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
           dropdownColor: const Color(0xFF0B1528),
           style: const TextStyle(color: Colors.white, fontSize: 12),
-          icon: const Icon(Icons.unfold_more_rounded, color: AppColors.textSecondary, size: 14),
-          items: empresas.map((e) => DropdownMenuItem<String>(
-            value: e['id']?.toString(),
-            child: Text(e['nome']?.toString() ?? '—', overflow: TextOverflow.ellipsis),
-          )).toList(),
-          onChanged: (v) { if (v != null) onChanged(v); },
+          icon: const Icon(
+            Icons.unfold_more_rounded,
+            color: AppColors.textSecondary,
+            size: 14,
+          ),
+          items: empresas
+              .map(
+                (e) => DropdownMenuItem<String>(
+                  value: e['id']?.toString(),
+                  child: Text(
+                    e['nome']?.toString() ?? '—',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
         ),
+      ),
+    );
+  }
+}
+
+class _DriverDropdown extends StatelessWidget {
+  final List<Map<String, dynamic>> drivers;
+  final String? currentDriverId;
+  final void Function(String?) onChanged;
+
+  const _DriverDropdown({
+    required this.drivers,
+    required this.currentDriverId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final validId = drivers.any((d) => d['id']?.toString() == currentDriverId)
+        ? currentDriverId
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1528),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: validId != null
+              ? const Color(0xFF1AA251).withOpacity(0.45)
+              : AppColors.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.local_shipping_rounded, color: Color(0xFF1AA251), size: 14),
+          const SizedBox(width: 6),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: validId,
+                isExpanded: true,
+                hint: const Text(
+                  'Vincular registro de motorista',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                dropdownColor: const Color(0xFF0B1528),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+                icon: const Icon(Icons.unfold_more_rounded, color: AppColors.textSecondary, size: 14),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('— Nenhum —',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  ),
+                  ...drivers.map(
+                    (d) => DropdownMenuItem<String?>(
+                      value: d['id']?.toString(),
+                      child: Text(
+                        d['name']?.toString() ?? '—',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
