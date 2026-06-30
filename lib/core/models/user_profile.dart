@@ -12,6 +12,7 @@ class UserProfile {
   final String? nome;
   final String? email;
   final DateTime? createdAt;
+  final String? veiculoId; // veículo vinculado ao motorista
 
   const UserProfile({
     required this.userId,
@@ -24,6 +25,7 @@ class UserProfile {
     this.nome,
     this.email,
     this.createdAt,
+    this.veiculoId,
   });
 
   /// Verifica se o usuário tem uma permissão específica.
@@ -72,6 +74,7 @@ class UserProfile {
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString())
           : null,
+      veiculoId: map['veiculo_id']?.toString(),
     );
   }
 
@@ -94,6 +97,7 @@ class UserProfile {
     DateTime? lastAccess,
     String? nome,
     String? email,
+    Object? veiculoId = _sentinel,
   }) {
     return UserProfile(
       userId: userId,
@@ -106,6 +110,9 @@ class UserProfile {
       nome: nome ?? this.nome,
       email: email ?? this.email,
       createdAt: createdAt,
+      veiculoId: veiculoId == _sentinel ? this.veiculoId : veiculoId as String?,
     );
   }
 }
+
+const _sentinel = Object();

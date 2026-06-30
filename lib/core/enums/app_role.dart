@@ -90,11 +90,13 @@ enum AppRole {
       case AppRole.motorista:
         return const [
           AppPermission.viewDashboard,
-          // NÃO tem viewVehicles (não vê lista de veículos da empresa)
+          // NÃO tem viewVehicles (não vê lista geral de veículos da empresa)
+          AppPermission.viewMaintenance, AppPermission.manageMaintenance,
           AppPermission.viewFuelings,    AppPermission.manageFuelings,
           AppPermission.viewOccurrences, AppPermission.manageOccurrences,
           AppPermission.viewChecklists,  AppPermission.manageChecklists,
           AppPermission.viewDocuments,   // próprios documentos (CNH, etc.)
+          AppPermission.viewAlerts,      // alertas do seu veículo
         ];
     }
   }
