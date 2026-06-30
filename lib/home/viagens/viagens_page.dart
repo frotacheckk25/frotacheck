@@ -1,8 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+
+/// Lê a localização atual via API de geolocalização do navegador.
+/// Best-effort: retorna null se indisponível, sem permissão, ou expirar —
+/// nunca deve bloquear o fluxo de iniciar/concluir viagem.
+Future<String?> _obterLocalizacao() async {
+  try {
+    final pos = await html.window.navigator.geolocation
+        .getCurrentPosition(enableHighAccuracy: true)
+        .timeout(const Duration(seconds: 5));
+    final lat = pos.coords?.latitude;
+    final lng = pos.coords?.longitude;
+    if (lat == null || lng == null) return null;
+    return '$lat,$lng';
+  } catch (_) {
+    return null;
+  }
+}
 
 class ViagensPage extends StatefulWidget {
   const ViagensPage({super.key});
@@ -46,18 +65,13 @@ class _ViagensPageState extends State<ViagensPage> {
         mMap[row['id'].toString()] = row;
       }
 
-      List<Map<String, dynamic>> viaList = [];
-      try {
-        final viaResp = await supabase
-            .from('viagens')
-            .select()
-            .order('data_inicio', ascending: false);
-        viaList = List<Map<String, dynamic>>.from(
-          (viaResp as List).map((e) => Map<String, dynamic>.from(e as Map)),
-        );
-      } catch (_) {
-        // tabela viagens não existe ainda
-      }
+      final viaResp = await supabase
+          .from('viagens')
+          .select()
+          .order('data_inicio', ascending: false);
+      final viaList = List<Map<String, dynamic>>.from(
+        (viaResp as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
 
       if (!mounted) return;
       setState(() {
@@ -68,7 +82,11 @@ class _ViagensPageState extends State<ViagensPage> {
       });
     } catch (e) {
       debugPrint('Erro ao carregar viagens: $e');
-      if (mounted) setState(() => isLoading = false);
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao carregar viagens: $e')),
+      );
     }
   }
 
@@ -348,6 +366,8 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
 
     setState(() => isLoading = true);
     final injetar = context.read<AppAuthProvider>().inject;
+    final localizacao = await _obterLocalizacao();
+    if (!mounted) return;
     try {
       await supabase.from('viagens').insert(injetar({
         'veiculo_id': veiculoId,
@@ -358,6 +378,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
         'quilometragem_inicio': double.parse(kmInicioCtrl.text),
         'status': 'em_progresso',
         'fotos_rota': [],
+        if (localizacao != null) 'localizacao_inicio': localizacao,
       }));
 
       if (!mounted) return;
@@ -522,17 +543,25 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       return;
     }
     setState(() => isLoading = true);
+    final localizacao = await _obterLocalizacao();
+    if (!mounted) return;
     try {
       final kmFim = double.parse(kmFimCtrl.text);
       final kmInicio = (widget.viagem['quilometragem_inicio'] as num?)?.toDouble() ?? 0;
       final kmPerc = kmFim - kmInicio;
 
+      final dataInicio = DateTime.tryParse(widget.viagem['data_inicio']?.toString() ?? '');
+      final dataFim = DateTime.now();
+      final duracaoMinutos = dataInicio != null ? dataFim.difference(dataInicio).inMinutes : null;
+
       await supabase.from('viagens').update({
-        'data_fim': DateTime.now().toIso8601String(),
+        'data_fim': dataFim.toIso8601String(),
         'quilometragem_fim': kmFim,
         'quilometragem_percorrida': kmPerc,
+        'duracao_minutos': duracaoMinutos,
         'status': 'concluida',
         'observacoes': obsCtrl.text,
+        if (localizacao != null) 'localizacao_fim': localizacao,
       }).eq('id', widget.viagem['id']);
 
       if (!mounted) return;
@@ -557,6 +586,13 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
     if (dt == null) return iso;
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _fmtDuracao(int minutos) {
+    final h = minutos ~/ 60;
+    final m = minutos % 60;
+    if (h == 0) return '${m}min';
+    return '${h}h ${m}min';
   }
 
   Color _statusColor(String status) {
@@ -641,6 +677,12 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
                     _infoRow('KM Percorrido', '${kmPerc.toStringAsFixed(1)} km',
                         color: AppColors.secondary),
                   if (v['data_fim'] != null) _infoRow('Fim', _fmt(v['data_fim']?.toString())),
+                  if (v['duracao_minutos'] != null)
+                    _infoRow('Duração', _fmtDuracao((v['duracao_minutos'] as num).toInt())),
+                  if (v['localizacao_inicio'] != null)
+                    _infoRow('Localização Início', v['localizacao_inicio'].toString()),
+                  if (v['localizacao_fim'] != null)
+                    _infoRow('Localização Fim', v['localizacao_fim'].toString()),
                   if (v['observacoes'] != null && v['observacoes'].toString().isNotEmpty)
                     _infoRow('Observações', v['observacoes'].toString()),
                 ],
