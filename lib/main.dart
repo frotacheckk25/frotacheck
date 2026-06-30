@@ -8,9 +8,11 @@ import 'dart:html' as html;
 import 'features/auth/login_page.dart';
 import 'features/home_page.dart';
 import 'home/master/master_dashboard_page.dart';
+import 'home/motorista/motorista_home_page.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/auth/app_auth_provider.dart';
+import 'core/enums/app_role.dart';
 import 'core/guards/app_guard.dart';
 
 void main() {
@@ -98,6 +100,9 @@ class _MasterAwareRouter extends StatelessWidget {
     final auth = context.watch<AppAuthProvider>();
     if (auth.isMaster && !auth.isImpersonating) {
       return const MasterDashboardPage();
+    }
+    if (auth.role == AppRole.motorista && !auth.isImpersonating) {
+      return const MotoristaHomePage();
     }
     return const HomePage();
   }

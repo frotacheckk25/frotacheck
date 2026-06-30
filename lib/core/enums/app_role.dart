@@ -86,14 +86,15 @@ enum AppRole {
           //          viewAllCompanies, manageCompanies, manageSystem
         ];
 
-      // ── MOTORISTA: restrito ao próprio trabalho diário ────────────────────
+      // ── MOTORISTA: restrito às próprias operações do dia ─────────────────
       case AppRole.motorista:
         return const [
           AppPermission.viewDashboard,
-          AppPermission.viewVehicles,
+          // NÃO tem viewVehicles (não vê lista de veículos da empresa)
           AppPermission.viewFuelings,    AppPermission.manageFuelings,
           AppPermission.viewOccurrences, AppPermission.manageOccurrences,
           AppPermission.viewChecklists,  AppPermission.manageChecklists,
+          AppPermission.viewDocuments,   // próprios documentos (CNH, etc.)
         ];
     }
   }
