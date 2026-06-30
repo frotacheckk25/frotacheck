@@ -11,6 +11,11 @@ class AppAuthProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<AuthState>? _authSub;
 
+  // Monotonically increasing counter — each _loadProfile() call captures its
+  // own generation. If a newer call starts before the older one finishes, the
+  // older call's results are silently discarded, preventing stale writes.
+  int _loadGen = 0;
+
   UserProfile? get profile  => _profile;
   bool get loading           => _loading;
   String? get error          => _error;
@@ -89,6 +94,7 @@ class AppAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadProfile() async {
+    final gen = ++_loadGen;
     _loading = true;
     _error = null;
     notifyListeners();
@@ -96,9 +102,8 @@ class AppAuthProvider extends ChangeNotifier {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
+        if (gen != _loadGen) return;
         _profile = null;
-        _loading = false;
-        notifyListeners();
         return;
       }
 
@@ -107,6 +112,10 @@ class AppAuthProvider extends ChangeNotifier {
           .select('*, empresas(nome)')
           .eq('user_id', userId)
           .maybeSingle();
+
+      // Discard results from a superseded call (e.g. tokenRefreshed fired
+      // while signedIn was still in-flight).
+      if (gen != _loadGen) return;
 
       if (res == null) {
         // Usuário no auth mas sem perfil — aguarda vinculação pelo admin
@@ -126,11 +135,14 @@ class AppAuthProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('AppAuthProvider._loadProfile error: $e');
+      if (gen != _loadGen) return;
       _error = e.toString();
       _profile = null;
     } finally {
-      _loading = false;
-      notifyListeners();
+      if (gen == _loadGen) {
+        _loading = false;
+        notifyListeners();
+      }
     }
   }
 

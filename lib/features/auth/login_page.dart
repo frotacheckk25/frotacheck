@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../home_page.dart';
 import 'register_page.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -45,11 +44,8 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailCtrl.text.trim(),
         password: _passCtrl.text.trim(),
       );
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-      );
+      // Navigation is handled by AppAuthProvider → AppGuard → _MasterAwareRouter.
+      // Do NOT push any route here — the guard rebuilds with the correct role.
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
