@@ -2324,6 +2324,61 @@ class _HomePageState extends State<HomePage> {
 
           // Separator after logo
           Container(height: 1, color: const Color(0xFF0E1E33)),
+
+          // ── Banner de impersonation — FIXO, fora do scroll ───────────────
+          Builder(builder: (ctx) {
+            final auth = ctx.watch<AppAuthProvider>();
+            if (!auth.isImpersonating) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withOpacity(0.10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.40)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.visibility_rounded, color: Color(0xFFF59E0B), size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Visualizando como:', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.w600)),
+                        Text(
+                          auth.impersonatedEmpresaNome ?? '',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => auth.exitEmpresa(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.45)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.arrow_back_rounded, color: Color(0xFFF59E0B), size: 11),
+                          SizedBox(width: 3),
+                          Text('Master', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
           const SizedBox(height: 10),
 
           // ── Nav items (scrollable) — guarded by AppAuthProvider ──────────
@@ -2335,56 +2390,6 @@ class _HomePageState extends State<HomePage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ─ Banner de impersonation ─────────────────────────────
-                    if (auth.isImpersonating) ...[
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.35)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(Icons.visibility_rounded, color: Color(0xFFF59E0B), size: 13),
-                                SizedBox(width: 5),
-                                Text('Visualizando como:', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.w600)),
-                              ],
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              auth.impersonatedEmpresaNome ?? '',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            GestureDetector(
-                              onTap: () => auth.exitEmpresa(),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B).withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(5),
-                                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.arrow_back_rounded, color: Color(0xFFF59E0B), size: 11),
-                                    SizedBox(width: 4),
-                                    Text('Painel Master', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.w700)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                     // ─ Principal ──────────────────────────────────────────
                     _sidebarSection('PRINCIPAL'),
                     _buildSidebarItem(Icons.dashboard_rounded, 'Dashboard', () {}, active: true),
