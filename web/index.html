@@ -18,7 +18,6 @@
     // Stub for PasskeyAuthenticator (required by passkeys_web, a transitive dependency of
     // supabase_flutter). Without it, window.PasskeyAuthenticator.init() throws a TypeError
     // during Flutter plugin registration and the app never renders (white screen).
-    // This app does not use passkeys, so a no-op stub is sufficient.
     window.PasskeyAuthenticator = {
       init: function() {},
       register: function() { return Promise.reject('Passkeys not configured'); },
@@ -30,19 +29,51 @@
     };
   </script>
   <script>
-    // Unregister all service workers and clear all caches unconditionally.
-    // Flutter's PWA service worker intercepts requests before Cache-Control headers
-    // take effect, causing mobile browsers to serve stale builds indefinitely.
-    // Since this app is not distributed as an installed PWA, offline caching is not needed.
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        registrations.forEach(function(reg) { reg.unregister(); });
-      });
-      caches.keys().then(function(keys) {
-        keys.forEach(function(key) { caches.delete(key); });
-      });
-    }
+    // Flutter's generated flutter_bootstrap.js registers a service worker (SW) that
+    // caches main.dart.js in CacheStorage — bypassing Cache-Control headers from Vercel.
+    // After a deploy the old SW keeps serving the previous JS build until all tabs close.
+    //
+    // Fix: (1) clear any stale SW + caches BEFORE loading flutter_bootstrap.js so the
+    //          browser fetches fresh assets on the very first visit after a deploy;
+    //      (2) override navigator.serviceWorker.register to block re-registration so
+    //          subsequent visits also get fresh assets directly from the network.
+    (function () {
+      function loadApp() {
+        // Block Flutter from re-registering a service worker after cleanup.
+        // flutter_bootstrap.js catches the rejection and logs a warning — app boots fine.
+        if ('serviceWorker' in navigator) {
+          try {
+            navigator.serviceWorker.register = function () {
+              return Promise.reject(new Error('Service worker disabled for fresh deploys'));
+            };
+          } catch (_) {}
+        }
+
+        var s = document.createElement('script');
+        s.type = 'module';
+        s.src = 'flutter_bootstrap.js';
+        document.body.appendChild(s);
+      }
+
+      if (!('serviceWorker' in navigator)) {
+        loadApp();
+        return;
+      }
+
+      // Unregister all SWs and clear all caches, then load the app.
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        if (registrations.length === 0) {
+          loadApp();
+          return;
+        }
+        Promise.all([
+          Promise.all(registrations.map(function (r) { return r.unregister(); })),
+          caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+          })
+        ]).then(loadApp);
+      }).catch(loadApp); // On any error just load the app anyway
+    })();
   </script>
-  <script src="flutter_bootstrap.js" type="module"></script>
 </body>
 </html>

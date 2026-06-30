@@ -44,12 +44,26 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     setState(() => _loadingVeiculo = true);
     final auth = context.read<AppAuthProvider>();
     final empresaId = auth.empresaId;
-    final driverId = auth.profile?.driverId;
 
     if (empresaId == null) {
       setState(() => _loadingVeiculo = false);
       return;
     }
+
+    // Busca driver_id sempre do banco para capturar vínculos feitos pelo admin
+    // após o login (o AppAuthProvider cacheia o perfil na sessão).
+    String? driverId = auth.profile?.driverId;
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        final fresh = await _supabase
+            .from('user_profiles')
+            .select('driver_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        if (fresh != null) driverId = fresh['driver_id']?.toString();
+      }
+    } catch (_) {}
 
     try {
       final hoje = DateTime.now();
