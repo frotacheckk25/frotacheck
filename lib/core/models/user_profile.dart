@@ -12,7 +12,7 @@ class UserProfile {
   final String? nome;
   final String? email;
   final DateTime? createdAt;
-  final String? veiculoId; // veículo vinculado ao motorista
+  final String? driverId; // FK para drivers.id — vincula usuário auth ao registro de motorista
 
   const UserProfile({
     required this.userId,
@@ -25,11 +25,9 @@ class UserProfile {
     this.nome,
     this.email,
     this.createdAt,
-    this.veiculoId,
+    this.driverId,
   });
 
-  /// Verifica se o usuário tem uma permissão específica.
-  /// MASTER sempre retorna true. Overrides individuais têm precedência sobre defaults do role.
   bool can(AppPermission permission) {
     if (role == AppRole.master) return true;
     final override = customPermissions[permission.name];
@@ -74,11 +72,10 @@ class UserProfile {
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString())
           : null,
-      veiculoId: map['veiculo_id']?.toString(),
+      driverId: map['driver_id']?.toString(),
     );
   }
 
-  /// Perfil temporário para usuário recém-cadastrado, aguardando vinculação de empresa.
   factory UserProfile.pending({required String userId, String? email}) {
     return UserProfile(
       userId: userId,
@@ -97,7 +94,7 @@ class UserProfile {
     DateTime? lastAccess,
     String? nome,
     String? email,
-    Object? veiculoId = _sentinel,
+    Object? driverId = _sentinel,
   }) {
     return UserProfile(
       userId: userId,
@@ -110,7 +107,7 @@ class UserProfile {
       nome: nome ?? this.nome,
       email: email ?? this.email,
       createdAt: createdAt,
-      veiculoId: veiculoId == _sentinel ? this.veiculoId : veiculoId as String?,
+      driverId: driverId == _sentinel ? this.driverId : driverId as String?,
     );
   }
 }

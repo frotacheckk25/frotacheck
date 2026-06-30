@@ -43,10 +43,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     setState(() => _loadingVeiculo = true);
     final auth = context.read<AppAuthProvider>();
     final empresaId = auth.empresaId;
-    final userId = auth.profile?.userId;
-    final veiculoId = auth.profile?.veiculoId;
+    final driverId = auth.profile?.driverId;
 
-    if (empresaId == null || userId == null) {
+    if (empresaId == null) {
       setState(() => _loadingVeiculo = false);
       return;
     }
@@ -55,81 +54,83 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       final hoje = DateTime.now();
       final inicioHoje = DateTime(hoje.year, hoje.month, hoje.day).toIso8601String();
 
-      // Veículo vinculado ao motorista
+      // Veículo vinculado ao motorista (via vehicles.driver_id)
       Map<String, dynamic>? veiculo;
-      if (veiculoId != null) {
+      if (driverId != null) {
         veiculo = await _supabase
-            .from('veiculos')
-            .select('id, placa, modelo, ano, tipo, status')
-            .eq('id', veiculoId)
+            .from('vehicles')
+            .select('id, plate, model, year, brand, status')
+            .eq('empresa_id', empresaId)
+            .eq('driver_id', driverId)
+            .limit(1)
             .maybeSingle()
             .catchError((_) => null);
       }
 
-      // KPIs do dia (filtrados pelo próprio motorista)
+      // KPIs do dia (filtrados pelo driverId do motorista)
       int checklistsHoje = 0;
       int ocorrenciasAbertas = 0;
       List<Map<String, dynamic>> alertas = [];
       Map<String, dynamic>? abastRes;
       Map<String, dynamic>? ultManut;
+      String? vehicleId = veiculo?['id']?.toString();
 
-      try {
-        final res = await _supabase
-            .from('checklists')
-            .select('id')
-            .eq('empresa_id', empresaId)
-            .eq('motorista_id', userId)
-            .gte('created_at', inicioHoje)
-            .count();
-        checklistsHoje = res.count;
-      } catch (_) {}
-
-      try {
-        final res = await _supabase
-            .from('ocorrencias')
-            .select('id')
-            .eq('empresa_id', empresaId)
-            .eq('motorista_id', userId)
-            .eq('status', 'aberto')
-            .count();
-        ocorrenciasAbertas = res.count;
-      } catch (_) {}
-
-      // Alertas do veículo vinculado
-      if (veiculoId != null) {
+      if (driverId != null) {
         try {
-          final alertRes = await _supabase
-              .from('alertas')
-              .select('id, titulo, prioridade')
+          final res = await _supabase
+              .from('checklists')
+              .select('id')
               .eq('empresa_id', empresaId)
-              .eq('veiculo_id', veiculoId)
-              .eq('resolvido', false)
-              .order('prioridade', ascending: false)
-              .limit(5);
-          alertas = List<Map<String, dynamic>>.from(alertRes);
+              .eq('motorista_id', driverId)
+              .gte('created_at', inicioHoje)
+              .count();
+          checklistsHoje = res.count;
+        } catch (_) {}
+
+        try {
+          final res = await _supabase
+              .from('occurrences')
+              .select('id')
+              .eq('empresa_id', empresaId)
+              .eq('driver_id', driverId)
+              .eq('status', 'aberto')
+              .count();
+          ocorrenciasAbertas = res.count;
+        } catch (_) {}
+
+        // Último abastecimento deste motorista
+        try {
+          abastRes = await _supabase
+              .from('fuelings')
+              .select('id, created_at, liters, total_value, vehicles(plate)')
+              .eq('empresa_id', empresaId)
+              .eq('driver_id', driverId)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
         } catch (_) {}
       }
 
-      // Último abastecimento deste motorista
-      try {
-        abastRes = await _supabase
-            .from('abastecimentos')
-            .select('id, created_at, litros, valor_total, veiculos(placa)')
-            .eq('empresa_id', empresaId)
-            .eq('motorista_id', userId)
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
-      } catch (_) {}
+      // Alertas do veículo vinculado
+      if (vehicleId != null) {
+        try {
+          final alertRes = await _supabase
+              .from('alerts')
+              .select('id, problem_type, priority, status')
+              .eq('empresa_id', empresaId)
+              .eq('vehicle_id', vehicleId)
+              .neq('status', 'resolvido')
+              .order('priority', ascending: false)
+              .limit(5);
+          alertas = List<Map<String, dynamic>>.from(alertRes);
+        } catch (_) {}
 
-      // Última manutenção do veículo vinculado
-      if (veiculoId != null) {
+        // Última manutenção do veículo vinculado
         try {
           ultManut = await _supabase
-              .from('manutencoes')
-              .select('id, created_at, tipo, descricao, status')
-              .eq('empresa_id', empresaId)
-              .eq('veiculo_id', veiculoId)
+              .from('oil_changes')
+              .select('id, created_at, vehicle_id, next_change_km')
+              .eq('vehicle_id', vehicleId)
               .order('created_at', ascending: false)
               .limit(1)
               .maybeSingle();
@@ -509,7 +510,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 cor: const Color(0xFFF59E0B),
                 titulo: 'Último Abastecimento',
                 subtitulo: _placaLabel(_ultimoAbastecimento!),
-                extra: _ultimoAbastecimento!['litros'] != null ? '${_ultimoAbastecimento!['litros']} L' : null,
+                extra: _ultimoAbastecimento!['liters'] != null ? '${_ultimoAbastecimento!['liters']} L' : null,
                 data: _ultimoAbastecimento!['created_at']?.toString(),
               )
             else
@@ -519,9 +520,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               _atividadeCard(
                 icon: Icons.build_rounded,
                 cor: const Color(0xFFEC4899),
-                titulo: 'Última Manutenção',
-                subtitulo: _ultimaManutencao!['tipo']?.toString() ?? 'Manutenção',
-                extra: _ultimaManutencao!['status']?.toString(),
+                titulo: 'Última Troca de Óleo',
+                subtitulo: 'Próxima troca: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
+                extra: null,
                 data: _ultimaManutencao!['created_at']?.toString(),
               )
             else
@@ -562,9 +563,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               _atividadeCard(
                 icon: Icons.build_rounded,
                 cor: const Color(0xFFEC4899),
-                titulo: _ultimaManutencao!['tipo']?.toString() ?? 'Manutenção',
-                subtitulo: _ultimaManutencao!['descricao']?.toString() ?? '',
-                extra: _ultimaManutencao!['status']?.toString(),
+                titulo: 'Última Troca de Óleo',
+                subtitulo: 'Próxima troca: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
+                extra: null,
                 data: _ultimaManutencao!['created_at']?.toString(),
               )
             else
@@ -659,7 +660,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 _infoRow(
                   'Veículo Vinculado',
                   _veiculo != null
-                      ? '${_veiculo!['placa'] ?? ''} — ${_veiculo!['modelo'] ?? ''}'
+                      ? '${_veiculo!['plate'] ?? ''} — ${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim()
                       : 'Nenhum',
                 ),
                 if (p?.lastAccess != null)
@@ -721,10 +722,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       );
     }
 
-    final placa = _veiculo!['placa']?.toString() ?? '—';
-    final modelo = _veiculo!['modelo']?.toString() ?? '—';
-    final ano = _veiculo!['ano']?.toString() ?? '';
-    final tipo = _veiculo!['tipo']?.toString() ?? '';
+    final placa = _veiculo!['plate']?.toString() ?? '—';
+    final modelo = '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
+    final ano = _veiculo!['year']?.toString() ?? '';
     final status = _veiculo!['status']?.toString() ?? 'ativo';
 
     final cor = status == 'ativo'
@@ -802,15 +802,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 ),
               ],
             ),
-            if (tipo.isNotEmpty) ...[
+            if (modelo.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Divider(color: AppColors.border, height: 1),
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.category_rounded, color: AppColors.textSecondary, size: 13),
+                  const Icon(Icons.directions_car_outlined, color: AppColors.textSecondary, size: 13),
                   const SizedBox(width: 6),
-                  Text(tipo, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  Text(modelo, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => setState(() => _activeSection = _Sec.meuVeiculo),
@@ -905,12 +905,13 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   }
 
   Widget _alertaCard(Map<String, dynamic> alerta) {
-    final prioridade = alerta['prioridade']?.toString() ?? 'media';
-    final cor = prioridade == 'critica'
+    final prioridade = alerta['priority']?.toString() ?? 'Media';
+    final cor = prioridade == 'Alta'
         ? const Color(0xFFEF4444)
-        : prioridade == 'alta'
+        : prioridade == 'Media'
             ? const Color(0xFFF59E0B)
             : const Color(0xFF3B82F6);
+    final titulo = alerta['problem_type']?.toString() ?? 'Alerta';
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -924,7 +925,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           Icon(Icons.warning_rounded, color: cor, size: 16),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(alerta['titulo']?.toString() ?? 'Alerta',
+            child: Text(titulo,
                 style: TextStyle(color: cor, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           Text(prioridade.toUpperCase(),
@@ -1012,8 +1013,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   }
 
   String _placaLabel(Map<String, dynamic> r) {
-    final v = r['veiculos'];
-    if (v is Map && v['placa'] != null) return v['placa'].toString();
+    final v = r['vehicles'];
+    if (v is Map && v['plate'] != null) return v['plate'].toString();
     return 'Veículo';
   }
 
