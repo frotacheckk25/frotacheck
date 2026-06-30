@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -79,13 +81,22 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
   Future<void> _carregarRelatorio() async {
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var fuelQ = supabase
+          .from('fuelings')
+          .select('liters, total_value, fuel_date, vehicles(plate), drivers(name)');
+      var multaQ = supabase.from('multas').select('valor, status');
+      var oilQ = supabase.from('oil_changes').select('id');
+      if (eid != null) {
+        fuelQ  = fuelQ.eq('empresa_id', eid);
+        multaQ = multaQ.eq('empresa_id', eid);
+        oilQ   = oilQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase
-            .from('fuelings')
-            .select('liters, total_value, fuel_date, vehicles(plate), drivers(name)')
-            .order('fuel_date', ascending: true),
-        supabase.from('multas').select('valor, status'),
-        supabase.from('oil_changes').select('id'),
+        fuelQ.order('fuel_date', ascending: true),
+        multaQ,
+        oilQ,
       ]);
 
       final fuelings = List<Map<String, dynamic>>.from(results[0]);

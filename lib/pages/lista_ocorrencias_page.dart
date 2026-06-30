@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 import 'detalhe_ocorrencia_page.dart';
 
@@ -43,14 +45,25 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
     });
 
     try {
-      // Carrega separado — não depende de FK configurada no Supabase
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var ocorrQ = supabase.from('occurrences').select('*');
+      if (auth.isMotorista && auth.driverId != null) {
+        ocorrQ = ocorrQ.eq('driver_id', auth.driverId!);
+      } else if (eid != null) {
+        ocorrQ = ocorrQ.eq('empresa_id', eid);
+      }
+
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
+      var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase
-            .from('occurrences')
-            .select('*')
-            .order('created_at', ascending: false),
-        supabase.from('vehicles').select('id, plate, brand, model'),
-        supabase.from('drivers').select('id, name'),
+        ocorrQ.order('created_at', ascending: false),
+        veicQ,
+        drivQ,
       ]);
 
       if (!mounted) return;

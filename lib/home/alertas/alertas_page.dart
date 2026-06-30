@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../pages/detalhe_ocorrencia_page.dart';
 
@@ -60,8 +62,38 @@ class _AlertasPageState extends State<AlertasPage> {
     Map<String, Map<String, dynamic>> veicMap = {};
     Map<String, Map<String, dynamic>> motMap = {};
 
+    final auth = context.read<AppAuthProvider>();
+    final eid = auth.effectiveEmpresaId;
+    var multaQ = supabase
+        .from('multas')
+        .select('id, vehicle_id, veiculo_id, tipo, valor, data, created_at')
+        .eq('status', 'aberta');
+    var docQ = supabase.from('documentos').select(
+      'id, vehicle_id, veiculo_id, tipo, descricao, data_vencimento, created_at',
+    );
+    var ocorrQ = supabase
+        .from('occurrences')
+        .select(
+          'id, problem_type, problem, priority, status, location, created_at, vehicle_id, driver_id',
+        )
+        .neq('status', 'Resolvido')
+        .eq('priority', 'Alta');
+    var oilQ = supabase.from('oil_changes').select(
+      'id, vehicle_id, service_type, oil_change_date, next_change_km, current_km, notes, created_at',
+    );
+    var veicQ = supabase.from('vehicles').select('id, plate, brand, model, odometer');
+    var drivQ = supabase.from('drivers').select('id, name');
+    if (eid != null) {
+      multaQ = multaQ.eq('empresa_id', eid);
+      docQ   = docQ.eq('empresa_id', eid);
+      ocorrQ = ocorrQ.eq('empresa_id', eid);
+      oilQ   = oilQ.eq('empresa_id', eid);
+      veicQ  = veicQ.eq('empresa_id', eid);
+      drivQ  = drivQ.eq('empresa_id', eid);
+    }
+
     await Future.wait([
-      // Tabela alerts (ocorrências, testes, etc.)
+      // Tabela alerts (schema sem empresa_id confirmado — RLS cobre)
       supabase
           .from('alerts')
           .select()
@@ -76,10 +108,7 @@ class _AlertasPageState extends State<AlertasPage> {
           }),
 
       // Multas abertas
-      supabase
-          .from('multas')
-          .select('id, vehicle_id, veiculo_id, tipo, valor, data, created_at')
-          .eq('status', 'aberta')
+      multaQ
           .order('created_at', ascending: false)
           .then((r) {
             rawMultas = List<Map<String, dynamic>>.from(
@@ -91,11 +120,7 @@ class _AlertasPageState extends State<AlertasPage> {
           }),
 
       // Documentos (todos, para filtrar vencidos/vencendo)
-      supabase
-          .from('documentos')
-          .select(
-            'id, vehicle_id, veiculo_id, tipo, descricao, data_vencimento, created_at',
-          )
+      docQ
           .then((r) {
             rawDocs = List<Map<String, dynamic>>.from(
               (r as List).map((e) => Map<String, dynamic>.from(e as Map)),
@@ -106,13 +131,7 @@ class _AlertasPageState extends State<AlertasPage> {
           }),
 
       // Ocorrências críticas abertas
-      supabase
-          .from('occurrences')
-          .select(
-            'id, problem_type, problem, priority, status, location, created_at, vehicle_id, driver_id',
-          )
-          .neq('status', 'Resolvido')
-          .eq('priority', 'Alta')
+      ocorrQ
           .order('created_at', ascending: false)
           .limit(10)
           .then((r) {
@@ -124,12 +143,8 @@ class _AlertasPageState extends State<AlertasPage> {
             debugPrint('occurrences query: $e');
           }),
 
-      // Trocas de óleo recentes (últimos 30 registros, para detectar próximas trocas)
-      supabase
-          .from('oil_changes')
-          .select(
-            'id, vehicle_id, service_type, oil_change_date, next_change_km, current_km, notes, created_at',
-          )
+      // Trocas de óleo recentes
+      oilQ
           .order('created_at', ascending: false)
           .limit(30)
           .then((r) {
@@ -141,7 +156,7 @@ class _AlertasPageState extends State<AlertasPage> {
             debugPrint('oil_changes query: $e');
           }),
 
-      // Planos de manutenção
+      // Planos de manutenção (schema sem empresa_id confirmado — RLS cobre)
       supabase
           .from('maintenance_plans')
           .select('*')
@@ -155,9 +170,7 @@ class _AlertasPageState extends State<AlertasPage> {
           }),
 
       // Veículos
-      supabase
-          .from('vehicles')
-          .select('id, plate, brand, model, odometer')
+      veicQ
           .then((r) {
             for (final v in (r as List)) {
               final row = Map<String, dynamic>.from(v as Map);
@@ -169,9 +182,7 @@ class _AlertasPageState extends State<AlertasPage> {
           }),
 
       // Motoristas
-      supabase
-          .from('drivers')
-          .select('id, name')
+      drivQ
           .then((r) {
             for (final m in (r as List)) {
               final row = Map<String, dynamic>.from(m as Map);

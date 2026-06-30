@@ -29,6 +29,18 @@ class AppAuthProvider extends ChangeNotifier {
   String? get empresaNome    => _profile?.empresaNome;
   AppRole? get role          => _profile?.role;
   bool   get isMaster        => _profile?.role == AppRole.master;
+  bool   get isMotorista     => _profile?.role == AppRole.motorista;
+  String? get driverId       => _profile?.driverId;
+
+  /// Empresa_id efetivo para filtros de queries Dart (defense-in-depth).
+  /// MASTER impersonando → empresa impersonada.
+  /// ADMIN/GESTOR/MOTORISTA → própria empresa.
+  /// MASTER sem impersonação → null (vê tudo; RLS garante).
+  String? get effectiveEmpresaId {
+    if (isImpersonating) return _impersonatedEmpresaId;
+    if (isMaster) return null;
+    return empresaId;
+  }
 
   // ── Impersonation (MASTER visualizando como empresa) ─────────────────────
   String? _impersonatedEmpresaId;

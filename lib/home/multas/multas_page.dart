@@ -32,17 +32,21 @@ class _MultasPageState extends State<MultasPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var multaQ = supabase.from('multas').select('*');
+      var veicQ  = supabase.from('vehicles').select('id, plate, brand, model');
+      var drivQ  = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        multaQ = multaQ.eq('empresa_id', eid);
+        veicQ  = veicQ.eq('empresa_id', eid);
+        drivQ  = drivQ.eq('empresa_id', eid);
+      }
       // Queries separadas — sem FK join
       final results = await Future.wait([
-        supabase
-            .from('multas')
-            .select('*')
-            .order('created_at', ascending: false),
-        supabase
-            .from('vehicles')
-            .select('id, plate, brand, model')
-            .order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
+        multaQ.order('created_at', ascending: false),
+        veicQ.order('plate'),
+        drivQ.order('name'),
       ]);
 
       final rawMultas = List<Map<String, dynamic>>.from(
@@ -668,12 +672,17 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
   Future<void> _carregarDados() async {
     setState(() => carregandoDados = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var veicQ2 = supabase.from('vehicles').select('id, plate, brand, model');
+      var drivQ2 = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ2 = veicQ2.eq('empresa_id', eid);
+        drivQ2 = drivQ2.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase
-            .from('vehicles')
-            .select('id, plate, brand, model')
-            .order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
+        veicQ2.order('plate'),
+        drivQ2.order('name'),
       ]);
       if (!mounted) return;
       setState(() {

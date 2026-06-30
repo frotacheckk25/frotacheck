@@ -45,7 +45,11 @@ class _VeiculosPageState extends State<VeiculosPage> {
 
   Future<void> carregarMotoristas() async {
     try {
-      final response = await supabase.from('drivers').select('id, name').order('name');
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var q = supabase.from('drivers').select('id, name');
+      if (eid != null) q = q.eq('empresa_id', eid);
+      final response = await q.order('name');
       if (!mounted) return;
       setState(() {
         motoristas = List<Map<String, dynamic>>.from(
@@ -61,10 +65,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
     if (!mounted) return;
     setState(() => carregandoVeiculos = true);
     try {
-      final response = await supabase
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var q = supabase
           .from('vehicles')
-          .select('id, plate, brand, model, year, color, odometer, driver_id')
-          .order('plate');
+          .select('id, plate, brand, model, year, color, odometer, driver_id');
+      if (eid != null) q = q.eq('empresa_id', eid);
+      final response = await q.order('plate');
       if (!mounted) return;
       setState(() {
         veiculos = List<Map<String, dynamic>>.from(

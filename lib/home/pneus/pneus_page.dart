@@ -27,10 +27,33 @@ class _PneusPageState extends State<PneusPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
-      // Queries separadas — sem depender de FK configurada
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+
+      // Motorista só vê pneus do próprio veículo
+      String? vehicleId;
+      if (auth.isMotorista && auth.driverId != null) {
+        final v = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('driver_id', auth.driverId!)
+            .limit(1)
+            .maybeSingle();
+        vehicleId = v?['id']?.toString();
+      }
+
+      var pneusQ = supabase.from('pneus').select('*');
+      if (auth.isMotorista) {
+        if (vehicleId != null) pneusQ = pneusQ.eq('vehicle_id', vehicleId);
+      } else if (eid != null) {
+        pneusQ = pneusQ.eq('empresa_id', eid);
+      }
+
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
+      if (eid != null) veicQ = veicQ.eq('empresa_id', eid);
       final results = await Future.wait([
-        supabase.from('pneus').select('*').order('created_at', ascending: false),
-        supabase.from('vehicles').select('id, plate, brand, model').order('plate'),
+        pneusQ.order('created_at', ascending: false),
+        veicQ.order('plate'),
       ]);
 
       final rawPneus = List<Map<String, dynamic>>.from(

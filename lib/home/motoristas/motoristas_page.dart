@@ -49,7 +49,11 @@ class _MotoristasPageState extends State<MotoristasPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
-      final response = await supabase.from('drivers').select().order('name');
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var q = supabase.from('drivers').select();
+      if (eid != null) q = q.eq('empresa_id', eid);
+      final response = await q.order('name');
       if (!mounted) return;
       setState(() {
         motoristas = List<Map<String, dynamic>>.from(

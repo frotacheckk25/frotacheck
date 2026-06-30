@@ -49,9 +49,20 @@ class _ViagensPageState extends State<ViagensPage> {
     if (!mounted) return;
     setState(() => isLoading = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final isMotorista = auth.isMotorista;
+      final driverId = auth.driverId;
+      final eid = auth.effectiveEmpresaId;
+
+      var veicQ2 = supabase.from('vehicles').select('id, plate, brand, model');
+      var drivQ2 = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ2 = veicQ2.eq('empresa_id', eid);
+        drivQ2 = drivQ2.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase.from('vehicles').select('id, plate, brand, model').order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
+        veicQ2.order('plate'),
+        drivQ2.order('name'),
       ]);
 
       final vMap = <String, Map<String, dynamic>>{};
@@ -65,10 +76,13 @@ class _ViagensPageState extends State<ViagensPage> {
         mMap[row['id'].toString()] = row;
       }
 
-      final viaResp = await supabase
-          .from('viagens')
-          .select()
-          .order('data_inicio', ascending: false);
+      var viaQ = supabase.from('viagens').select();
+      if (isMotorista && driverId != null) {
+        viaQ = viaQ.eq('motorista_id', driverId);
+      } else if (eid != null) {
+        viaQ = viaQ.eq('empresa_id', eid);
+      }
+      final viaResp = await viaQ.order('data_inicio', ascending: false);
       final viaList = List<Map<String, dynamic>>.from(
         (viaResp as List).map((e) => Map<String, dynamic>.from(e as Map)),
       );

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 class RelatoriosAvancadosPage extends StatefulWidget {
@@ -58,13 +60,21 @@ class _RelatoriosAvancadosPageState
   Future<void> _carregarDados() async {
     setState(() => isLoading = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var fuelQ  = supabase.from('fuelings').select('liters, total_value, fuel_date');
+      var multaQ = supabase.from('multas').select('valor');
+      var ocorrQ = supabase.from('occurrences').select('problem_type, status');
+      if (eid != null) {
+        fuelQ  = fuelQ.eq('empresa_id', eid);
+        multaQ = multaQ.eq('empresa_id', eid);
+        ocorrQ = ocorrQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase
-            .from('fuelings')
-            .select('liters, total_value, fuel_date'),
-        supabase.from('multas').select('valor'),
+        fuelQ,
+        multaQ,
         // Tabela correta: occurrences (não ocorrencias)
-        supabase.from('occurrences').select('problem_type, status'),
+        ocorrQ,
       ]);
 
       final fuelings = List<Map<String, dynamic>>.from(results[0]);

@@ -67,10 +67,25 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var ocorrQ = supabase.from('occurrences').select('*');
+      if (auth.isMotorista && auth.driverId != null) {
+        ocorrQ = ocorrQ.eq('driver_id', auth.driverId!);
+      } else if (eid != null) {
+        ocorrQ = ocorrQ.eq('empresa_id', eid);
+      }
+
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
+      var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase.from('occurrences').select('*').order('created_at', ascending: false).limit(100),
-        supabase.from('vehicles').select('id, plate, brand, model').order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
+        ocorrQ.order('created_at', ascending: false).limit(100),
+        veicQ.order('plate'),
+        drivQ.order('name'),
       ]);
       if (!mounted) return;
       final vList = List<Map<String, dynamic>>.from(

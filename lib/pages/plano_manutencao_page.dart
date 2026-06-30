@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 import 'troca_oleo_page.dart';
 
@@ -27,12 +29,38 @@ class _PlanoManutencaoPageState extends State<PlanoManutencaoPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final isMotorista = auth.isMotorista;
+      final driverId = auth.driverId;
+
+      // Motorista: exibe apenas o plano do próprio veículo
+      String? vehicleId;
+      if (isMotorista && driverId != null) {
+        final v = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('driver_id', driverId)
+            .limit(1)
+            .maybeSingle();
+        vehicleId = v?['id']?.toString();
+      }
+
+      final eid = auth.effectiveEmpresaId;
+
+      var oilQ  = supabase
+          .from('oil_changes')
+          .select('id, vehicle_id, change_date, oil_type, next_change_km, created_at');
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model, odometer');
+      if (isMotorista) {
+        if (vehicleId != null) { oilQ = oilQ.eq('vehicle_id', vehicleId); veicQ = veicQ.eq('id', vehicleId); }
+      } else if (eid != null) {
+        oilQ  = oilQ.eq('empresa_id', eid);
+        veicQ = veicQ.eq('empresa_id', eid);
+      }
+
       final results = await Future.wait([
-        supabase
-            .from('oil_changes')
-            .select('id, vehicle_id, change_date, oil_type, next_change_km, created_at')
-            .order('created_at', ascending: false),
-        supabase.from('vehicles').select('id, plate, brand, model, odometer'),
+        oilQ.order('created_at', ascending: false),
+        veicQ,
       ]);
 
       final trocas = List<Map<String, dynamic>>.from(

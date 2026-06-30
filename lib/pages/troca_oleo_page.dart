@@ -67,9 +67,36 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final isMotorista = auth.isMotorista;
+      final driverId = auth.driverId;
+
+      // Motorista: carrega apenas dados do próprio veículo
+      String? vehicleId;
+      if (isMotorista && driverId != null) {
+        final v = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('driver_id', driverId)
+            .limit(1)
+            .maybeSingle();
+        vehicleId = v?['id']?.toString();
+      }
+
+      final eid = auth.effectiveEmpresaId;
+
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model, odometer');
+      var oilQ  = supabase.from('oil_changes').select('*');
+      if (isMotorista) {
+        if (vehicleId != null) { veicQ = veicQ.eq('id', vehicleId); oilQ = oilQ.eq('vehicle_id', vehicleId); }
+      } else if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        oilQ  = oilQ.eq('empresa_id', eid);
+      }
+
       final results = await Future.wait([
-        supabase.from('vehicles').select('id, plate, brand, model, odometer').order('plate'),
-        supabase.from('oil_changes').select('*').order('created_at', ascending: false).limit(100),
+        veicQ.order('plate'),
+        oilQ.order('created_at', ascending: false).limit(100),
       ]);
 
       if (!mounted) return;

@@ -32,10 +32,25 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
   Future<void> carregarDados() async {
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var fuelingsQ = supabase.from('fuelings').select('*');
+      if (auth.isMotorista && auth.driverId != null) {
+        fuelingsQ = fuelingsQ.eq('driver_id', auth.driverId!);
+      } else if (eid != null) {
+        fuelingsQ = fuelingsQ.eq('empresa_id', eid);
+      }
+
+      var veicQ = supabase.from('vehicles').select('id, plate, model');
+      var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
-        supabase.from('fuelings').select('*').order('created_at', ascending: false).limit(50),
-        supabase.from('vehicles').select('id, plate, model').order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
+        fuelingsQ.order('created_at', ascending: false).limit(50),
+        veicQ.order('plate'),
+        drivQ.order('name'),
       ]);
       if (mounted) {
         final vList = List<Map<String, dynamic>>.from(results[1]);

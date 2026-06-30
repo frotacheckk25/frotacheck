@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:frotacheck/home/abastecimentos/detalhe_abastecimento_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 class ListaAbastecimentosPage extends StatefulWidget {
@@ -28,14 +30,13 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
   Future<void> carregarAbastecimentos() async {
     setState(() => carregando = true);
     try {
-      final dados = await supabase
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var q = supabase
           .from('fuelings')
-          .select('''
-            *,
-            vehicles (plate),
-            drivers (name)
-          ''')
-          .order('created_at', ascending: false);
+          .select('*, vehicles (plate), drivers (name)');
+      if (eid != null) q = q.eq('empresa_id', eid);
+      final dados = await q.order('created_at', ascending: false);
 
       setState(() {
         abastecimentos = List<Map<String, dynamic>>.from(

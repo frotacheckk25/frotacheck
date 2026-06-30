@@ -31,17 +31,21 @@ class _DocumentosPageState extends State<DocumentosPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var docQ  = supabase.from('documentos').select('*');
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model, driver_id');
+      var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        docQ  = docQ.eq('empresa_id', eid);
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
       // Queries separadas — sem FK join
       final results = await Future.wait([
-        supabase
-            .from('documentos')
-            .select('*')
-            .order('data_vencimento', ascending: true),
-        supabase
-            .from('vehicles')
-            .select('id, plate, brand, model, driver_id')
-            .order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
+        docQ.order('data_vencimento', ascending: true),
+        veicQ.order('plate'),
+        drivQ.order('name'),
       ]);
 
       final rawDocs = List<Map<String, dynamic>>.from(

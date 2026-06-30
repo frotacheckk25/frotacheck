@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 import '../../../pages/ocorrencias_page.dart';
@@ -32,11 +34,38 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
     if (!mounted) return;
     setState(() => carregando = true);
     try {
-      final results = await Future.wait([
-        supabase.from('oil_changes').select('id, vehicle_id, next_change_km'),
-        supabase.from('occurrences').select('id, status'),
-        supabase.from('vehicles').select('id, odometer'),
-      ]);
+      final auth = context.read<AppAuthProvider>();
+      final isMotorista = auth.isMotorista;
+      final driverId = auth.driverId;
+
+      // Motorista: estatísticas limitadas ao próprio veículo/driver
+      String? vehicleId;
+      if (isMotorista && driverId != null) {
+        final v = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('driver_id', driverId)
+            .limit(1)
+            .maybeSingle();
+        vehicleId = v?['id']?.toString();
+      }
+
+      final eid = auth.effectiveEmpresaId;
+
+      var oilQ  = supabase.from('oil_changes').select('id, vehicle_id, next_change_km');
+      var ocorrQ = supabase.from('occurrences').select('id, status');
+      var veicQ  = supabase.from('vehicles').select('id, odometer');
+
+      if (isMotorista) {
+        if (vehicleId != null) { oilQ = oilQ.eq('vehicle_id', vehicleId); veicQ = veicQ.eq('id', vehicleId); }
+        if (driverId != null) ocorrQ = ocorrQ.eq('driver_id', driverId);
+      } else if (eid != null) {
+        oilQ  = oilQ.eq('empresa_id', eid);
+        ocorrQ = ocorrQ.eq('empresa_id', eid);
+        veicQ  = veicQ.eq('empresa_id', eid);
+      }
+
+      final results = await Future.wait([oilQ, ocorrQ, veicQ]);
 
       final trocas = List<Map<String, dynamic>>.from(
         (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
