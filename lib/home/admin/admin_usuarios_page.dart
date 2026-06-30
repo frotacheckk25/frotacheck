@@ -33,6 +33,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   List<Map<String, dynamic>> _usuarios = [];
   List<Map<String, dynamic>> _empresas = [];
   List<Map<String, dynamic>> _drivers = [];
+  List<Map<String, dynamic>> _vehicles = [];
   bool _loading = true;
   String? _erro;
   RealtimeChannel? _channel;
@@ -102,13 +103,23 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       // Carrega motoristas (drivers) da empresa — para vinculação
       List<Map<String, dynamic>> drivers = [];
       try {
-        var driversQuery = _supabase
+        final drRes = await _supabase
             .from('drivers')
             .select('id, name')
             .order('name');
-        // RLS restringe ao empresa_id automaticamente; MASTER vê todos
-        final drRes = await driversQuery;
         drivers = (drRes as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } catch (_) {}
+
+      // Carrega veículos da empresa — para vinculação ao motorista
+      List<Map<String, dynamic>> vehicles = [];
+      try {
+        final vRes = await _supabase
+            .from('vehicles')
+            .select('id, plate, model, brand, driver_id')
+            .order('plate');
+        vehicles = (vRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
       } catch (_) {}
@@ -118,6 +129,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         _usuarios = lista;
         _empresas = empresas;
         _drivers = drivers;
+        _vehicles = vehicles;
         _loading = false;
       });
     } catch (e) {
@@ -178,6 +190,40 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _vincularVeiculo(String driverId, String? vehicleId) async {
+    try {
+      // Remove vínculo atual deste motorista de qualquer veículo
+      await _supabase
+          .from('vehicles')
+          .update({'driver_id': null})
+          .eq('driver_id', driverId);
+      // Atribui o novo veículo (se selecionado)
+      if (vehicleId != null) {
+        await _supabase
+            .from('vehicles')
+            .update({'driver_id': driverId})
+            .eq('id', vehicleId);
+      }
+      await _carregar();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(vehicleId != null
+                ? 'Veículo vinculado ao motorista!'
+                : 'Veículo desvinculado.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao vincular veículo: $e'), backgroundColor: AppColors.danger),
         );
       }
     }
@@ -264,7 +310,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _usuarios.length,
-      itemBuilder: (_, i) => _buildCard(_usuarios[i], auth, canManage, _drivers),
+      itemBuilder: (_, i) => _buildCard(_usuarios[i], auth, canManage, _drivers, _vehicles),
     );
   }
 
@@ -273,6 +319,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     AppAuthProvider auth,
     bool canManage,
     List<Map<String, dynamic>> drivers,
+    List<Map<String, dynamic>> vehicles,
   ) {
     final userId = u['user_id']?.toString() ?? '';
     final nome = u['nome']?.toString() ?? u['email']?.toString() ?? 'Sem nome';
@@ -498,6 +545,16 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                   currentDriverId: u['driver_id']?.toString(),
                   onChanged: (id) => _vincularDriver(userId, id),
                 ),
+                // Vinculação de veículo (apenas quando driver já está vinculado)
+                if (u['driver_id'] != null && vehicles.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _VehicleDropdown(
+                    vehicles: vehicles,
+                    driverId: u['driver_id'].toString(),
+                    onChanged: (vId) =>
+                        _vincularVeiculo(u['driver_id'].toString(), vId),
+                  ),
+                ],
               ],
             ],
           ],
@@ -714,6 +771,83 @@ class _DriverDropdown extends StatelessWidget {
                       value: d['id']?.toString(),
                       child: Text(
                         d['name']?.toString() ?? '—',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VehicleDropdown extends StatelessWidget {
+  final List<Map<String, dynamic>> vehicles;
+  final String driverId;
+  final void Function(String?) onChanged;
+
+  const _VehicleDropdown({
+    required this.vehicles,
+    required this.driverId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Veículo atualmente atribuído a este motorista
+    String? currentVehicleId;
+    for (final v in vehicles) {
+      if (v['driver_id']?.toString() == driverId) {
+        currentVehicleId = v['id']?.toString();
+        break;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1528),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: currentVehicleId != null
+              ? const Color(0xFF3B82F6).withOpacity(0.45)
+              : AppColors.border,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.directions_car_rounded, color: Color(0xFF3B82F6), size: 14),
+          const SizedBox(width: 6),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: currentVehicleId,
+                isExpanded: true,
+                hint: const Text(
+                  'Vincular veículo ao motorista',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                dropdownColor: const Color(0xFF0B1528),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+                icon: const Icon(Icons.unfold_more_rounded,
+                    color: AppColors.textSecondary, size: 14),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('— Nenhum veículo —',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  ),
+                  ...vehicles.map(
+                    (v) => DropdownMenuItem<String?>(
+                      value: v['id']?.toString(),
+                      child: Text(
+                        '${v['plate'] ?? '—'}  ${v['brand'] ?? ''} ${v['model'] ?? ''}'.trim(),
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12),
                       ),

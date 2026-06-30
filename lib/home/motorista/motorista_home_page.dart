@@ -24,6 +24,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   final _supabase = Supabase.instance.client;
 
   _Sec _activeSection = _Sec.dashboard;
+  _MobileTab _activeTab = _MobileTab.dashboard;
 
   bool _loadingVeiculo = true;
   Map<String, dynamic>? _veiculo;
@@ -158,6 +159,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     final auth = context.watch<AppAuthProvider>();
     final nome = auth.profile?.nome ?? auth.profile?.email ?? 'Motorista';
     final primeiroNome = nome.split(' ').first;
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
+    if (isMobile) return _buildMobileScaffold(auth, primeiroNome);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -166,6 +170,397 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _buildSidebar(auth, primeiroNome),
           Expanded(child: _buildContent(auth, primeiroNome)),
         ],
+      ),
+    );
+  }
+
+  // ── Layout Mobile ─────────────────────────────────────────────────────────
+
+  Widget _buildMobileScaffold(AppAuthProvider auth, String primeiroNome) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        titleSpacing: 12,
+        title: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1AA251), Color(0xFF0D6B35)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 14),
+            ),
+            const SizedBox(width: 8),
+            const Text('FrotaCheck',
+                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
+            onPressed: _carregar,
+          ),
+        ],
+      ),
+      body: _buildMobileBody(auth, primeiroNome),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildMobileBody(AppAuthProvider auth, String primeiroNome) {
+    switch (_activeTab) {
+      case _MobileTab.dashboard:
+        return _buildMobileDashboard(auth, primeiroNome);
+      case _MobileTab.veiculo:
+        return _buildMeuVeiculo();
+      case _MobileTab.atividades:
+        return _buildMobileAtividades();
+      case _MobileTab.perfil:
+        return _buildPerfil(auth);
+    }
+  }
+
+  Widget _buildBottomNav() {
+    return BottomNavigationBar(
+      backgroundColor: AppColors.surface,
+      selectedItemColor: const Color(0xFF1AA251),
+      unselectedItemColor: AppColors.textSecondary,
+      currentIndex: _activeTab.index,
+      type: BottomNavigationBarType.fixed,
+      selectedFontSize: 10,
+      unselectedFontSize: 10,
+      onTap: (i) => setState(() => _activeTab = _MobileTab.values[i]),
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.dashboard_rounded, size: 22),
+          label: 'Início',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.directions_car_rounded, size: 22),
+          label: 'Veículo',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.apps_rounded, size: 22),
+          label: 'Atividades',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_rounded, size: 22),
+          label: 'Perfil',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileDashboard(AppAuthProvider auth, String primeiroNome) {
+    final hora = DateTime.now().hour;
+    final saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+
+    return RefreshIndicator(
+      color: const Color(0xFF1AA251),
+      onRefresh: _carregar,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$saudacao, $primeiroNome!',
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            _buildVeiculoCardMobile(),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _kpi('Checklists\nHoje', '$_checklistsHoje', Icons.checklist_rounded,
+                    const Color(0xFF1AA251)),
+                const SizedBox(width: 10),
+                _kpi('Ocorrências\nAbertas', '$_ocorrenciasAbertas',
+                    Icons.report_problem_rounded,
+                    _ocorrenciasAbertas > 0
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF475569)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const Text('Ações Rápidas',
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.5,
+              children: [
+                _acaoMobile(
+                    Icons.checklist_rtl_rounded, 'Checklist\nSaída', const Color(0xFF1AA251),
+                    () => _push(const SelecionarVeiculoChecklistPage())),
+                _acaoMobile(
+                    Icons.assignment_turned_in_rounded, 'Checklist\nRetorno',
+                    const Color(0xFF3B82F6),
+                    () => _push(const SelecionarVeiculoChecklistPage())),
+                _acaoMobile(
+                    Icons.local_gas_station_rounded, 'Abastecer', const Color(0xFFF59E0B),
+                    () => _push(const AbastecimentosPage())),
+                _acaoMobile(
+                    Icons.report_problem_rounded, 'Ocorrência', const Color(0xFFEF4444),
+                    () => _push(const ListaOcorrenciasPage())),
+              ],
+            ),
+            if (_alertas.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text('Alertas do Veículo',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              ..._alertas.map(_alertaCard),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVeiculoCardMobile() {
+    if (_loadingVeiculo) {
+      return Container(
+        height: 68,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: const Center(
+            child: CircularProgressIndicator(color: Color(0xFF1AA251), strokeWidth: 2)),
+      );
+    }
+    if (_veiculo == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.directions_car_outlined, color: Color(0xFF475569), size: 22),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nenhum veículo vinculado',
+                      style: TextStyle(
+                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('Solicite ao gestor que vincule um veículo.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final placa = _veiculo!['plate']?.toString() ?? '—';
+    final modelo = '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
+    final status = _veiculo!['status']?.toString() ?? 'ativo';
+    final cor = status == 'ativo'
+        ? const Color(0xFF1AA251)
+        : status == 'manutencao'
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFFEF4444);
+
+    return GestureDetector(
+      onTap: () => setState(() => _activeTab = _MobileTab.veiculo),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cor.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: cor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(Icons.directions_car_rounded, color: cor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(placa,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.5)),
+                  if (modelo.isNotEmpty)
+                    Text(modelo,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 11)),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: cor.withOpacity(0.30)),
+                  ),
+                  child: Text(status.toUpperCase(),
+                      style: TextStyle(
+                          color: cor, fontSize: 9, fontWeight: FontWeight.w700)),
+                ),
+                if (_alertas.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text('${_alertas.length} alerta(s)',
+                      style: const TextStyle(
+                          color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w600)),
+                ],
+              ],
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _acaoMobile(IconData icon, String label, Color cor, VoidCallback onTap) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cor.withOpacity(0.28)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(color: cor.withOpacity(0.12), shape: BoxShape.circle),
+                child: Icon(icon, color: cor, size: 24),
+              ),
+              const SizedBox(height: 6),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileAtividades() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 14),
+          child: Text('Atividades',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+        ),
+        _itemAtividade(Icons.route_rounded, 'Minha Viagem', 'Registrar início e fim de viagem',
+            const Color(0xFF8B5CF6), () => _push(const ViagensPage())),
+        _itemAtividade(Icons.checklist_rtl_rounded, 'Checklist Saída', 'Vistoria antes de sair',
+            const Color(0xFF1AA251), () => _push(const SelecionarVeiculoChecklistPage())),
+        _itemAtividade(Icons.assignment_turned_in_rounded, 'Checklist Retorno',
+            'Vistoria ao retornar', const Color(0xFF3B82F6),
+            () => _push(const SelecionarVeiculoChecklistPage())),
+        _itemAtividade(Icons.local_gas_station_rounded, 'Abastecimentos',
+            'Registrar abastecimento', const Color(0xFFF59E0B),
+            () => _push(const AbastecimentosPage())),
+        _itemAtividade(Icons.build_rounded, 'Manutenções', 'Registrar manutenção do veículo',
+            const Color(0xFFEC4899), () => _push(const ManutencoesPage())),
+        _itemAtividade(Icons.report_problem_rounded, 'Ocorrências', 'Registrar nova ocorrência',
+            const Color(0xFFEF4444), () => _push(const ListaOcorrenciasPage())),
+        _itemAtividade(Icons.description_rounded, 'Documentos', 'Ver documentos do veículo',
+            const Color(0xFF06B6D4), () => _push(const DocumentosPage())),
+        _itemAtividade(Icons.history_rounded, 'Histórico Checklists',
+            'Ver todos os checklists realizados', const Color(0xFF6B7280),
+            () => _push(const HistoricoChecklistPage())),
+      ],
+    );
+  }
+
+  Widget _itemAtividade(
+      IconData icon, String titulo, String subtitulo, Color cor, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: cor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: cor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(titulo,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(subtitulo,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 18),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1039,3 +1434,5 @@ enum _Sec {
   abastecimentos, manutencoes, ocorrencias,
   documentos, perfil,
 }
+
+enum _MobileTab { dashboard, veiculo, atividades, perfil }
