@@ -21,6 +21,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
   final cnhController = TextEditingController();
   final telefoneController = TextEditingController();
   final categoriaController = TextEditingController();
+  final emailContaController = TextEditingController();
 
   List<Map<String, dynamic>> motoristas = [];
   bool carregando = true;
@@ -41,6 +42,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
     cnhController.dispose();
     telefoneController.dispose();
     categoriaController.dispose();
+    emailContaController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -82,6 +84,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
 
     setState(() => isSaving = true);
 
+    final emailConta = emailContaController.text.trim().toLowerCase();
     final payload = <String, dynamic>{
       'name': nomeController.text.trim(),
       'cnh_number': cnhController.text.trim(),
@@ -93,6 +96,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
     final categoria = categoriaController.text.trim().toUpperCase();
     payload['phone'] = telefone.isNotEmpty ? telefone : null;
     payload['cnh_category'] = categoria.isNotEmpty ? categoria : null;
+    if (emailConta.isNotEmpty) payload['email'] = emailConta;
 
     try {
       final isNew = editingId == null;
@@ -102,15 +106,44 @@ class _MotoristasPageState extends State<MotoristasPage> {
             .insert(context.read<AppAuthProvider>().inject(payload))
             .select();
         if (!mounted) return;
+
+        String? driverId;
         if (result.isNotEmpty) {
           final novo = Map<String, dynamic>.from(result.first as Map);
+          driverId = novo['id']?.toString();
           setState(() {
             motoristas = [novo, ...motoristas];
             motoristas.sort((a, b) =>
                 (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString()));
           });
         }
-        _snackSucesso('Motorista cadastrado com sucesso!');
+
+        // Vínculo automático com conta do motorista pelo e-mail
+        if (emailConta.isNotEmpty && driverId != null) {
+          try {
+            final userProfile = await supabase
+                .from('user_profiles')
+                .select('user_id')
+                .eq('email', emailConta)
+                .maybeSingle();
+            if (userProfile != null) {
+              final uId = userProfile['user_id'].toString();
+              await Future.wait([
+                supabase.from('user_profiles')
+                    .update({'driver_id': driverId}).eq('user_id', uId),
+                supabase.from('drivers')
+                    .update({'user_id': uId}).eq('id', driverId),
+              ]);
+              _snackSucesso('Motorista cadastrado e vinculado à conta $emailConta!');
+            } else {
+              _snackSucesso('Motorista cadastrado! Conta "$emailConta" não encontrada ainda — vínculo pendente.');
+            }
+          } catch (_) {
+            _snackSucesso('Motorista cadastrado com sucesso!');
+          }
+        } else {
+          _snackSucesso('Motorista cadastrado com sucesso!');
+        }
       } else {
         await supabase.from('drivers').update(payload).eq('id', editingId!);
         if (!mounted) return;
@@ -120,12 +153,31 @@ class _MotoristasPageState extends State<MotoristasPage> {
             motoristas[idx] = {...motoristas[idx], ...payload, 'id': editingId};
           }
         });
+
+        // Ao editar, re-vincular conta se email foi preenchido
+        if (emailConta.isNotEmpty) {
+          try {
+            final userProfile = await supabase
+                .from('user_profiles')
+                .select('user_id')
+                .eq('email', emailConta)
+                .maybeSingle();
+            if (userProfile != null) {
+              final uId = userProfile['user_id'].toString();
+              await Future.wait([
+                supabase.from('user_profiles')
+                    .update({'driver_id': editingId}).eq('user_id', uId),
+                supabase.from('drivers')
+                    .update({'user_id': uId}).eq('id', editingId!),
+              ]);
+            }
+          } catch (_) {}
+        }
         _snackSucesso('Motorista atualizado!');
       }
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
-      // Mostra erro detalhado para diagnóstico
       _snackErro('Erro ao salvar: $e');
       debugPrint('ERRO SALVAR MOTORISTA: $e');
     } finally {
@@ -174,6 +226,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
       cnhController.text = m['cnh_number']?.toString() ?? '';
       telefoneController.text = m['phone']?.toString() ?? '';
       categoriaController.text = m['cnh_category']?.toString() ?? '';
+      emailContaController.text = m['email']?.toString() ?? '';
       final raw = m['cnh_expiration']?.toString() ?? '';
       cnhValidade = DateTime.tryParse(raw);
     });
@@ -186,6 +239,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
     cnhController.clear();
     telefoneController.clear();
     categoriaController.clear();
+    emailContaController.clear();
     _formKey.currentState?.reset();
     setState(() {
       editingId = null;
@@ -506,6 +560,21 @@ class _MotoristasPageState extends State<MotoristasPage> {
                 keyboardType: TextInputType.phone,
                 hint: '(11) 99999-9999',
               ),
+              const SizedBox(height: 12),
+              _campo(
+                controller: emailContaController,
+                label: 'E-mail da conta do motorista',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                hint: 'Ex: joao@gmail.com',
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  'Informe o e-mail usado na criação da conta para vincular automaticamente.',
+                  style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 11),
+                ),
+              ),
               const SizedBox(height: 24),
               SizedBox(
                 height: 52,
@@ -719,6 +788,20 @@ class _MotoristasPageState extends State<MotoristasPage> {
                   Text(
                     'Tel: ${m['phone']}',
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  ),
+                if (m['email'] != null && m['email'].toString().isNotEmpty)
+                  Row(
+                    children: [
+                      const Icon(Icons.link, size: 11, color: AppColors.success),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          m['email'].toString(),
+                          style: const TextStyle(color: AppColors.success, fontSize: 11),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 if (cnhStatus.isNotEmpty) ...[
                   const SizedBox(height: 4),
