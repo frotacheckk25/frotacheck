@@ -209,15 +209,8 @@ class _MotoristasPageState extends State<MotoristasPage> {
     );
     if (!mounted || conf != true) return;
     try {
-      // Limpar todas as FKs antes de excluir
-      for (final t in ['fuelings', 'occurrences', 'viagens', 'checklists']) {
-        try {
-          await supabase.from(t).update({'driver_id': null}).eq('driver_id', id);
-        } catch (_) {}
-      }
-      await supabase.from('vehicles').update({'driver_id': null}).eq('driver_id', id);
-      await supabase.from('user_profiles').update({'driver_id': null}).eq('driver_id', id);
-      await supabase.from('drivers').delete().eq('id', id);
+      // Usa RPC SECURITY DEFINER para limpar todas as FKs e excluir (bypassa RLS)
+      await supabase.rpc('excluir_motorista_safe', params: {'driver_id_param': id});
       if (!mounted) return;
       setState(() => motoristas.removeWhere((m) => m['id']?.toString() == id));
       _snackSucesso('$nome excluído');
