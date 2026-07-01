@@ -140,10 +140,6 @@ DO $$ BEGIN
   ALTER TABLE public.viagens    ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
 EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
-DO $$ BEGIN
-  ALTER TABLE public.manutencoes ADD COLUMN IF NOT EXISTS empresa_id uuid REFERENCES public.empresas(id);
-EXCEPTION WHEN undefined_table THEN NULL; END $$;
-
 -- ─── 6. RLS DE ISOLAMENTO POR EMPRESA EM TABELAS DE DADOS ────────────────────
 -- Padrão: usuário vê dados da própria empresa; MASTER vê tudo.
 

@@ -30,11 +30,21 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   bool _loadingVeiculo = true;
   Map<String, dynamic>? _veiculo;
-  int _checklistsHoje = 0;
   int _ocorrenciasAbertas = 0;
   List<Map<String, dynamic>> _alertas = [];
   Map<String, dynamic>? _ultimoAbastecimento;
   Map<String, dynamic>? _ultimaManutencao;
+
+  // Tarefas de hoje
+  bool _checklistSaidaHoje = false;
+  bool _checklistRetornoHoje = false;
+  int _abastecimentosHoje = 0;
+  String _manutencaoStatus = 'Verificar';
+
+  // Resumo do dia
+  int _viagensHoje = 0;
+  double _distanciaHoje = 0;
+  int _tempoTransitoMin = 0;
 
   @override
   void initState() {
@@ -48,6 +58,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     final empresaId = auth.empresaId;
     String? driverId = auth.profile?.driverId;
     final userId = _supabase.auth.currentUser?.id;
+
     try {
       if (userId != null) {
         final fresh = await _supabase
@@ -83,6 +94,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       final inicioHoje =
           DateTime(hoje.year, hoje.month, hoje.day).toIso8601String();
 
+      // ── Veículo ───────────────────────────────────────────────────────────
       Map<String, dynamic>? veiculo;
       try {
         final rpcResult = await _supabase.rpc('get_my_vehicle') as List?;
@@ -91,25 +103,50 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         }
       } catch (_) {}
 
-      int checklistsHoje = 0;
+      final vehicleId = veiculo?['id']?.toString();
+
+      // Accumulators
       int ocorrenciasAbertas = 0;
       List<Map<String, dynamic>> alertas = [];
       Map<String, dynamic>? abastRes;
       Map<String, dynamic>? ultManut;
-      final vehicleId = veiculo?['id']?.toString();
+      bool checklistSaida = false;
+      bool checklistRetorno = false;
+      int abastecimentosHoje = 0;
+      int viagensHoje = 0;
+      double distanciaHoje = 0;
+      int tempoTransitoMin = 0;
+      String manutencaoStatus = 'Verificar';
 
+      // ── Queries que precisam de driverId + empresaId ──────────────────────
       if (driverId != null && empresaId != null) {
+        // Checklist saída hoje
         try {
           final res = await _supabase
               .from('checklists')
               .select('id')
               .eq('empresa_id', empresaId)
               .eq('motorista_id', driverId)
+              .eq('tipo', 'saida')
               .gte('created_at', inicioHoje)
               .count();
-          checklistsHoje = res.count;
+          checklistSaida = res.count > 0;
         } catch (_) {}
 
+        // Checklist retorno hoje
+        try {
+          final res = await _supabase
+              .from('checklists')
+              .select('id')
+              .eq('empresa_id', empresaId)
+              .eq('motorista_id', driverId)
+              .eq('tipo', 'retorno')
+              .gte('created_at', inicioHoje)
+              .count();
+          checklistRetorno = res.count > 0;
+        } catch (_) {}
+
+        // Ocorrências abertas
         try {
           final res = await _supabase
               .from('occurrences')
@@ -121,6 +158,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           ocorrenciasAbertas = res.count;
         } catch (_) {}
 
+        // Último abastecimento (para atividade recente)
         try {
           abastRes = await _supabase
               .from('fuelings')
@@ -131,8 +169,42 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .limit(1)
               .maybeSingle();
         } catch (_) {}
+
+        // Abastecimentos hoje (contagem)
+        try {
+          final res = await _supabase
+              .from('fuelings')
+              .select('id')
+              .eq('empresa_id', empresaId)
+              .eq('driver_id', driverId)
+              .gte('created_at', inicioHoje)
+              .count();
+          abastecimentosHoje = res.count;
+        } catch (_) {}
       }
 
+      // ── Viagens hoje (só precisa de driverId) ─────────────────────────────
+      if (driverId != null) {
+        try {
+          final viaRes = await _supabase
+              .from('viagens')
+              .select('quilometragem_percorrida, duracao_minutos, status')
+              .eq('motorista_id', driverId)
+              .gte('data_inicio', inicioHoje)
+              .neq('status', 'cancelada');
+          for (final v in viaRes as List) {
+            viagensHoje++;
+            if (v['status'] == 'concluida') {
+              distanciaHoje +=
+                  (v['quilometragem_percorrida'] as num?)?.toDouble() ?? 0;
+              tempoTransitoMin +=
+                  (v['duracao_minutos'] as num?)?.toInt() ?? 0;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // ── Alertas do veículo ────────────────────────────────────────────────
       if (vehicleId != null && empresaId != null) {
         try {
           final alertRes = await _supabase
@@ -147,6 +219,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         } catch (_) {}
       }
 
+      // ── Última manutenção (oil_change) ────────────────────────────────────
       if (vehicleId != null) {
         try {
           ultManut = await _supabase
@@ -156,6 +229,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .order('created_at', ascending: false)
               .limit(1)
               .maybeSingle();
+          if (ultManut != null) {
+            final dtManut = DateTime.tryParse(
+                ultManut['created_at']?.toString() ?? '');
+            if (dtManut != null &&
+                DateTime.now().difference(dtManut).inDays < 90) {
+              manutencaoStatus = 'Em dia';
+            }
+          }
         } catch (_) {}
       }
 
@@ -165,8 +246,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         _alertas = alertas;
         _ultimoAbastecimento = abastRes;
         _ultimaManutencao = ultManut;
-        _checklistsHoje = checklistsHoje;
         _ocorrenciasAbertas = ocorrenciasAbertas;
+        _checklistSaidaHoje = checklistSaida;
+        _checklistRetornoHoje = checklistRetorno;
+        _abastecimentosHoje = abastecimentosHoje;
+        _viagensHoje = viagensHoje;
+        _distanciaHoje = distanciaHoje;
+        _tempoTransitoMin = tempoTransitoMin;
+        _manutencaoStatus = manutencaoStatus;
         _loadingVeiculo = false;
       });
     } catch (e) {
@@ -195,7 +282,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  // ── Mobile Scaffold ───────────────────────────────────────────────────────
+  // ── Mobile scaffold ───────────────────────────────────────────────────────
 
   Widget _buildMobileScaffold(AppAuthProvider auth, String primeiroNome) {
     return Scaffold(
@@ -229,11 +316,33 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded,
-                color: AppColors.textSecondary, size: 20),
-            onPressed: _carregar,
-          ),
+          if (_alertas.isNotEmpty)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_rounded,
+                      color: AppColors.textSecondary, size: 20),
+                  onPressed: _carregar,
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444), shape: BoxShape.circle),
+                  ),
+                ),
+              ],
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded,
+                  color: AppColors.textSecondary, size: 20),
+              onPressed: _carregar,
+            ),
         ],
       ),
       body: _buildMobileBody(auth, primeiroNome),
@@ -278,7 +387,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  // ── Mobile Dashboard ──────────────────────────────────────────────────────
+  // ── Mobile dashboard ──────────────────────────────────────────────────────
 
   Widget _buildMobileDashboard(AppAuthProvider auth, String primeiroNome) {
     final hora = DateTime.now().hour;
@@ -301,54 +410,173 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
             _buildVeiculoBanner(),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
+
+            // Tarefas (scroll horizontal no mobile)
+            _sectionHeader('Tarefas de Hoje'),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 110,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _taskCardMobile(Icons.checklist_rtl_rounded, 'Checklist\nSaída',
+                      const Color(0xFF1AA251),
+                      _checklistSaidaHoje ? 'Concluído' : 'Não iniciado',
+                      _checklistSaidaHoje
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFF94A3B8),
+                      () => _push(const SelecionarVeiculoChecklistPage())),
+                  const SizedBox(width: 8),
+                  _taskCardMobile(Icons.assignment_turned_in_rounded,
+                      'Checklist\nRetorno', const Color(0xFF3B82F6),
+                      _checklistRetornoHoje ? 'Concluído' : 'Não iniciado',
+                      _checklistRetornoHoje
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFF94A3B8),
+                      () => _push(const SelecionarVeiculoChecklistPage())),
+                  const SizedBox(width: 8),
+                  _taskCardMobile(Icons.local_gas_station_rounded,
+                      'Abaste-\ncimento', const Color(0xFFF59E0B),
+                      _abastecimentosHoje > 0
+                          ? '$_abastecimentosHoje registrado(s)'
+                          : 'Não registrado',
+                      _abastecimentosHoje > 0
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFFF59E0B),
+                      () => _push(const AbastecimentosPage())),
+                  const SizedBox(width: 8),
+                  _taskCardMobile(Icons.build_rounded, 'Manutenção',
+                      const Color(0xFF8B5CF6), _manutencaoStatus,
+                      _manutencaoStatus == 'Em dia'
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFFF59E0B),
+                      () => _push(const ManutencoesPage())),
+                  const SizedBox(width: 8),
+                  _taskCardMobile(Icons.report_problem_rounded, 'Ocorrências',
+                      const Color(0xFFEF4444),
+                      _ocorrenciasAbertas == 0
+                          ? 'Nenhuma'
+                          : '$_ocorrenciasAbertas aberta(s)',
+                      _ocorrenciasAbertas == 0
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFFEF4444),
+                      () => _push(const ListaOcorrenciasPage())),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Resumo do dia (2x2 chips)
+            _sectionHeader('Resumo do Dia'),
+            const SizedBox(height: 8),
             Row(
               children: [
-                _kpiChip(Icons.checklist_rounded, '$_checklistsHoje',
-                    'checklists', const Color(0xFF1AA251)),
+                Expanded(
+                    child: _resumoChip(Icons.route_rounded, 'Viagens',
+                        '$_viagensHoje', const Color(0xFF3B82F6))),
                 const SizedBox(width: 8),
-                _kpiChip(
-                    Icons.report_problem_rounded,
-                    '$_ocorrenciasAbertas',
-                    'ocorrências',
-                    _ocorrenciasAbertas > 0
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFF475569)),
+                Expanded(
+                    child: _resumoChip(Icons.straighten_rounded, 'Distância',
+                        '${_distanciaHoje.toStringAsFixed(0)} km',
+                        const Color(0xFF8B5CF6))),
               ],
             ),
-            if (_alertas.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              ..._alertas.map(_alertaBanner),
-            ],
-            const SizedBox(height: 14),
-            _sectionHeader('Ações Rápidas'),
             const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 2.2,
+            Row(
               children: [
-                _acaoCompacta(Icons.checklist_rtl_rounded, 'Checklist Saída',
-                    const Color(0xFF1AA251),
-                    () => _push(const SelecionarVeiculoChecklistPage())),
-                _acaoCompacta(
-                    Icons.assignment_turned_in_rounded,
-                    'Checklist Retorno',
-                    const Color(0xFF3B82F6),
-                    () => _push(const SelecionarVeiculoChecklistPage())),
-                _acaoCompacta(Icons.local_gas_station_rounded, 'Abastecer',
-                    const Color(0xFFF59E0B),
-                    () => _push(const AbastecimentosPage())),
-                _acaoCompacta(Icons.report_problem_rounded, 'Ocorrência',
-                    const Color(0xFFEF4444),
-                    () => _push(const ListaOcorrenciasPage())),
+                Expanded(
+                    child: _resumoChip(Icons.timer_rounded, 'Trânsito',
+                        _fmtTempo(_tempoTransitoMin),
+                        const Color(0xFF06B6D4))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: _resumoChip(Icons.local_gas_station_rounded,
+                        'Abastecimentos', '$_abastecimentosHoje',
+                        const Color(0xFFF59E0B))),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _taskCardMobile(IconData icon, String titulo, Color cor,
+      String status, Color statusCor, VoidCallback onTap) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 95,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cor.withOpacity(0.22)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: cor.withOpacity(0.12), shape: BoxShape.circle),
+                child: Icon(icon, color: cor, size: 18),
+              ),
+              const SizedBox(height: 6),
+              Text(titulo,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2)),
+              const SizedBox(height: 3),
+              Text(status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: statusCor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _resumoChip(
+      IconData icon, String label, String valor, Color cor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border(left: BorderSide(color: cor, width: 3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: cor, size: 14),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 9)),
+                Text(valor,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -391,12 +619,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 const Color(0xFFF59E0B),
                 () => _push(const AbastecimentosPage())),
             _atividadeGrid(Icons.build_rounded, 'Manutenções',
-                const Color(0xFFEC4899), () => _push(const ManutencoesPage())),
+                const Color(0xFFEC4899),
+                () => _push(const ManutencoesPage())),
             _atividadeGrid(Icons.report_problem_rounded, 'Ocorrências',
                 const Color(0xFFEF4444),
                 () => _push(const ListaOcorrenciasPage())),
             _atividadeGrid(Icons.description_rounded, 'Documentos',
-                const Color(0xFF06B6D4), () => _push(const DocumentosPage())),
+                const Color(0xFF06B6D4),
+                () => _push(const DocumentosPage())),
             _atividadeGrid(Icons.tire_repair_rounded, 'Pneus',
                 const Color(0xFF10B981), () => _push(const PneusPage())),
             _atividadeGrid(Icons.gavel_rounded, 'Multas',
@@ -440,43 +670,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                       color: Colors.white,
                       fontSize: 11,
                       fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _acaoCompacta(
-      IconData icon, String label, Color cor, VoidCallback onTap) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border(
-              top: BorderSide(color: cor, width: 2),
-              left: BorderSide(color: AppColors.border),
-              right: BorderSide(color: AppColors.border),
-              bottom: BorderSide(color: AppColors.border),
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, color: cor, size: 17),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600)),
-              ),
             ],
           ),
         ),
@@ -551,6 +744,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   _item(Icons.build_rounded, 'Manutenções', _Sec.manutencoes),
                   _item(Icons.report_problem_rounded, 'Ocorrências',
                       _Sec.ocorrencias),
+                  const SizedBox(height: 4),
+                  _label('DOCUMENTOS'),
                   _item(Icons.description_rounded, 'Documentos',
                       _Sec.documentos),
                   _item(Icons.tire_repair_rounded, 'Controle de Pneus',
@@ -611,9 +806,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               Expanded(
                 child: Text(label,
                     style: TextStyle(
-                        color: active
-                            ? Colors.white
-                            : const Color(0xFF94A3B8),
+                        color:
+                            active ? Colors.white : const Color(0xFF94A3B8),
                         fontSize: 12,
                         fontWeight: active
                             ? FontWeight.w600
@@ -780,7 +974,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     }
   }
 
-  // ── Dashboard Desktop ─────────────────────────────────────────────────────
+  // ── Dashboard Desktop (foco em tarefas) ───────────────────────────────────
 
   Widget _buildDashboard(AppAuthProvider auth, String primeiroNome) {
     final hora = DateTime.now().hour;
@@ -809,109 +1003,380 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                       Text('$saudacao, $primeiroNome!',
                           style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 20,
+                              fontSize: 22,
                               fontWeight: FontWeight.w700)),
                       const SizedBox(height: 2),
                       Text(dataStr,
                           style: const TextStyle(
-                              color: AppColors.textSecondary, fontSize: 12)),
+                              color: AppColors.textSecondary, fontSize: 13)),
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: _carregar,
-                  icon: const Icon(Icons.refresh_rounded,
-                      color: AppColors.textSecondary, size: 18),
-                  tooltip: 'Atualizar',
+                // Notification bell
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: _carregar,
+                      icon: const Icon(Icons.notifications_rounded,
+                          color: AppColors.textSecondary, size: 22),
+                      tooltip: 'Atualizar',
+                    ),
+                    if (_alertas.isNotEmpty)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // ── Vehicle banner (slim) ─────────────────────────────────────
+            const SizedBox(height: 4),
             _buildVeiculoBanner(),
-            const SizedBox(height: 12),
-
-            // ── KPI chips ─────────────────────────────────────────────────
-            Row(
-              children: [
-                _kpiChip(Icons.checklist_rounded, '$_checklistsHoje',
-                    'checklists hoje', const Color(0xFF1AA251)),
-                const SizedBox(width: 8),
-                _kpiChip(
-                    Icons.report_problem_rounded,
-                    '$_ocorrenciasAbertas',
-                    'ocorrências abertas',
-                    _ocorrenciasAbertas > 0
-                        ? const Color(0xFFEF4444)
-                        : const Color(0xFF475569)),
-                if (_alertas.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  _kpiChip(Icons.warning_rounded, '${_alertas.length}',
-                      'alertas', const Color(0xFFF59E0B)),
-                ],
-              ],
-            ),
             const SizedBox(height: 20),
 
-            // ── Alerts ────────────────────────────────────────────────────
-            if (_alertas.isNotEmpty) ...[
-              _sectionHeader('Alertas do Veículo'),
-              const SizedBox(height: 8),
-              ..._alertas.map(_alertaBanner),
-              const SizedBox(height: 20),
-            ],
-
-            // ── Quick actions ─────────────────────────────────────────────
-            _sectionHeader('Ações Rápidas'),
-            const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 4,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.4,
-              children: [
-                _acaoTile(Icons.checklist_rtl_rounded, 'Checklist\nSaída',
-                    const Color(0xFF1AA251),
-                    () => _onTap(_Sec.checklistSaida)),
-                _acaoTile(
-                    Icons.assignment_turned_in_rounded,
-                    'Checklist\nRetorno',
-                    const Color(0xFF3B82F6),
-                    () => _onTap(_Sec.checklistRetorno)),
-                _acaoTile(Icons.route_rounded, 'Minha\nViagem',
-                    const Color(0xFF8B5CF6), () => _onTap(_Sec.viagem)),
-                _acaoTile(Icons.local_gas_station_rounded, 'Abastecer',
-                    const Color(0xFFF59E0B),
-                    () => _onTap(_Sec.abastecimentos)),
-                _acaoTile(Icons.build_rounded, 'Manutenção',
-                    const Color(0xFFEC4899), () => _onTap(_Sec.manutencoes)),
-                _acaoTile(Icons.report_problem_rounded, 'Ocorrência',
-                    const Color(0xFFEF4444), () => _onTap(_Sec.ocorrencias)),
-                _acaoTile(Icons.tire_repair_rounded, 'Pneus',
-                    const Color(0xFF10B981), () => _onTap(_Sec.pneus)),
-                _acaoTile(Icons.gavel_rounded, 'Multas',
-                    const Color(0xFFDC2626), () => _onTap(_Sec.multas)),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // ── Timeline atividade recente ────────────────────────────────
-            _sectionHeader('Atividade Recente'),
+            // ── Suas tarefas de hoje ──────────────────────────────────────
+            _sectionHeader('Suas tarefas de hoje'),
             const SizedBox(height: 10),
-            _buildTimeline(),
+            if (_loadingVeiculo)
+              Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                      color: Color(0xFF1AA251), strokeWidth: 2),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: _taskCard(
+                      icon: Icons.checklist_rtl_rounded,
+                      cor: const Color(0xFF1AA251),
+                      titulo: 'Checklist Saída',
+                      status: _checklistSaidaHoje ? 'Concluído' : 'Não iniciado',
+                      statusCor: _checklistSaidaHoje
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFF94A3B8),
+                      onTap: () => _onTap(_Sec.checklistSaida),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _taskCard(
+                      icon: Icons.assignment_turned_in_rounded,
+                      cor: const Color(0xFF3B82F6),
+                      titulo: 'Checklist Retorno',
+                      status:
+                          _checklistRetornoHoje ? 'Concluído' : 'Não iniciado',
+                      statusCor: _checklistRetornoHoje
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFF94A3B8),
+                      onTap: () => _onTap(_Sec.checklistRetorno),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _taskCard(
+                      icon: Icons.local_gas_station_rounded,
+                      cor: const Color(0xFFF59E0B),
+                      titulo: 'Abastecimento',
+                      status: _abastecimentosHoje > 0
+                          ? '$_abastecimentosHoje registrado(s)'
+                          : 'Não registrado',
+                      statusCor: _abastecimentosHoje > 0
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFFF59E0B),
+                      onTap: () => _onTap(_Sec.abastecimentos),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _taskCard(
+                      icon: Icons.build_rounded,
+                      cor: const Color(0xFF8B5CF6),
+                      titulo: 'Manutenção',
+                      status: _manutencaoStatus,
+                      statusCor: _manutencaoStatus == 'Em dia'
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFFF59E0B),
+                      onTap: () => _onTap(_Sec.manutencoes),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _taskCard(
+                      icon: Icons.report_problem_rounded,
+                      cor: const Color(0xFFEF4444),
+                      titulo: 'Ocorrências',
+                      status: _ocorrenciasAbertas == 0
+                          ? 'Nenhuma'
+                          : '$_ocorrenciasAbertas aberta(s)',
+                      statusCor: _ocorrenciasAbertas == 0
+                          ? const Color(0xFF1AA251)
+                          : const Color(0xFFEF4444),
+                      onTap: () => _onTap(_Sec.ocorrencias),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 20),
+
+            // ── Resumo do dia + Atividade recente (lado a lado) ───────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Resumo do dia
+                Expanded(child: _buildResumoPanel()),
+                const SizedBox(width: 16),
+                // Atividade recente
+                Expanded(child: _buildAtividadePanel()),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // ── Banner segurança ──────────────────────────────────────────
+            _buildSafetyBanner(),
             const SizedBox(height: 14),
             TextButton.icon(
               onPressed: () => _push(const HistoricoChecklistPage()),
               icon: const Icon(Icons.history_rounded,
                   size: 13, color: Color(0xFF1AA251)),
               label: const Text('Ver histórico de checklists',
-                  style: TextStyle(color: Color(0xFF1AA251), fontSize: 12)),
+                  style:
+                      TextStyle(color: Color(0xFF1AA251), fontSize: 12)),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildResumoPanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader('Resumo do dia'),
+          const SizedBox(height: 12),
+          const Divider(color: AppColors.border, height: 1),
+          _resumoRow(Icons.route_rounded, const Color(0xFF3B82F6),
+              'Viagens', '$_viagensHoje'),
+          const Divider(color: AppColors.border, height: 1),
+          _resumoRow(Icons.straighten_rounded, const Color(0xFF8B5CF6),
+              'Distância',
+              '${_distanciaHoje.toStringAsFixed(1)} km'),
+          const Divider(color: AppColors.border, height: 1),
+          _resumoRow(Icons.timer_rounded, const Color(0xFF06B6D4),
+              'Tempo em trânsito', _fmtTempo(_tempoTransitoMin)),
+          const Divider(color: AppColors.border, height: 1),
+          _resumoRow(Icons.local_gas_station_rounded,
+              const Color(0xFFF59E0B), 'Abastecimentos',
+              '$_abastecimentosHoje'),
+        ],
+      ),
+    );
+  }
+
+  Widget _resumoRow(IconData icon, Color cor, String label, String valor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: cor.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Icon(icon, color: cor, size: 15),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13)),
+          ),
+          Text(valor,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAtividadePanel() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader('Atividade recente'),
+          const SizedBox(height: 12),
+          if (_ultimoAbastecimento != null)
+            _atividadeItem(
+              icon: Icons.local_gas_station_rounded,
+              cor: const Color(0xFFF59E0B),
+              titulo: 'Último abastecimento',
+              sub: _placaLabel(_ultimoAbastecimento!),
+              extra: _ultimoAbastecimento!['liters'] != null
+                  ? '${_ultimoAbastecimento!['liters']} L'
+                  : null,
+              data: _ultimoAbastecimento!['created_at']?.toString(),
+            )
+          else
+            _vazioSmall('Nenhum abastecimento registrado.'),
+          const SizedBox(height: 8),
+          if (_ultimaManutencao != null)
+            _atividadeItem(
+              icon: Icons.build_rounded,
+              cor: const Color(0xFFEC4899),
+              titulo: 'Última troca de óleo',
+              sub:
+                  'Próxima troca: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
+              data: _ultimaManutencao!['created_at']?.toString(),
+            )
+          else
+            _vazioSmall('Nenhuma manutenção registrada.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _atividadeItem({
+    required IconData icon,
+    required Color cor,
+    required String titulo,
+    required String sub,
+    String? extra,
+    String? data,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+                color: cor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: cor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(titulo,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+                Text(sub,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 11)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (extra != null)
+                Text(extra,
+                    style: TextStyle(
+                        color: cor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              if (data != null)
+                Text(_dataCurta(data),
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 10)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetyBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF071A0F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1AA251).withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1AA251).withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.shield_rounded,
+                color: Color(0xFF1AA251), size: 22),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Dirija com segurança!',
+                    style: TextStyle(
+                        color: Color(0xFF1AA251),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700)),
+                Text('Seus registros fazem a diferença.',
+                    style: TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12)),
+              ],
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => _push(const HistoricoChecklistPage()),
+            icon: const Icon(Icons.arrow_forward_rounded, size: 13),
+            label: const Text('Ver dicas'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: BorderSide(color: Colors.white.withOpacity(0.20)),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -934,7 +1399,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                       fontWeight: FontWeight.w700)),
               IconButton(
                 onPressed: _carregar,
-                icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+                icon:
+                    const Icon(Icons.refresh_rounded, color: Colors.white70),
                 tooltip: 'Atualizar',
               ),
             ],
@@ -989,20 +1455,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     final nome = p?.nome ?? p?.email ?? 'M';
     return Stack(
       children: [
-        // Logo ghosted large in top-right (efeito "saindo do fundo")
         Positioned(
           top: -20,
           right: -40,
           child: Opacity(
             opacity: 0.07,
-            child: Image.asset(
-              'assets/images/frotacheckkk.png',
-              width: 360,
-              fit: BoxFit.fitWidth,
-            ),
+            child: Image.asset('assets/images/frotacheckkk.png',
+                width: 360, fit: BoxFit.fitWidth),
           ),
         ),
-        // Glow verde sutil atrás da logo
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -1017,7 +1478,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ),
           ),
         ),
-        // Conteúdo
         SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -1051,8 +1511,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                             ),
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color:
-                                    const Color(0xFF1AA251).withOpacity(0.30)),
+                                color: const Color(0xFF1AA251)
+                                    .withOpacity(0.30)),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -1099,8 +1559,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color:
-                                      const Color(0xFF1AA251).withOpacity(0.12),
+                                  color: const Color(0xFF1AA251)
+                                      .withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                       color: const Color(0xFF1AA251)
@@ -1130,8 +1590,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                           : 'Nenhum vinculado',
                     ),
                     if (p?.lastAccess != null)
-                      _infoRow(
-                          'Último acesso', _dataFull(p!.lastAccess!.toLocal())),
+                      _infoRow('Último acesso',
+                          _dataFull(p!.lastAccess!.toLocal())),
                   ],
                 ),
               ),
@@ -1148,8 +1608,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title:
-            const Text('Editar nome', style: TextStyle(color: Colors.white)),
+        title: const Text('Editar nome',
+            style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -1173,8 +1633,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.secondary),
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child:
-                const Text('Salvar', style: TextStyle(color: Colors.white)),
+            child: const Text('Salvar',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1204,22 +1664,20 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   Widget _buildVeiculoBanner() {
     if (_loadingVeiculo) {
       return Container(
-        height: 62,
+        height: 58,
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: const Center(
-            child:
-                CircularProgressIndicator(color: Color(0xFF1AA251), strokeWidth: 2)),
+            child: CircularProgressIndicator(
+                color: Color(0xFF1AA251), strokeWidth: 2)),
       );
     }
-
     if (_veiculo == null) {
       return Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(10),
@@ -1231,25 +1689,13 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 color: Color(0xFF475569), size: 18),
             SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Nenhum veículo vinculado',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
-                  Text('Solicite ao gestor que vincule um veículo.',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11)),
-                ],
-              ),
+              child: Text('Nenhum veículo vinculado — solicite ao gestor.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ),
           ],
         ),
       );
     }
-
     final placa = _veiculo!['plate']?.toString() ?? '—';
     final modelo =
         '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
@@ -1272,55 +1718,66 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           bottom: BorderSide(color: AppColors.border),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(
         children: [
-          Icon(Icons.directions_car_rounded, color: cor, size: 20),
+          Icon(Icons.directions_car_rounded, color: cor, size: 18),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
                 Text(placa,
                     style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.5)),
-                if (modelo.isNotEmpty)
+                if (modelo.isNotEmpty) ...[
+                  const SizedBox(width: 10),
                   Text('$modelo${ano.isNotEmpty ? '  ·  $ano' : ''}',
                       style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11)),
+                          color: AppColors.textSecondary, fontSize: 12)),
+                ],
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: cor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: cor.withOpacity(0.30)),
-                ),
-                child: Text(status.toUpperCase(),
-                    style: TextStyle(
-                        color: cor,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700)),
-              ),
-              if (_alertas.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text('${_alertas.length} alerta(s)',
-                    style: const TextStyle(
-                        color: Color(0xFFEF4444),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600)),
-              ],
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: cor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: cor.withOpacity(0.30)),
+            ),
+            child: Text(status.toUpperCase(),
+                style: TextStyle(
+                    color: cor, fontSize: 9, fontWeight: FontWeight.w700)),
           ),
+          if (_alertas.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: const Color(0xFFEF4444).withOpacity(0.30)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.warning_rounded,
+                      color: Color(0xFFEF4444), size: 11),
+                  const SizedBox(width: 3),
+                  Text('${_alertas.length}',
+                      style: const TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1338,47 +1795,17 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         ),
       );
     }
-
     if (_veiculo == null) {
       return _cardBase(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF475569).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.directions_car_outlined,
-                    color: Color(0xFF475569), size: 28),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Nenhum veículo vinculado',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700)),
-                    SizedBox(height: 4),
-                    Text(
-                      'Solicite ao gestor ou admin da empresa que vincule um veículo ao seu perfil.',
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        child: const Padding(
+          padding: EdgeInsets.all(18),
+          child: Text(
+            'Nenhum veículo vinculado. Solicite ao gestor ou admin que vincule um veículo ao seu perfil.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
         ),
       );
     }
-
     final placa = _veiculo!['plate']?.toString() ?? '—';
     final modelo =
         '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
@@ -1389,7 +1816,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         : status == 'manutencao'
             ? const Color(0xFFF59E0B)
             : const Color(0xFFEF4444);
-
     return _cardBase(
       border: cor.withOpacity(0.40),
       child: Padding(
@@ -1402,7 +1828,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 color: cor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.directions_car_rounded, color: cor, size: 28),
+              child:
+                  Icon(Icons.directions_car_rounded, color: cor, size: 28),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -1449,46 +1876,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   // ── Timeline ──────────────────────────────────────────────────────────────
 
-  Widget _buildTimeline() {
-    final hasAbast = _ultimoAbastecimento != null;
-    final hasManut = _ultimaManutencao != null;
-    if (!hasAbast && !hasManut) {
-      return _vazio('Nenhuma atividade recente registrada.');
-    }
-    return Column(
-      children: [
-        if (hasAbast)
-          _timelineItem(
-            icon: Icons.local_gas_station_rounded,
-            cor: const Color(0xFFF59E0B),
-            titulo: 'Último Abastecimento',
-            subtitulo: _placaLabel(_ultimoAbastecimento!),
-            extra: _ultimoAbastecimento!['liters'] != null
-                ? '${_ultimoAbastecimento!['liters']} L'
-                : null,
-            data: _ultimoAbastecimento!['created_at']?.toString(),
-            isLast: !hasManut,
-          ),
-        if (hasManut)
-          _timelineItem(
-            icon: Icons.build_rounded,
-            cor: const Color(0xFFEC4899),
-            titulo: 'Última Troca de Óleo',
-            subtitulo:
-                'Próxima: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
-            data: _ultimaManutencao!['created_at']?.toString(),
-            isLast: true,
-          ),
-      ],
-    );
-  }
-
   Widget _timelineItem({
     required IconData icon,
     required Color cor,
     required String titulo,
     required String subtitulo,
-    String? extra,
     String? data,
     bool isLast = false,
   }) {
@@ -1507,8 +1899,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                     BoxDecoration(color: cor, shape: BoxShape.circle),
               ),
               if (!isLast)
-                Container(
-                    width: 1.5, height: 38, color: AppColors.border),
+                Container(width: 1.5, height: 38, color: AppColors.border),
             ],
           ),
         ),
@@ -1535,36 +1926,79 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                                 color: Colors.white,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600)),
-                        if (subtitulo.isNotEmpty)
-                          Text(subtitulo,
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11)),
+                        Text(subtitulo,
+                            style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11)),
                       ],
                     ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (extra != null)
-                        Text(extra,
-                            style: TextStyle(
-                                color: cor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600)),
-                      if (data != null)
-                        Text(_dataCurta(data),
-                            style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 10)),
-                    ],
-                  ),
+                  if (data != null)
+                    Text(_dataCurta(data),
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 10)),
                 ],
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  // ── Task card ─────────────────────────────────────────────────────────────
+
+  Widget _taskCard({
+    required IconData icon,
+    required Color cor,
+    required String titulo,
+    required String status,
+    required Color statusCor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 140,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: cor.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: cor, size: 24),
+              ),
+              const SizedBox(height: 10),
+              Text(titulo,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: statusCor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1600,71 +2034,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   fontWeight: FontWeight.w700)),
         ],
       );
-
-  Widget _kpiChip(IconData icon, String valor, String label, Color cor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: cor.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cor.withOpacity(0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: cor, size: 13),
-          const SizedBox(width: 6),
-          Text(valor,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(width: 5),
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 10)),
-        ],
-      ),
-    );
-  }
-
-  Widget _acaoTile(
-      IconData icon, String label, Color cor, VoidCallback onTap) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border(
-              top: BorderSide(color: cor, width: 2),
-              left: BorderSide(color: AppColors.border),
-              right: BorderSide(color: AppColors.border),
-              bottom: BorderSide(color: AppColors.border),
-            ),
-          ),
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: cor, size: 18),
-              const SizedBox(height: 5),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _alertaBanner(Map<String, dynamic> alerta) {
     final prioridade = alerta['priority']?.toString() ?? 'Media';
@@ -1721,6 +2090,13 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
+  Widget _vazioSmall(String msg) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Text(msg,
+            style: const TextStyle(
+                color: AppColors.textSecondary, fontSize: 12)),
+      );
+
   Widget _infoRow(String label, String valor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -1741,6 +2117,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         ],
       ),
     );
+  }
+
+  String _fmtTempo(int minutos) {
+    final h = minutos ~/ 60;
+    final m = minutos % 60;
+    return '${h}h ${m.toString().padLeft(2, '0')}m';
   }
 
   String _placaLabel(Map<String, dynamic> r) {

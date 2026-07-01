@@ -982,8 +982,9 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
                 decoration: _dec('Valor da Multa (R\$) *', Icons.attach_money),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Informe o valor';
-                  if (double.tryParse(v.replaceAll(',', '.')) == null)
+                  if (double.tryParse(v.replaceAll(',', '.')) == null) {
                     return 'Valor inválido';
+                  }
                   return null;
                 },
               ),
@@ -1367,10 +1368,11 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
       widget.onAtualizada();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+      }
     }
   }
 

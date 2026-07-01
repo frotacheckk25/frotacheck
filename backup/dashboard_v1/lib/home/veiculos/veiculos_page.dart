@@ -43,7 +43,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
 
   Future<void> carregarMotoristas() async {
     try {
-      final response = await supabase.from('drivers').select('id, name').order('name');
+      final response = await supabase
+          .from('drivers')
+          .select('id, name')
+          .order('name');
       if (!mounted) return;
       setState(() {
         motoristas = List<Map<String, dynamic>>.from(
@@ -84,7 +87,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
     final id = veiculo['driver_id']?.toString();
     if (id == null) return 'Sem motorista';
     try {
-      final m = motoristas.firstWhere((d) => d['id']?.toString() == id, orElse: () => {});
+      final m = motoristas.firstWhere(
+        (d) => d['id']?.toString() == id,
+        orElse: () => {},
+      );
       return m['name']?.toString() ?? 'Sem motorista';
     } catch (_) {
       return 'Sem motorista';
@@ -117,8 +123,11 @@ class _VeiculosPageState extends State<VeiculosPage> {
           final novoVeiculo = Map<String, dynamic>.from(result.first as Map);
           setState(() {
             veiculos = [novoVeiculo, ...veiculos];
-            veiculos.sort((a, b) =>
-                (a['plate'] ?? '').toString().compareTo((b['plate'] ?? '').toString()));
+            veiculos.sort(
+              (a, b) => (a['plate'] ?? '').toString().compareTo(
+                (b['plate'] ?? '').toString(),
+              ),
+            );
           });
         }
       } else {
@@ -126,7 +135,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
         if (!mounted) return;
         // Atualiza localmente
         setState(() {
-          final idx = veiculos.indexWhere((v) => v['id']?.toString() == editingId);
+          final idx = veiculos.indexWhere(
+            (v) => v['id']?.toString() == editingId,
+          );
           if (idx >= 0) {
             veiculos[idx] = {...veiculos[idx], ...payload, 'id': editingId};
           }
@@ -134,7 +145,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
       }
 
       if (!mounted) return;
-      _mostrarSucesso(isNew ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado!');
+      _mostrarSucesso(
+        isNew ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado!',
+      );
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
@@ -147,11 +160,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
   void _mostrarSucesso(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(children: [
-          const Icon(Icons.check_circle, color: Colors.white),
-          const SizedBox(width: 10),
-          Text(msg),
-        ]),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(msg),
+          ],
+        ),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -163,11 +178,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
   void _mostrarErro(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(children: [
-          const Icon(Icons.error_outline, color: Colors.white),
-          const SizedBox(width: 10),
-          Expanded(child: Text(msg)),
-        ]),
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(child: Text(msg)),
+          ],
+        ),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -214,7 +231,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Excluir veículo', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Excluir veículo',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           'Deseja excluir o veículo $placa permanentemente?',
           style: const TextStyle(color: AppColors.textSecondary),
@@ -249,7 +269,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
     if (q.isEmpty) return veiculos;
     return veiculos.where((v) {
       final nome = _nomeMotorista(v);
-      return '${v['plate']} ${v['brand']} ${v['model']} $nome'.toLowerCase().contains(q);
+      return '${v['plate']} ${v['brand']} ${v['model']} $nome'
+          .toLowerCase()
+          .contains(q);
     }).toList();
   }
 
@@ -335,18 +357,33 @@ class _VeiculosPageState extends State<VeiculosPage> {
               color: AppColors.secondary.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.local_shipping, color: AppColors.secondary, size: 26),
+            child: const Icon(
+              Icons.local_shipping,
+              color: AppColors.secondary,
+              size: 26,
+            ),
           ),
           const SizedBox(width: 14),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Gestão da Frota',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(
+                  'Gestão da Frota',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 SizedBox(height: 4),
-                Text('Cadastre, edite e gerencie todos os veículos da frota.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                Text(
+                  'Cadastre, edite e gerencie todos os veículos da frota.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),
@@ -359,11 +396,26 @@ class _VeiculosPageState extends State<VeiculosPage> {
     final atribuidos = veiculos.where((v) => v['driver_id'] != null).length;
     return Row(
       children: [
-        _statCard('Total de veículos', veiculos.length.toString(), Icons.directions_car, AppColors.secondary),
+        _statCard(
+          'Total de veículos',
+          veiculos.length.toString(),
+          Icons.directions_car,
+          AppColors.secondary,
+        ),
         const SizedBox(width: 12),
-        _statCard('Atribuídos', atribuidos.toString(), Icons.person_pin_circle, AppColors.success),
+        _statCard(
+          'Atribuídos',
+          atribuidos.toString(),
+          Icons.person_pin_circle,
+          AppColors.success,
+        ),
         const SizedBox(width: 12),
-        _statCard('Sem motorista', (veiculos.length - atribuidos).toString(), Icons.warning_amber, AppColors.warning),
+        _statCard(
+          'Sem motorista',
+          (veiculos.length - atribuidos).toString(),
+          Icons.warning_amber,
+          AppColors.warning,
+        ),
       ],
     );
   }
@@ -385,8 +437,22 @@ class _VeiculosPageState extends State<VeiculosPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(color: color.withOpacity(0.85), fontSize: 11, fontWeight: FontWeight.w600)),
-                  Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: color.withOpacity(0.85),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -411,13 +477,19 @@ class _VeiculosPageState extends State<VeiculosPage> {
               Row(
                 children: [
                   Icon(
-                    editingId != null ? Icons.edit_note : Icons.add_circle_outline,
-                    color: editingId != null ? AppColors.warning : AppColors.secondary,
+                    editingId != null
+                        ? Icons.edit_note
+                        : Icons.add_circle_outline,
+                    color: editingId != null
+                        ? AppColors.warning
+                        : AppColors.secondary,
                     size: 22,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    editingId != null ? 'Editar Veículo' : 'Registrar Novo Veículo',
+                    editingId != null
+                        ? 'Editar Veículo'
+                        : 'Registrar Novo Veículo',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,
@@ -433,7 +505,8 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 icon: Icons.credit_card,
                 hint: 'Ex: ABC-1234',
                 textCapitalization: TextCapitalization.characters,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe a placa' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Informe a placa' : null,
               ),
               const SizedBox(height: 12),
               _campo(
@@ -441,7 +514,8 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 label: 'Marca *',
                 icon: Icons.branding_watermark,
                 hint: 'Ex: Volkswagen',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe a marca' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Informe a marca' : null,
               ),
               const SizedBox(height: 12),
               _campo(
@@ -449,7 +523,8 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 label: 'Modelo *',
                 icon: Icons.directions_car_filled,
                 hint: 'Ex: Gol',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o modelo' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Informe o modelo' : null,
               ),
               const SizedBox(height: 12),
               Row(
@@ -462,9 +537,11 @@ class _VeiculosPageState extends State<VeiculosPage> {
                       hint: '2024',
                       keyboardType: TextInputType.number,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Informe o ano';
+                        if (v == null || v.trim().isEmpty)
+                          return 'Informe o ano';
                         final ano = int.tryParse(v.trim());
-                        if (ano == null || ano < 1900 || ano > 2100) return 'Ano inválido';
+                        if (ano == null || ano < 1900 || ano > 2100)
+                          return 'Ano inválido';
                         return null;
                       },
                     ),
@@ -477,7 +554,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
                       icon: Icons.speed,
                       hint: '0',
                       keyboardType: TextInputType.number,
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o Km' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Informe o Km'
+                          : null,
                     ),
                   ),
                 ],
@@ -488,7 +567,8 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 label: 'Cor *',
                 icon: Icons.color_lens,
                 hint: 'Ex: Branco',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe a cor' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Informe a cor' : null,
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -496,16 +576,26 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 decoration: InputDecoration(
                   labelText: 'Motorista responsável',
                   prefixIcon: const Icon(Icons.person_outline, size: 20),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
                 ),
                 hint: const Text('Selecionar motorista (opcional)'),
                 items: [
-                  const DropdownMenuItem<String>(value: null, child: Text('Sem motorista')),
-                  ...motoristas.map((m) => DropdownMenuItem<String>(
-                    value: m['id']?.toString(),
-                    child: Text(m['name']?.toString() ?? ''),
-                  )),
+                  const DropdownMenuItem<String>(
+                    value: null,
+                    child: Text('Sem motorista'),
+                  ),
+                  ...motoristas.map(
+                    (m) => DropdownMenuItem<String>(
+                      value: m['id']?.toString(),
+                      child: Text(m['name']?.toString() ?? ''),
+                    ),
+                  ),
                 ],
                 onChanged: (v) => setState(() => motoristaSelecionado = v),
               ),
@@ -515,21 +605,42 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 child: ElevatedButton.icon(
                   onPressed: isSaving ? null : salvarVeiculo,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: editingId != null ? AppColors.warning : AppColors.success,
+                    backgroundColor: editingId != null
+                        ? AppColors.warning
+                        : AppColors.success,
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: AppColors.border,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 3,
                   ),
                   icon: isSaving
                       ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
                         )
-                      : Icon(editingId != null ? Icons.save : Icons.save_alt_rounded, size: 20),
+                      : Icon(
+                          editingId != null
+                              ? Icons.save
+                              : Icons.save_alt_rounded,
+                          size: 20,
+                        ),
                   label: Text(
-                    isSaving ? 'Salvando...' : (editingId != null ? 'ATUALIZAR VEÍCULO' : 'SALVAR VEÍCULO'),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    isSaving
+                        ? 'Salvando...'
+                        : (editingId != null
+                              ? 'ATUALIZAR VEÍCULO'
+                              : 'SALVAR VEÍCULO'),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
@@ -540,7 +651,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textSecondary,
                     side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   icon: const Icon(Icons.close, size: 16),
                   label: const Text('Cancelar edição'),
@@ -549,7 +662,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: _limparFormulario,
-                  style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                  ),
                   icon: const Icon(Icons.clear_all, size: 16),
                   label: const Text('Limpar campos'),
                 ),
@@ -579,7 +694,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
         hintText: hint,
         prefixIcon: Icon(icon, size: 20),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
         errorStyle: const TextStyle(fontSize: 11),
       ),
       validator: validator,
@@ -594,12 +712,23 @@ class _VeiculosPageState extends State<VeiculosPage> {
         Row(
           children: [
             const Expanded(
-              child: Text('Veículos Cadastrados',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Veículos Cadastrados',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             if (!carregandoVeiculos)
-              Text('${veiculosFiltrados.length} de ${veiculos.length}',
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              Text(
+                '${veiculosFiltrados.length} de ${veiculos.length}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 10),
@@ -610,7 +739,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
             hintText: 'Buscar por placa, marca, modelo ou motorista...',
             prefixIcon: const Icon(Icons.search, size: 20),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -633,7 +765,8 @@ class _VeiculosPageState extends State<VeiculosPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: veiculosFiltrados.length,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, i) => _buildVeiculoCard(veiculosFiltrados[i]),
+            itemBuilder: (context, i) =>
+                _buildVeiculoCard(veiculosFiltrados[i]),
           ),
       ],
     );
@@ -651,10 +784,21 @@ class _VeiculosPageState extends State<VeiculosPage> {
         children: [
           const Icon(Icons.error_outline, color: AppColors.danger, size: 32),
           const SizedBox(height: 8),
-          const Text('Erro ao carregar veículos',
-              style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold)),
+          const Text(
+            'Erro ao carregar veículos',
+            style: TextStyle(
+              color: AppColors.danger,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(erroMsg ?? '', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          Text(
+            erroMsg ?? '',
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: carregarVeiculos,
@@ -676,13 +820,22 @@ class _VeiculosPageState extends State<VeiculosPage> {
       ),
       child: Column(
         children: [
-          Icon(Icons.directions_car_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.5)),
+          Icon(
+            Icons.directions_car_outlined,
+            size: 48,
+            color: AppColors.textSecondary.withOpacity(0.5),
+          ),
           const SizedBox(height: 12),
-          const Text('Nenhum veículo encontrado',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+          const Text(
+            'Nenhum veículo encontrado',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+          ),
           if (searchController.text.isNotEmpty) ...[
             const SizedBox(height: 6),
-            TextButton(onPressed: () => setState(() => searchController.clear()), child: const Text('Limpar busca')),
+            TextButton(
+              onPressed: () => setState(() => searchController.clear()),
+              child: const Text('Limpar busca'),
+            ),
           ],
         ],
       ),
@@ -696,7 +849,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: isEditing ? AppColors.warning.withOpacity(0.08) : AppColors.surface,
+        color: isEditing
+            ? AppColors.warning.withOpacity(0.08)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isEditing ? AppColors.warning : AppColors.border,
@@ -712,11 +867,19 @@ class _VeiculosPageState extends State<VeiculosPage> {
             color: AppColors.secondary.withOpacity(0.12),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.directions_car, color: AppColors.secondary, size: 22),
+          child: const Icon(
+            Icons.directions_car,
+            color: AppColors.secondary,
+            size: 22,
+          ),
         ),
         title: Text(
           '${v['plate'] ?? '--'} • ${v['brand'] ?? ''} ${v['model'] ?? ''}',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -727,14 +890,18 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 Icon(
                   temMotorista ? Icons.person : Icons.person_off,
                   size: 13,
-                  color: temMotorista ? AppColors.success : AppColors.textSecondary,
+                  color: temMotorista
+                      ? AppColors.success
+                      : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     nomeMotorista,
                     style: TextStyle(
-                      color: temMotorista ? AppColors.success : AppColors.textSecondary,
+                      color: temMotorista
+                          ? AppColors.success
+                          : AppColors.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -744,14 +911,19 @@ class _VeiculosPageState extends State<VeiculosPage> {
             const SizedBox(height: 2),
             Text(
               'Ano: ${v['year'] ?? '--'} • Km: ${v['odometer'] ?? '--'} • Cor: ${v['color'] ?? '--'}',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
         trailing: PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
           color: AppColors.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           onSelected: (action) {
             if (action == 'edit') editarVeiculo(v);
             if (action == 'delete') {
@@ -763,19 +935,27 @@ class _VeiculosPageState extends State<VeiculosPage> {
           itemBuilder: (_) => [
             const PopupMenuItem(
               value: 'edit',
-              child: Row(children: [
-                Icon(Icons.edit_outlined, size: 16, color: AppColors.secondary),
-                SizedBox(width: 8),
-                Text('Editar', style: TextStyle(color: Colors.white)),
-              ]),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: AppColors.secondary,
+                  ),
+                  SizedBox(width: 8),
+                  Text('Editar', style: TextStyle(color: Colors.white)),
+                ],
+              ),
             ),
             const PopupMenuItem(
               value: 'delete',
-              child: Row(children: [
-                Icon(Icons.delete_outline, size: 16, color: AppColors.danger),
-                SizedBox(width: 8),
-                Text('Excluir', style: TextStyle(color: AppColors.danger)),
-              ]),
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 16, color: AppColors.danger),
+                  SizedBox(width: 8),
+                  Text('Excluir', style: TextStyle(color: AppColors.danger)),
+                ],
+              ),
             ),
           ],
         ),

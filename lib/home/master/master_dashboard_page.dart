@@ -37,7 +37,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
   List<Map<String, dynamic>> _empresas = [];
 
-
   @override
   void initState() {
     super.initState();
@@ -75,7 +74,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       ]);
 
       final empresas = List<Map<String, dynamic>>.from(results[0] as List);
-      final onlineProfiles = List<Map<String, dynamic>>.from(results[8] as List);
+      final onlineProfiles = List<Map<String, dynamic>>.from(
+        results[8] as List,
+      );
 
       final onlineIds = onlineProfiles
           .map((p) => p['empresa_id'])
@@ -88,7 +89,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _totalEmpresas = empresas.length;
         _empresasAtivas = empresas.where((e) => e['status'] == 'ativo').length;
         _empresasBloqueadas = empresas
-            .where((e) => e['status'] == 'suspenso' || e['status'] == 'cancelado')
+            .where(
+              (e) => e['status'] == 'suspenso' || e['status'] == 'cancelado',
+            )
             .length;
         _empresasOnline = onlineIds.length;
         _totalUsuarios = (results[1] as List).length;
@@ -137,9 +140,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     if (_searchQuery.isEmpty) return _empresas;
     final q = _searchQuery.toLowerCase();
     return _empresas
-        .where((e) =>
-            (e['nome'] as String? ?? '').toLowerCase().contains(q) ||
-            (e['cnpj'] as String? ?? '').toLowerCase().contains(q))
+        .where(
+          (e) =>
+              (e['nome'] as String? ?? '').toLowerCase().contains(q) ||
+              (e['cnpj'] as String? ?? '').toLowerCase().contains(q),
+        )
         .toList();
   }
 
@@ -165,7 +170,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFEF4444)))
+                    child: CircularProgressIndicator(color: Color(0xFFEF4444)),
+                  )
                 : _buildContent(),
           ),
         ],
@@ -208,24 +214,33 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.admin_panel_settings_rounded,
-                      color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.admin_panel_settings_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('FrotaCheck',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800)),
-                    Text('MASTER',
-                        style: TextStyle(
-                            color: Color(0xFFEF4444),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.5)),
+                    Text(
+                      'FrotaCheck',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'MASTER',
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -236,11 +251,16 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
           // Nav
           _sidebarItem(Icons.dashboard_rounded, 'Painel Geral', active: true),
-          _sidebarItem(Icons.group_rounded, 'Todos os Usuários', onTap: () {
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => const AdminUsuariosPage(),
-            ));
-          }),
+          _sidebarItem(
+            Icons.group_rounded,
+            'Todos os Usuários',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminUsuariosPage()),
+              );
+            },
+          ),
           const Spacer(),
 
           // Stats resumidas
@@ -255,25 +275,35 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Resumo',
-                    style: TextStyle(
-                        color: Color(0xFF475569),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5)),
+                const Text(
+                  'Resumo',
+                  style: TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                _resumoItem(Icons.business_rounded, '$_empresasAtivas ativas',
-                    const Color(0xFF22C55E)),
+                _resumoItem(
+                  Icons.business_rounded,
+                  '$_empresasAtivas ativas',
+                  const Color(0xFF22C55E),
+                ),
                 const SizedBox(height: 4),
                 _resumoItem(
-                    Icons.wifi_rounded,
-                    '$_empresasOnline online',
-                    _empresasOnline > 0
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFF334155)),
+                  Icons.wifi_rounded,
+                  '$_empresasOnline online',
+                  _empresasOnline > 0
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFF334155),
+                ),
                 const SizedBox(height: 4),
-                _resumoItem(Icons.business_rounded,
-                    '$_empresasAtivas ativas', const Color(0xFF3B82F6)),
+                _resumoItem(
+                  Icons.business_rounded,
+                  '$_empresasAtivas ativas',
+                  const Color(0xFF3B82F6),
+                ),
               ],
             ),
           ),
@@ -288,14 +318,20 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(Icons.logout_rounded,
-                        color: Color(0xFFEF4444), size: 17),
+                    Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 17,
+                    ),
                     SizedBox(width: 10),
-                    Text('Sair',
-                        style: TextStyle(
-                            color: Color(0xFFEF4444),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      'Sair',
+                      style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -307,34 +343,41 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     );
   }
 
-  Widget _sidebarItem(IconData icon, String label,
-      {bool active = false, VoidCallback? onTap}) {
+  Widget _sidebarItem(
+    IconData icon,
+    String label, {
+    bool active = false,
+    VoidCallback? onTap,
+  }) {
     final container = Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: active
           ? BoxDecoration(
               color: const Color(0xFFEF4444).withOpacity(0.10),
               borderRadius: BorderRadius.circular(8),
-              border:
-                  Border.all(color: const Color(0xFFEF4444).withOpacity(0.22)),
+              border: Border.all(
+                color: const Color(0xFFEF4444).withOpacity(0.22),
+              ),
             )
           : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
-            Icon(icon,
-                color: active
-                    ? const Color(0xFFEF4444)
-                    : const Color(0xFF475569),
-                size: 17),
+            Icon(
+              icon,
+              color: active ? const Color(0xFFEF4444) : const Color(0xFF475569),
+              size: 17,
+            ),
             const SizedBox(width: 10),
-            Text(label,
-                style: TextStyle(
-                    color: active ? Colors.white : const Color(0xFF94A3B8),
-                    fontSize: 13,
-                    fontWeight:
-                        active ? FontWeight.w600 : FontWeight.w400)),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? Colors.white : const Color(0xFF94A3B8),
+                fontSize: 13,
+                fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
           ],
         ),
       ),
@@ -355,9 +398,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       children: [
         Icon(icon, color: color, size: 13),
         const SizedBox(width: 6),
-        Text(text,
-            style: TextStyle(
-                color: color, fontSize: 11, fontWeight: FontWeight.w500)),
+        Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -391,15 +439,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     final hora = _lastUpdated == null
         ? ''
         : '${_lastUpdated!.hour.toString().padLeft(2, '0')}:'
-            '${_lastUpdated!.minute.toString().padLeft(2, '0')}:'
-            '${_lastUpdated!.second.toString().padLeft(2, '0')}';
+              '${_lastUpdated!.minute.toString().padLeft(2, '0')}:'
+              '${_lastUpdated!.second.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
       decoration: const BoxDecoration(
         color: Color(0xFF080F1E),
-        border:
-            Border(bottom: BorderSide(color: Color(0xFF0E1E33))),
+        border: Border(bottom: BorderSide(color: Color(0xFF0E1E33))),
       ),
       child: Row(
         children: [
@@ -419,38 +466,45 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                       boxShadow: _empresasOnline > 0
                           ? [
                               BoxShadow(
-                                color:
-                                    const Color(0xFF22C55E).withOpacity(0.5),
+                                color: const Color(0xFF22C55E).withOpacity(0.5),
                                 blurRadius: 6,
-                              )
+                              ),
                             ]
                           : null,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('Painel Master',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700)),
+                  const Text(
+                    'Painel Master',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 2),
-              const Text('Visão global do sistema FrotaCheck',
-                  style:
-                      TextStyle(color: Color(0xFF475569), fontSize: 13)),
+              const Text(
+                'Visão global do sistema FrotaCheck',
+                style: TextStyle(color: Color(0xFF475569), fontSize: 13),
+              ),
             ],
           ),
           const Spacer(),
           if (hora.isNotEmpty)
-            Text('Atualizado $hora',
-                style: const TextStyle(
-                    color: Color(0xFF334155), fontSize: 11)),
+            Text(
+              'Atualizado $hora',
+              style: const TextStyle(color: Color(0xFF334155), fontSize: 11),
+            ),
           const SizedBox(width: 8),
           IconButton(
             onPressed: _loadAll,
-            icon: const Icon(Icons.refresh_rounded,
-                color: Color(0xFF475569), size: 20),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: Color(0xFF475569),
+              size: 20,
+            ),
             tooltip: 'Atualizar agora',
           ),
         ],
@@ -462,50 +516,96 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
   Widget _buildKpiGrid() {
     final cards = [
-      _Kpi('Total Empresas', '$_totalEmpresas', Icons.business_rounded,
-          const Color(0xFF3B82F6)),
-      _Kpi('Empresas Ativas', '$_empresasAtivas', Icons.check_circle_rounded,
-          const Color(0xFF22C55E)),
-      _Kpi('Bloqueadas/Suspensas', '$_empresasBloqueadas',
-          Icons.block_rounded, const Color(0xFFEF4444)),
-      _Kpi('Online Agora', '$_empresasOnline', Icons.wifi_rounded,
-          const Color(0xFF10B981),
-          pulse: _empresasOnline > 0),
-      _Kpi('Total Usuários', '$_totalUsuarios', Icons.people_rounded,
-          const Color(0xFF8B5CF6)),
-      _Kpi('Total Veículos', '$_totalVeiculos',
-          Icons.directions_car_rounded, const Color(0xFFF59E0B)),
-      _Kpi('Total Motoristas', '$_totalMotoristas', Icons.badge_rounded,
-          const Color(0xFF06B6D4)),
-      _Kpi('Abastecimentos', '$_totalAbastecimentos',
-          Icons.local_gas_station_rounded, const Color(0xFFEC4899)),
-      _Kpi('Checklists', '$_totalChecklists', Icons.checklist_rounded,
-          const Color(0xFF14B8A6)),
-      _Kpi('Ocorrências', '$_totalOcorrencias', Icons.warning_amber_rounded,
-          const Color(0xFFF97316)),
-      _Kpi('Manutenções', '$_totalManutencoes', Icons.build_rounded,
-          const Color(0xFF64748B)),
+      _Kpi(
+        'Total Empresas',
+        '$_totalEmpresas',
+        Icons.business_rounded,
+        const Color(0xFF3B82F6),
+      ),
+      _Kpi(
+        'Empresas Ativas',
+        '$_empresasAtivas',
+        Icons.check_circle_rounded,
+        const Color(0xFF22C55E),
+      ),
+      _Kpi(
+        'Bloqueadas/Suspensas',
+        '$_empresasBloqueadas',
+        Icons.block_rounded,
+        const Color(0xFFEF4444),
+      ),
+      _Kpi(
+        'Online Agora',
+        '$_empresasOnline',
+        Icons.wifi_rounded,
+        const Color(0xFF10B981),
+        pulse: _empresasOnline > 0,
+      ),
+      _Kpi(
+        'Total Usuários',
+        '$_totalUsuarios',
+        Icons.people_rounded,
+        const Color(0xFF8B5CF6),
+      ),
+      _Kpi(
+        'Total Veículos',
+        '$_totalVeiculos',
+        Icons.directions_car_rounded,
+        const Color(0xFFF59E0B),
+      ),
+      _Kpi(
+        'Total Motoristas',
+        '$_totalMotoristas',
+        Icons.badge_rounded,
+        const Color(0xFF06B6D4),
+      ),
+      _Kpi(
+        'Abastecimentos',
+        '$_totalAbastecimentos',
+        Icons.local_gas_station_rounded,
+        const Color(0xFFEC4899),
+      ),
+      _Kpi(
+        'Checklists',
+        '$_totalChecklists',
+        Icons.checklist_rounded,
+        const Color(0xFF14B8A6),
+      ),
+      _Kpi(
+        'Ocorrências',
+        '$_totalOcorrencias',
+        Icons.warning_amber_rounded,
+        const Color(0xFFF97316),
+      ),
+      _Kpi(
+        'Manutenções',
+        '$_totalManutencoes',
+        Icons.build_rounded,
+        const Color(0xFF64748B),
+      ),
     ];
 
-    return LayoutBuilder(builder: (ctx, c) {
-      final cols = c.maxWidth < 700
-          ? 2
-          : c.maxWidth < 1100
-              ? 3
-              : 4;
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: cols,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.85,
-        ),
-        itemCount: cards.length,
-        itemBuilder: (_, i) => _buildKpiCard(cards[i]),
-      );
-    });
+    return LayoutBuilder(
+      builder: (ctx, c) {
+        final cols = c.maxWidth < 700
+            ? 2
+            : c.maxWidth < 1100
+            ? 3
+            : 4;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.85,
+          ),
+          itemCount: cards.length,
+          itemBuilder: (_, i) => _buildKpiCard(cards[i]),
+        );
+      },
+    );
   }
 
   Widget _buildKpiCard(_Kpi k) {
@@ -540,9 +640,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     color: k.color,
                     shape: BoxShape.circle,
                     boxShadow: [
-                      BoxShadow(
-                          color: k.color.withOpacity(0.6),
-                          blurRadius: 6)
+                      BoxShadow(color: k.color.withOpacity(0.6), blurRadius: 6),
                     ],
                   ),
                 ),
@@ -552,15 +650,19 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(k.value,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700)),
+              Text(
+                k.value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(k.label,
-                  style: const TextStyle(
-                      color: Color(0xFF64748B), fontSize: 11)),
+              Text(
+                k.label,
+                style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+              ),
             ],
           ),
         ],
@@ -576,26 +678,32 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       children: [
         Row(
           children: [
-            const Text('Empresas',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700)),
+            const Text(
+              'Empresas',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(width: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: const Color(0xFF3B82F6).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                    color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                  color: const Color(0xFF3B82F6).withOpacity(0.3),
+                ),
               ),
-              child: Text('$_totalEmpresas',
-                  style: const TextStyle(
-                      color: Color(0xFF3B82F6),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                '$_totalEmpresas',
+                style: const TextStyle(
+                  color: Color(0xFF3B82F6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -612,17 +720,17 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           child: TextField(
             controller: _searchCtrl,
             onChanged: (v) => setState(() => _searchQuery = v),
-            style:
-                const TextStyle(color: Colors.white, fontSize: 13),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
             decoration: const InputDecoration(
               hintText: 'Pesquisar por nome ou CNPJ...',
-              hintStyle:
-                  TextStyle(color: Color(0xFF334155), fontSize: 13),
-              prefixIcon: Icon(Icons.search_rounded,
-                  color: Color(0xFF334155), size: 18),
+              hintStyle: TextStyle(color: Color(0xFF334155), fontSize: 13),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: Color(0xFF334155),
+                size: 18,
+              ),
               border: InputBorder.none,
-              contentPadding:
-                  EdgeInsets.symmetric(vertical: 11),
+              contentPadding: EdgeInsets.symmetric(vertical: 11),
             ),
           ),
         ),
@@ -647,7 +755,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         ? 'Nenhuma empresa cadastrada ainda.'
                         : 'Nenhuma empresa encontrada para "$_searchQuery".',
                     style: const TextStyle(
-                        color: Color(0xFF334155), fontSize: 13),
+                      color: Color(0xFF334155),
+                      fontSize: 13,
+                    ),
                   ),
                 )
               else
@@ -657,9 +767,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     children: [
                       _companyRow(e),
                       if (i < _empresasFiltradas.length - 1)
-                        Container(
-                            height: 1,
-                            color: const Color(0xFF0A1628)),
+                        Container(height: 1, color: const Color(0xFF0A1628)),
                     ],
                   );
                 }),
@@ -672,13 +780,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
   Widget _tableHeader() {
     const style = TextStyle(
-        color: Color(0xFF475569),
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5);
+      color: Color(0xFF475569),
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+    );
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: const [
           Expanded(flex: 3, child: Text('EMPRESA', style: style)),
@@ -698,7 +806,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
     DateTime? dt;
     if (createdAt != null) {
-      try { dt = DateTime.parse(createdAt); } catch (_) {}
+      try {
+        dt = DateTime.parse(createdAt);
+      } catch (_) {}
     }
     final dataCadastro = dt != null
         ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}'
@@ -726,28 +836,37 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     border: Border.all(color: iconColor.withOpacity(0.3)),
                   ),
                   alignment: Alignment.center,
-                  child: Text(inicial,
-                      style: const TextStyle(
-                          color: iconColor,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700)),
+                  child: Text(
+                    inicial,
+                    style: const TextStyle(
+                      color: iconColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(nome,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        nome,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       if (cnpj.isNotEmpty)
-                        Text(cnpj,
-                            style: const TextStyle(
-                                color: Color(0xFF475569),
-                                fontSize: 10)),
+                        Text(
+                          cnpj,
+                          style: const TextStyle(
+                            color: Color(0xFF475569),
+                            fontSize: 10,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -761,20 +880,24 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             child: Row(
               children: [
                 Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                              color: statusColor.withOpacity(0.5),
-                              blurRadius: 4)
-                        ])),
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withOpacity(0.5),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 6),
-                Text(status,
-                    style: TextStyle(
-                        color: statusColor, fontSize: 12)),
+                Text(
+                  status,
+                  style: TextStyle(color: statusColor, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -782,9 +905,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           // Cadastro
           Expanded(
             flex: 2,
-            child: Text(dataCadastro,
-                style: const TextStyle(
-                    color: Color(0xFF64748B), fontSize: 12)),
+            child: Text(
+              dataCadastro,
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+            ),
           ),
 
           // Ações
@@ -796,21 +920,23 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   child: ElevatedButton.icon(
                     onPressed: () => _enterAsEmpresa(empresa),
                     icon: const Icon(Icons.login_rounded, size: 13),
-                    label: const Text('Entrar',
-                        style: TextStyle(fontSize: 12)),
+                    label: const Text('Entrar', style: TextStyle(fontSize: 12)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          const Color(0xFF3B82F6).withOpacity(0.15),
-                      foregroundColor:
-                          const Color(0xFF3B82F6),
+                      backgroundColor: const Color(
+                        0xFF3B82F6,
+                      ).withOpacity(0.15),
+                      foregroundColor: const Color(0xFF3B82F6),
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7),
-                          side: BorderSide(
-                              color: const Color(0xFF3B82F6)
-                                  .withOpacity(0.3))),
+                        borderRadius: BorderRadius.circular(7),
+                        side: BorderSide(
+                          color: const Color(0xFF3B82F6).withOpacity(0.3),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -824,18 +950,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
   void _enterAsEmpresa(Map<String, dynamic> empresa) {
     context.read<AppAuthProvider>().enterAsEmpresa(
-          empresa['id'] as String,
-          empresa['nome'] as String? ?? 'Empresa',
-        );
+      empresa['id'] as String,
+      empresa['nome'] as String? ?? 'Empresa',
+    );
     // _MasterAwareRouter detecta isImpersonating=true e exibe HomePage
   }
 
   Color _statusColor(String status) => switch (status) {
-        'ativo' => const Color(0xFF22C55E),
-        'suspenso' => const Color(0xFFF59E0B),
-        'cancelado' || 'bloqueado' => const Color(0xFFEF4444),
-        _ => const Color(0xFF64748B),
-      };
+    'ativo' => const Color(0xFF22C55E),
+    'suspenso' => const Color(0xFFF59E0B),
+    'cancelado' || 'bloqueado' => const Color(0xFFEF4444),
+    _ => const Color(0xFF64748B),
+  };
 }
 
 // Data class
@@ -846,6 +972,11 @@ class _Kpi {
   final Color color;
   final bool pulse;
 
-  const _Kpi(this.label, this.value, this.icon, this.color,
-      {this.pulse = false});
+  const _Kpi(
+    this.label,
+    this.value,
+    this.icon,
+    this.color, {
+    this.pulse = false,
+  });
 }
