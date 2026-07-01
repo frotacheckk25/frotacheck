@@ -43,12 +43,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   Future<void> _carregar() async {
     setState(() => _loadingVeiculo = true);
     final auth = context.read<AppAuthProvider>();
-    final empresaId = auth.empresaId;
 
-    if (empresaId == null) {
-      setState(() => _loadingVeiculo = false);
-      return;
-    }
+    // empresaId é usado nos filtros de KPI abaixo; não bloqueia o load do veículo.
+    final empresaId = auth.empresaId;
 
     // Busca driver_id sempre do banco para capturar vínculos feitos pelo admin
     // após o login (o AppAuthProvider cacheia o perfil na sessão).
@@ -113,7 +110,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       Map<String, dynamic>? ultManut;
       String? vehicleId = veiculo?['id']?.toString();
 
-      if (driverId != null) {
+      if (driverId != null && empresaId != null) {
         try {
           final res = await _supabase
               .from('checklists')
@@ -149,8 +146,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         } catch (_) {}
       }
 
-      // Alertas do veículo vinculado
-      if (vehicleId != null) {
+      // Alertas do veículo vinculado (requer empresaId para o filtro RLS)
+      if (vehicleId != null && empresaId != null) {
         try {
           final alertRes = await _supabase
               .from('alerts')
@@ -162,8 +159,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .limit(5);
           alertas = List<Map<String, dynamic>>.from(alertRes);
         } catch (_) {}
+      }
 
-        // Última manutenção do veículo vinculado
+      // Última manutenção (só precisa do vehicleId, sem empresa_id)
+      if (vehicleId != null) {
         try {
           ultManut = await _supabase
               .from('oil_changes')
@@ -990,8 +989,18 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Meu Veículo',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Meu Veículo',
+                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+              IconButton(
+                onPressed: _carregar,
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+                tooltip: 'Atualizar',
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           _buildVeiculoCard(destaque: false),
           if (_veiculo != null) ...[
