@@ -45,12 +45,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   Future<void> _carregar() async {
     setState(() => _loadingVeiculo = true);
     final auth = context.read<AppAuthProvider>();
-
-    // empresaId é usado nos filtros de KPI abaixo; não bloqueia o load do veículo.
     final empresaId = auth.empresaId;
-
-    // Busca driver_id sempre do banco para capturar vínculos feitos pelo admin
-    // após o login (o AppAuthProvider cacheia o perfil na sessão).
     String? driverId = auth.profile?.driverId;
     final userId = _supabase.auth.currentUser?.id;
     try {
@@ -64,9 +59,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       }
     } catch (_) {}
 
-    // Fallback: se user_profiles.driver_id é null, tenta via drivers.user_id.
-    // Isso cobre o caso onde o Gestor vinculou o veículo ao motorista
-    // mas o admin ainda não vinculou o usuário ao driver em Gestão de Usuários.
     if (driverId == null && userId != null) {
       try {
         final driverRow = await _supabase
@@ -77,8 +69,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         final fallbackId = driverRow?['id']?.toString();
         if (fallbackId != null) {
           driverId = fallbackId;
-          // Auto-corrige user_profiles.driver_id para que próximos loads usem
-          // o caminho rápido e o RBAC/RLS funcionem corretamente.
           await _supabase
               .from('user_profiles')
               .update({'driver_id': fallbackId})
@@ -90,11 +80,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
     try {
       final hoje = DateTime.now();
-      final inicioHoje = DateTime(hoje.year, hoje.month, hoje.day).toIso8601String();
+      final inicioHoje =
+          DateTime(hoje.year, hoje.month, hoje.day).toIso8601String();
 
-      // Busca veículo via RPC SECURITY DEFINER para burlar RLS policies.
-      // A função get_my_vehicle() usa driver_id do user_profiles do usuário
-      // autenticado, sem depender de nenhuma policy de isolamento.
       Map<String, dynamic>? veiculo;
       try {
         final rpcResult = await _supabase.rpc('get_my_vehicle') as List?;
@@ -103,13 +91,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         }
       } catch (_) {}
 
-      // KPIs do dia (filtrados pelo driverId do motorista)
       int checklistsHoje = 0;
       int ocorrenciasAbertas = 0;
       List<Map<String, dynamic>> alertas = [];
       Map<String, dynamic>? abastRes;
       Map<String, dynamic>? ultManut;
-      String? vehicleId = veiculo?['id']?.toString();
+      final vehicleId = veiculo?['id']?.toString();
 
       if (driverId != null && empresaId != null) {
         try {
@@ -134,7 +121,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           ocorrenciasAbertas = res.count;
         } catch (_) {}
 
-        // Último abastecimento deste motorista
         try {
           abastRes = await _supabase
               .from('fuelings')
@@ -147,7 +133,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         } catch (_) {}
       }
 
-      // Alertas do veículo vinculado (requer empresaId para o filtro RLS)
       if (vehicleId != null && empresaId != null) {
         try {
           final alertRes = await _supabase
@@ -162,7 +147,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         } catch (_) {}
       }
 
-      // Última manutenção (só precisa do vehicleId, sem empresa_id)
       if (vehicleId != null) {
         try {
           ultManut = await _supabase
@@ -211,7 +195,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  // ── Layout Mobile ─────────────────────────────────────────────────────────
+  // ── Mobile Scaffold ───────────────────────────────────────────────────────
 
   Widget _buildMobileScaffold(AppAuthProvider auth, String primeiroNome) {
     return Scaffold(
@@ -233,16 +217,21 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 ),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 14),
+              child: const Icon(Icons.local_shipping_rounded,
+                  color: Colors.white, size: 14),
             ),
             const SizedBox(width: 8),
             const Text('FrotaCheck',
-                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700)),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
+            icon: const Icon(Icons.refresh_rounded,
+                color: AppColors.textSecondary, size: 20),
             onPressed: _carregar,
           ),
         ],
@@ -277,216 +266,152 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       onTap: (i) => setState(() => _activeTab = _MobileTab.values[i]),
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard_rounded, size: 22),
-          label: 'Início',
-        ),
+            icon: Icon(Icons.dashboard_rounded, size: 22), label: 'Início'),
         BottomNavigationBarItem(
-          icon: Icon(Icons.directions_car_rounded, size: 22),
-          label: 'Veículo',
-        ),
+            icon: Icon(Icons.directions_car_rounded, size: 22),
+            label: 'Veículo'),
         BottomNavigationBarItem(
-          icon: Icon(Icons.apps_rounded, size: 22),
-          label: 'Atividades',
-        ),
+            icon: Icon(Icons.apps_rounded, size: 22), label: 'Atividades'),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person_rounded, size: 22),
-          label: 'Perfil',
-        ),
+            icon: Icon(Icons.person_rounded, size: 22), label: 'Perfil'),
       ],
     );
   }
 
+  // ── Mobile Dashboard ──────────────────────────────────────────────────────
+
   Widget _buildMobileDashboard(AppAuthProvider auth, String primeiroNome) {
     final hora = DateTime.now().hour;
-    final saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+    final saudacao =
+        hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
 
     return RefreshIndicator(
       color: const Color(0xFF1AA251),
       onRefresh: _carregar,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('$saudacao, $primeiroNome!',
                 style: const TextStyle(
-                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            _buildVeiculoCardMobile(),
-            const SizedBox(height: 12),
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            _buildVeiculoBanner(),
+            const SizedBox(height: 10),
             Row(
               children: [
-                _kpi('Checklists\nHoje', '$_checklistsHoje', Icons.checklist_rounded,
-                    const Color(0xFF1AA251)),
-                const SizedBox(width: 10),
-                _kpi('Ocorrências\nAbertas', '$_ocorrenciasAbertas',
+                _kpiChip(Icons.checklist_rounded, '$_checklistsHoje',
+                    'checklists', const Color(0xFF1AA251)),
+                const SizedBox(width: 8),
+                _kpiChip(
                     Icons.report_problem_rounded,
+                    '$_ocorrenciasAbertas',
+                    'ocorrências',
                     _ocorrenciasAbertas > 0
                         ? const Color(0xFFEF4444)
                         : const Color(0xFF475569)),
               ],
             ),
+            if (_alertas.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ..._alertas.map(_alertaBanner),
+            ],
             const SizedBox(height: 14),
-            const Text('Ações Rápidas',
-                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+            _sectionHeader('Ações Rápidas'),
             const SizedBox(height: 8),
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.5,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.2,
               children: [
-                _acaoMobile(
-                    Icons.checklist_rtl_rounded, 'Checklist\nSaída', const Color(0xFF1AA251),
+                _acaoCompacta(Icons.checklist_rtl_rounded, 'Checklist Saída',
+                    const Color(0xFF1AA251),
                     () => _push(const SelecionarVeiculoChecklistPage())),
-                _acaoMobile(
-                    Icons.assignment_turned_in_rounded, 'Checklist\nRetorno',
+                _acaoCompacta(
+                    Icons.assignment_turned_in_rounded,
+                    'Checklist Retorno',
                     const Color(0xFF3B82F6),
                     () => _push(const SelecionarVeiculoChecklistPage())),
-                _acaoMobile(
-                    Icons.local_gas_station_rounded, 'Abastecer', const Color(0xFFF59E0B),
+                _acaoCompacta(Icons.local_gas_station_rounded, 'Abastecer',
+                    const Color(0xFFF59E0B),
                     () => _push(const AbastecimentosPage())),
-                _acaoMobile(
-                    Icons.report_problem_rounded, 'Ocorrência', const Color(0xFFEF4444),
+                _acaoCompacta(Icons.report_problem_rounded, 'Ocorrência',
+                    const Color(0xFFEF4444),
                     () => _push(const ListaOcorrenciasPage())),
               ],
             ),
-            if (_alertas.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              const Text('Alertas do Veículo',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              ..._alertas.map(_alertaCard),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVeiculoCardMobile() {
-    if (_loadingVeiculo) {
-      return Container(
-        height: 68,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: const Center(
-            child: CircularProgressIndicator(color: Color(0xFF1AA251), strokeWidth: 2)),
-      );
-    }
-    if (_veiculo == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: const Row(
+  // ── Mobile Atividades (grid) ──────────────────────────────────────────────
+
+  Widget _buildMobileAtividades() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      children: [
+        const Text('Atividades',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.15,
           children: [
-            Icon(Icons.directions_car_outlined, color: Color(0xFF475569), size: 22),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Nenhum veículo vinculado',
-                      style: TextStyle(
-                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                  Text('Solicite ao gestor que vincule um veículo.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                ],
-              ),
-            ),
+            _atividadeGrid(Icons.route_rounded, 'Minha Viagem',
+                const Color(0xFF8B5CF6), () => _push(const ViagensPage())),
+            _atividadeGrid(
+                Icons.checklist_rtl_rounded,
+                'Checklist Saída',
+                const Color(0xFF1AA251),
+                () => _push(const SelecionarVeiculoChecklistPage())),
+            _atividadeGrid(
+                Icons.assignment_turned_in_rounded,
+                'Checklist Retorno',
+                const Color(0xFF3B82F6),
+                () => _push(const SelecionarVeiculoChecklistPage())),
+            _atividadeGrid(
+                Icons.local_gas_station_rounded,
+                'Abastecimentos',
+                const Color(0xFFF59E0B),
+                () => _push(const AbastecimentosPage())),
+            _atividadeGrid(Icons.build_rounded, 'Manutenções',
+                const Color(0xFFEC4899), () => _push(const ManutencoesPage())),
+            _atividadeGrid(Icons.report_problem_rounded, 'Ocorrências',
+                const Color(0xFFEF4444),
+                () => _push(const ListaOcorrenciasPage())),
+            _atividadeGrid(Icons.description_rounded, 'Documentos',
+                const Color(0xFF06B6D4), () => _push(const DocumentosPage())),
+            _atividadeGrid(Icons.tire_repair_rounded, 'Pneus',
+                const Color(0xFF10B981), () => _push(const PneusPage())),
+            _atividadeGrid(Icons.gavel_rounded, 'Multas',
+                const Color(0xFFDC2626), () => _push(const MultasPage())),
+            _atividadeGrid(Icons.history_rounded, 'Histórico',
+                const Color(0xFF6B7280),
+                () => _push(const HistoricoChecklistPage())),
           ],
         ),
-      );
-    }
-
-    final placa = _veiculo!['plate']?.toString() ?? '—';
-    final modelo = '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
-    final status = _veiculo!['status']?.toString() ?? 'ativo';
-    final cor = status == 'ativo'
-        ? const Color(0xFF1AA251)
-        : status == 'manutencao'
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFFEF4444);
-
-    return GestureDetector(
-      onTap: () => setState(() => _activeTab = _MobileTab.veiculo),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cor.withOpacity(0.35)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: cor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(Icons.directions_car_rounded, color: cor, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(placa,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.5)),
-                  if (modelo.isNotEmpty)
-                    Text(modelo,
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 11)),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: cor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: cor.withOpacity(0.30)),
-                  ),
-                  child: Text(status.toUpperCase(),
-                      style: TextStyle(
-                          color: cor, fontSize: 9, fontWeight: FontWeight.w700)),
-                ),
-                if (_alertas.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text('${_alertas.length} alerta(s)',
-                      style: const TextStyle(
-                          color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w600)),
-                ],
-              ],
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 16),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
-  Widget _acaoMobile(IconData icon, String label, Color cor, VoidCallback onTap) {
+  Widget _atividadeGrid(
+      IconData icon, String label, Color cor, VoidCallback onTap) {
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(12),
@@ -496,24 +421,25 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cor.withOpacity(0.28)),
+            border: Border.all(color: cor.withOpacity(0.22)),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(color: cor.withOpacity(0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: cor, size: 24),
+                decoration: BoxDecoration(
+                    color: cor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: cor, size: 22),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 7),
               Text(label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      height: 1.3)),
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -521,86 +447,36 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  Widget _buildMobileAtividades() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 14),
-          child: Text('Atividades',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-        ),
-        _itemAtividade(Icons.route_rounded, 'Minha Viagem', 'Registrar início e fim de viagem',
-            const Color(0xFF8B5CF6), () => _push(const ViagensPage())),
-        _itemAtividade(Icons.checklist_rtl_rounded, 'Checklist Saída', 'Vistoria antes de sair',
-            const Color(0xFF1AA251), () => _push(const SelecionarVeiculoChecklistPage())),
-        _itemAtividade(Icons.assignment_turned_in_rounded, 'Checklist Retorno',
-            'Vistoria ao retornar', const Color(0xFF3B82F6),
-            () => _push(const SelecionarVeiculoChecklistPage())),
-        _itemAtividade(Icons.local_gas_station_rounded, 'Abastecimentos',
-            'Registrar abastecimento', const Color(0xFFF59E0B),
-            () => _push(const AbastecimentosPage())),
-        _itemAtividade(Icons.build_rounded, 'Manutenções', 'Registrar manutenção do veículo',
-            const Color(0xFFEC4899), () => _push(const ManutencoesPage())),
-        _itemAtividade(Icons.report_problem_rounded, 'Ocorrências', 'Registrar nova ocorrência',
-            const Color(0xFFEF4444), () => _push(const ListaOcorrenciasPage())),
-        _itemAtividade(Icons.description_rounded, 'Documentos', 'Ver documentos do veículo',
-            const Color(0xFF06B6D4), () => _push(const DocumentosPage())),
-        _itemAtividade(Icons.tire_repair_rounded, 'Controle de Pneus',
-            'Verificar e registrar estado dos pneus', const Color(0xFF10B981),
-            () => _push(const PneusPage())),
-        _itemAtividade(Icons.gavel_rounded, 'Multas',
-            'Registrar multas recebidas', const Color(0xFFDC2626),
-            () => _push(const MultasPage())),
-        _itemAtividade(Icons.history_rounded, 'Histórico Checklists',
-            'Ver todos os checklists realizados', const Color(0xFF6B7280),
-            () => _push(const HistoricoChecklistPage())),
-      ],
-    );
-  }
-
-  Widget _itemAtividade(
-      IconData icon, String titulo, String subtitulo, Color cor, VoidCallback onTap) {
+  Widget _acaoCompacta(
+      IconData icon, String label, Color cor, VoidCallback onTap) {
     return Material(
-      color: Colors.transparent,
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(10),
+            border: Border(
+              top: BorderSide(color: cor, width: 2),
+              left: BorderSide(color: AppColors.border),
+              right: BorderSide(color: AppColors.border),
+              bottom: BorderSide(color: AppColors.border),
+            ),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: cor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: cor, size: 22),
-              ),
-              const SizedBox(width: 14),
+              Icon(icon, color: cor, size: 17),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(titulo,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text(subtitulo,
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 11)),
-                  ],
-                ),
+                child: Text(label,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 18),
             ],
           ),
         ),
@@ -616,7 +492,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       color: AppColors.surface,
       child: Column(
         children: [
-          // Logo
           Container(
             padding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
             child: Row(
@@ -632,42 +507,54 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 18),
+                  child: const Icon(Icons.local_shipping_rounded,
+                      color: Colors.white, size: 18),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('FrotaCheck', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                      Text('Motorista', style: TextStyle(color: Color(0xFF1AA251), fontSize: 10)),
+                      Text('FrotaCheck',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700)),
+                      Text('Motorista',
+                          style: TextStyle(
+                              color: Color(0xFF1AA251), fontSize: 10)),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-
           Container(height: 1, color: const Color(0xFF0E1E33)),
           const SizedBox(height: 6),
-
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Column(
                 children: [
                   _item(Icons.dashboard_rounded, 'Dashboard', _Sec.dashboard),
-                  _item(Icons.directions_car_rounded, 'Meu Veículo', _Sec.meuVeiculo),
+                  _item(Icons.directions_car_rounded, 'Meu Veículo',
+                      _Sec.meuVeiculo),
                   const SizedBox(height: 4),
                   _label('OPERAÇÕES'),
                   _item(Icons.route_rounded, 'Minha Viagem', _Sec.viagem),
-                  _item(Icons.checklist_rtl_rounded, 'Checklist Saída', _Sec.checklistSaida),
-                  _item(Icons.assignment_turned_in_rounded, 'Checklist Retorno', _Sec.checklistRetorno),
-                  _item(Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos),
+                  _item(Icons.checklist_rtl_rounded, 'Checklist Saída',
+                      _Sec.checklistSaida),
+                  _item(Icons.assignment_turned_in_rounded,
+                      'Checklist Retorno', _Sec.checklistRetorno),
+                  _item(Icons.local_gas_station_rounded, 'Abastecimentos',
+                      _Sec.abastecimentos),
                   _item(Icons.build_rounded, 'Manutenções', _Sec.manutencoes),
-                  _item(Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias),
-                  _item(Icons.description_rounded, 'Documentos', _Sec.documentos),
-                  _item(Icons.tire_repair_rounded, 'Controle de Pneus', _Sec.pneus),
+                  _item(Icons.report_problem_rounded, 'Ocorrências',
+                      _Sec.ocorrencias),
+                  _item(Icons.description_rounded, 'Documentos',
+                      _Sec.documentos),
+                  _item(Icons.tire_repair_rounded, 'Controle de Pneus',
+                      _Sec.pneus),
                   _item(Icons.gavel_rounded, 'Multas', _Sec.multas),
                   const SizedBox(height: 4),
                   _label('CONTA'),
@@ -676,7 +563,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               ),
             ),
           ),
-
           Container(height: 1, color: const Color(0xFF0E1E33)),
           _buildLogout(auth),
           _buildProfileCard(auth, nome),
@@ -688,7 +574,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 0, 3),
-        child: Text(text, style: const TextStyle(color: Color(0xFF475569), fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+        child: Text(text,
+            style: const TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8)),
       );
 
   Widget _item(IconData icon, String label, _Sec section) {
@@ -705,19 +596,28 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               ? BoxDecoration(
                   color: const Color(0xFF1AA251).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1AA251).withOpacity(0.30)),
+                  border: Border.all(
+                      color: const Color(0xFF1AA251).withOpacity(0.30)),
                 )
               : null,
           child: Row(
             children: [
-              Icon(icon, color: active ? const Color(0xFF1AA251) : const Color(0xFF475569), size: 15),
+              Icon(icon,
+                  color: active
+                      ? const Color(0xFF1AA251)
+                      : const Color(0xFF475569),
+                  size: 15),
               const SizedBox(width: 9),
               Expanded(
                 child: Text(label,
                     style: TextStyle(
-                        color: active ? Colors.white : const Color(0xFF94A3B8),
+                        color: active
+                            ? Colors.white
+                            : const Color(0xFF94A3B8),
                         fontSize: 12,
-                        fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
+                        fontWeight: active
+                            ? FontWeight.w600
+                            : FontWeight.w400)),
               ),
             ],
           ),
@@ -737,10 +637,13 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               title: const Text('Finalizar Sessão'),
               content: const Text('Deseja realmente sair?'),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancelar')),
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                  style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444)),
                   child: const Text('Sair'),
                 ),
               ],
@@ -754,7 +657,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             children: [
               Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 14),
               SizedBox(width: 8),
-              Text('Sair', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text('Sair',
+                  style: TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -778,7 +685,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             backgroundColor: const Color(0xFF1AA251).withOpacity(0.18),
             child: Text(
               nome.isNotEmpty ? nome[0].toUpperCase() : 'M',
-              style: const TextStyle(color: Color(0xFF1AA251), fontSize: 11, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                  color: Color(0xFF1AA251),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700),
             ),
           ),
           const SizedBox(width: 8),
@@ -787,17 +697,24 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(nome,
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600),
                     overflow: TextOverflow.ellipsis),
                 Container(
                   margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1AA251).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text('MOTORISTA',
-                      style: TextStyle(color: Color(0xFF1AA251), fontSize: 8, fontWeight: FontWeight.w700)),
+                      style: TextStyle(
+                          color: Color(0xFF1AA251),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
@@ -845,7 +762,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   }
 
   void _push(Widget page) =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) => _carregar());
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page))
+          .then((_) => _carregar());
 
   // ── Content ───────────────────────────────────────────────────────────────
 
@@ -862,19 +780,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     }
   }
 
-  // ── Dashboard ─────────────────────────────────────────────────────────────
+  // ── Dashboard Desktop ─────────────────────────────────────────────────────
 
   Widget _buildDashboard(AppAuthProvider auth, String primeiroNome) {
     final hora = DateTime.now().hour;
-    final String saudacao;
-    if (hora < 12) {
-      saudacao = 'Bom dia';
-    } else if (hora < 18) {
-      saudacao = 'Boa tarde';
-    } else {
-      saudacao = 'Boa noite';
-    }
-
+    final saudacao =
+        hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
     final now = DateTime.now();
     final dataStr =
         '${_semana[now.weekday - 1]}, ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
@@ -884,11 +795,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       onRefresh: _carregar,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // ── Header ────────────────────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -896,99 +807,108 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('$saudacao, $primeiroNome!',
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text(dataStr, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(dataStr,
+                          style: const TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12)),
                     ],
                   ),
                 ),
                 IconButton(
                   onPressed: _carregar,
-                  icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary),
+                  icon: const Icon(Icons.refresh_rounded,
+                      color: AppColors.textSecondary, size: 18),
+                  tooltip: 'Atualizar',
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-
-            // ── Cartão do Veículo (destaque máximo) ───────────────────────
-            _buildVeiculoCard(destaque: true),
             const SizedBox(height: 16),
 
-            // ── KPIs do dia ────────────────────────────────────────────────
+            // ── Vehicle banner (slim) ─────────────────────────────────────
+            _buildVeiculoBanner(),
+            const SizedBox(height: 12),
+
+            // ── KPI chips ─────────────────────────────────────────────────
             Row(
               children: [
-                _kpi('Checklists Hoje', '$_checklistsHoje', Icons.checklist_rounded, const Color(0xFF1AA251)),
-                const SizedBox(width: 12),
-                _kpi('Ocorrências Abertas', '$_ocorrenciasAbertas', Icons.report_problem_rounded,
-                    _ocorrenciasAbertas > 0 ? const Color(0xFFEF4444) : const Color(0xFF475569)),
+                _kpiChip(Icons.checklist_rounded, '$_checklistsHoje',
+                    'checklists hoje', const Color(0xFF1AA251)),
+                const SizedBox(width: 8),
+                _kpiChip(
+                    Icons.report_problem_rounded,
+                    '$_ocorrenciasAbertas',
+                    'ocorrências abertas',
+                    _ocorrenciasAbertas > 0
+                        ? const Color(0xFFEF4444)
+                        : const Color(0xFF475569)),
+                if (_alertas.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _kpiChip(Icons.warning_rounded, '${_alertas.length}',
+                      'alertas', const Color(0xFFF59E0B)),
+                ],
               ],
             ),
             const SizedBox(height: 20),
 
-            // ── Ações rápidas ──────────────────────────────────────────────
-            _sectionTitle('Ações Rápidas'),
-            const SizedBox(height: 10),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.15,
-              children: [
-                _acao(Icons.checklist_rtl_rounded, 'Checklist\nSaída', const Color(0xFF1AA251), () => _onTap(_Sec.checklistSaida)),
-                _acao(Icons.assignment_turned_in_rounded, 'Checklist\nRetorno', const Color(0xFF3B82F6), () => _onTap(_Sec.checklistRetorno)),
-                _acao(Icons.route_rounded, 'Minha\nViagem', const Color(0xFF8B5CF6), () => _onTap(_Sec.viagem)),
-                _acao(Icons.local_gas_station_rounded, 'Abastecer', const Color(0xFFF59E0B), () => _onTap(_Sec.abastecimentos)),
-                _acao(Icons.build_rounded, 'Manutenção', const Color(0xFFEC4899), () => _onTap(_Sec.manutencoes)),
-                _acao(Icons.report_problem_rounded, 'Ocorrência', const Color(0xFFEF4444), () => _onTap(_Sec.ocorrencias)),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // ── Alertas do veículo ─────────────────────────────────────────
+            // ── Alerts ────────────────────────────────────────────────────
             if (_alertas.isNotEmpty) ...[
-              _sectionTitle('Alertas do Meu Veículo'),
-              const SizedBox(height: 10),
-              ..._alertas.map(_alertaCard),
+              _sectionHeader('Alertas do Veículo'),
+              const SizedBox(height: 8),
+              ..._alertas.map(_alertaBanner),
               const SizedBox(height: 20),
             ],
 
-            // ── Atividade recente ──────────────────────────────────────────
-            _sectionTitle('Atividade Recente'),
-            const SizedBox(height: 10),
-            if (_ultimoAbastecimento != null)
-              _atividadeCard(
-                icon: Icons.local_gas_station_rounded,
-                cor: const Color(0xFFF59E0B),
-                titulo: 'Último Abastecimento',
-                subtitulo: _placaLabel(_ultimoAbastecimento!),
-                extra: _ultimoAbastecimento!['liters'] != null ? '${_ultimoAbastecimento!['liters']} L' : null,
-                data: _ultimoAbastecimento!['created_at']?.toString(),
-              )
-            else
-              _vazio('Nenhum abastecimento registrado.'),
-            const SizedBox(height: 6),
-            if (_ultimaManutencao != null)
-              _atividadeCard(
-                icon: Icons.build_rounded,
-                cor: const Color(0xFFEC4899),
-                titulo: 'Última Troca de Óleo',
-                subtitulo: 'Próxima troca: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
-                extra: null,
-                data: _ultimaManutencao!['created_at']?.toString(),
-              )
-            else
-              _vazio('Nenhuma manutenção registrada.'),
-
+            // ── Quick actions ─────────────────────────────────────────────
+            _sectionHeader('Ações Rápidas'),
+            const SizedBox(height: 8),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 4,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.4,
+              children: [
+                _acaoTile(Icons.checklist_rtl_rounded, 'Checklist\nSaída',
+                    const Color(0xFF1AA251),
+                    () => _onTap(_Sec.checklistSaida)),
+                _acaoTile(
+                    Icons.assignment_turned_in_rounded,
+                    'Checklist\nRetorno',
+                    const Color(0xFF3B82F6),
+                    () => _onTap(_Sec.checklistRetorno)),
+                _acaoTile(Icons.route_rounded, 'Minha\nViagem',
+                    const Color(0xFF8B5CF6), () => _onTap(_Sec.viagem)),
+                _acaoTile(Icons.local_gas_station_rounded, 'Abastecer',
+                    const Color(0xFFF59E0B),
+                    () => _onTap(_Sec.abastecimentos)),
+                _acaoTile(Icons.build_rounded, 'Manutenção',
+                    const Color(0xFFEC4899), () => _onTap(_Sec.manutencoes)),
+                _acaoTile(Icons.report_problem_rounded, 'Ocorrência',
+                    const Color(0xFFEF4444), () => _onTap(_Sec.ocorrencias)),
+                _acaoTile(Icons.tire_repair_rounded, 'Pneus',
+                    const Color(0xFF10B981), () => _onTap(_Sec.pneus)),
+                _acaoTile(Icons.gavel_rounded, 'Multas',
+                    const Color(0xFFDC2626), () => _onTap(_Sec.multas)),
+              ],
+            ),
             const SizedBox(height: 20),
-            Center(
-              child: TextButton.icon(
-                onPressed: () => _push(const HistoricoChecklistPage()),
-                icon: const Icon(Icons.history_rounded, size: 14, color: Color(0xFF1AA251)),
-                label: const Text('Ver histórico de checklists',
-                    style: TextStyle(color: Color(0xFF1AA251), fontSize: 12)),
-              ),
+
+            // ── Timeline atividade recente ────────────────────────────────
+            _sectionHeader('Atividade Recente'),
+            const SizedBox(height: 10),
+            _buildTimeline(),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: () => _push(const HistoricoChecklistPage()),
+              icon: const Icon(Icons.history_rounded,
+                  size: 13, color: Color(0xFF1AA251)),
+              label: const Text('Ver histórico de checklists',
+                  style: TextStyle(color: Color(0xFF1AA251), fontSize: 12)),
             ),
           ],
         ),
@@ -1008,7 +928,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Meu Veículo',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700)),
               IconButton(
                 onPressed: _carregar,
                 icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
@@ -1017,27 +940,28 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ],
           ),
           const SizedBox(height: 20),
-          _buildVeiculoCard(destaque: false),
+          _buildVeiculoCard(),
           if (_veiculo != null) ...[
             const SizedBox(height: 20),
-            _sectionTitle('Última Manutenção'),
+            _sectionHeader('Última Manutenção'),
             const SizedBox(height: 10),
             if (_ultimaManutencao != null)
-              _atividadeCard(
+              _timelineItem(
                 icon: Icons.build_rounded,
                 cor: const Color(0xFFEC4899),
                 titulo: 'Última Troca de Óleo',
-                subtitulo: 'Próxima troca: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
-                extra: null,
+                subtitulo:
+                    'Próxima: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
                 data: _ultimaManutencao!['created_at']?.toString(),
+                isLast: true,
               )
             else
               _vazio('Nenhuma manutenção registrada para este veículo.'),
             const SizedBox(height: 20),
-            _sectionTitle('Alertas Ativos'),
+            _sectionHeader('Alertas Ativos'),
             const SizedBox(height: 10),
             if (_alertas.isNotEmpty)
-              ..._alertas.map(_alertaCard)
+              ..._alertas.map(_alertaBanner)
             else
               _vazio('Nenhum alerta ativo para este veículo.'),
             const SizedBox(height: 20),
@@ -1062,90 +986,159 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   Widget _buildPerfil(AppAuthProvider auth) {
     final p = auth.profile;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Meu Perfil',
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+    final nome = p?.nome ?? p?.email ?? 'M';
+    return Stack(
+      children: [
+        // Logo ghosted large in top-right (efeito "saindo do fundo")
+        Positioned(
+          top: -20,
+          right: -40,
+          child: Opacity(
+            opacity: 0.07,
+            child: Image.asset(
+              'assets/images/frotacheckkk.png',
+              width: 360,
+              fit: BoxFit.fitWidth,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          ),
+        ),
+        // Glow verde sutil atrás da logo
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0.65, -0.45),
+                radius: 0.65,
+                colors: [
+                  const Color(0xFF1AA251).withOpacity(0.06),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Conteúdo
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader('Meu Perfil'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: const Color(0xFF1AA251).withOpacity(0.18),
-                      child: Text(
-                        ((p?.nome ?? p?.email) ?? 'M')[0].toUpperCase(),
-                        style: const TextStyle(color: Color(0xFF1AA251), fontSize: 22, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    Row(
+                      children: [
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF1AA251).withOpacity(0.25),
+                                const Color(0xFF0D6B35).withOpacity(0.15),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color:
+                                    const Color(0xFF1AA251).withOpacity(0.30)),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            nome[0].toUpperCase(),
+                            style: const TextStyle(
+                                color: Color(0xFF1AA251),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(p?.nome ?? 'Sem nome',
-                                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(p?.nome ?? 'Sem nome',
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
+                                  IconButton(
+                                    onPressed: () =>
+                                        _editarNome(auth, p?.nome ?? ''),
+                                    icon: const Icon(Icons.edit_rounded,
+                                        size: 16,
+                                        color: AppColors.textSecondary),
+                                    tooltip: 'Editar nome',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                onPressed: () => _editarNome(auth, p?.nome ?? ''),
-                                icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.textSecondary),
-                                tooltip: 'Editar nome',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
+                              const SizedBox(height: 2),
+                              Text(p?.email ?? '',
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12)),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF1AA251).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: const Color(0xFF1AA251)
+                                          .withOpacity(0.30)),
+                                ),
+                                child: const Text('MOTORISTA',
+                                    style: TextStyle(
+                                        color: Color(0xFF1AA251),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700)),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(p?.email ?? '', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1AA251).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF1AA251).withOpacity(0.30)),
-                            ),
-                            child: const Text('MOTORISTA',
-                                style: TextStyle(color: Color(0xFF1AA251), fontSize: 9, fontWeight: FontWeight.w700)),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 18),
+                    const Divider(color: AppColors.border),
+                    const SizedBox(height: 12),
+                    _infoRow('Empresa', p?.empresaNome ?? '—'),
+                    _infoRow('Status', p?.status ?? '—'),
+                    _infoRow(
+                      'Veículo',
+                      _veiculo != null
+                          ? '${_veiculo!['plate'] ?? ''} — ${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'
+                              .trim()
+                          : 'Nenhum vinculado',
+                    ),
+                    if (p?.lastAccess != null)
+                      _infoRow(
+                          'Último acesso', _dataFull(p!.lastAccess!.toLocal())),
                   ],
                 ),
-                const SizedBox(height: 18),
-                const Divider(color: AppColors.border),
-                const SizedBox(height: 10),
-                _infoRow('Empresa', p?.empresaNome ?? '—'),
-                _infoRow('Status', p?.status ?? '—'),
-                _infoRow(
-                  'Veículo Vinculado',
-                  _veiculo != null
-                      ? '${_veiculo!['plate'] ?? ''} — ${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim()
-                      : 'Nenhum',
-                ),
-                if (p?.lastAccess != null)
-                  _infoRow('Último acesso', _dataFull(p!.lastAccess!.toLocal())),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1155,7 +1148,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Editar nome', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Editar nome', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -1172,12 +1166,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary),
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Salvar', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Salvar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -1187,26 +1184,156 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
-      await _supabase.from('user_profiles').update({'nome': salvo}).eq('user_id', userId);
+      await _supabase
+          .from('user_profiles')
+          .update({'nome': salvo})
+          .eq('user_id', userId);
       await auth.reload();
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Erro ao salvar: $e'),
+            backgroundColor: Colors.red));
       }
     }
   }
 
-  // ── Cartão de Veículo ─────────────────────────────────────────────────────
+  // ── Vehicle widgets ───────────────────────────────────────────────────────
 
-  Widget _buildVeiculoCard({required bool destaque}) {
+  Widget _buildVeiculoBanner() {
+    if (_loadingVeiculo) {
+      return Container(
+        height: 62,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: const Center(
+            child:
+                CircularProgressIndicator(color: Color(0xFF1AA251), strokeWidth: 2)),
+      );
+    }
+
+    if (_veiculo == null) {
+      return Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.directions_car_outlined,
+                color: Color(0xFF475569), size: 18),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nenhum veículo vinculado',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                  Text('Solicite ao gestor que vincule um veículo.',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final placa = _veiculo!['plate']?.toString() ?? '—';
+    final modelo =
+        '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
+    final ano = _veiculo!['year']?.toString() ?? '';
+    final status = _veiculo!['status']?.toString() ?? 'ativo';
+    final cor = status == 'ativo'
+        ? const Color(0xFF1AA251)
+        : status == 'manutencao'
+            ? const Color(0xFFF59E0B)
+            : const Color(0xFFEF4444);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border(
+          left: BorderSide(color: cor, width: 3),
+          top: BorderSide(color: AppColors.border),
+          right: BorderSide(color: AppColors.border),
+          bottom: BorderSide(color: AppColors.border),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.directions_car_rounded, color: cor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(placa,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5)),
+                if (modelo.isNotEmpty)
+                  Text('$modelo${ano.isNotEmpty ? '  ·  $ano' : ''}',
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11)),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: cor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: cor.withOpacity(0.30)),
+                ),
+                child: Text(status.toUpperCase(),
+                    style: TextStyle(
+                        color: cor,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700)),
+              ),
+              if (_alertas.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text('${_alertas.length} alerta(s)',
+                    style: const TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVeiculoCard() {
     if (_loadingVeiculo) {
       return _cardBase(
         child: const Center(
           child: Padding(
             padding: EdgeInsets.all(20),
-            child: CircularProgressIndicator(color: Color(0xFF1AA251), strokeWidth: 2),
+            child: CircularProgressIndicator(
+                color: Color(0xFF1AA251), strokeWidth: 2),
           ),
         ),
       );
@@ -1224,7 +1351,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   color: const Color(0xFF475569).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.directions_car_outlined, color: Color(0xFF475569), size: 28),
+                child: const Icon(Icons.directions_car_outlined,
+                    color: Color(0xFF475569), size: 28),
               ),
               const SizedBox(width: 16),
               const Expanded(
@@ -1232,11 +1360,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Nenhum veículo vinculado',
-                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700)),
                     SizedBox(height: 4),
                     Text(
                       'Solicite ao gestor ou admin da empresa que vincule um veículo ao seu perfil.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -1248,10 +1380,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     }
 
     final placa = _veiculo!['plate']?.toString() ?? '—';
-    final modelo = '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
+    final modelo =
+        '${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'.trim();
     final ano = _veiculo!['year']?.toString() ?? '';
     final status = _veiculo!['status']?.toString() ?? 'ativo';
-
     final cor = status == 'ativo'
         ? const Color(0xFF1AA251)
         : status == 'manutencao'
@@ -1262,92 +1394,177 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       border: cor.withOpacity(0.40),
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(Icons.directions_car_rounded, color: cor, size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (destaque)
-                        const Text('MEU VEÍCULO',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                      Text(placa,
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2)),
-                      Text('$modelo${ano.isNotEmpty ? "  •  $ano" : ""}',
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: cor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: cor.withOpacity(0.35)),
-                      ),
-                      child: Text(status.toUpperCase(),
-                          style: TextStyle(color: cor, fontSize: 10, fontWeight: FontWeight.w700)),
-                    ),
-                    if (_alertas.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.30)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 11),
-                            const SizedBox(width: 4),
-                            Text('${_alertas.length} alerta(s)',
-                                style: const TextStyle(color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.directions_car_rounded, color: cor, size: 28),
             ),
-            if (modelo.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(color: AppColors.border, height: 1),
-              const SizedBox(height: 10),
-              Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.directions_car_outlined, color: AppColors.textSecondary, size: 13),
-                  const SizedBox(width: 6),
-                  Text(modelo, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => setState(() => _activeSection = _Sec.meuVeiculo),
-                    child: const Text('Ver detalhes →',
-                        style: TextStyle(color: Color(0xFF1AA251), fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
+                  const Text('MEU VEÍCULO',
+                      style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1)),
+                  Text(placa,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2)),
+                  Text('$modelo${ano.isNotEmpty ? "  •  $ano" : ""}',
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontSize: 12)),
                 ],
               ),
-            ],
+            ),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: cor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: cor.withOpacity(0.35)),
+              ),
+              child: Text(status.toUpperCase(),
+                  style: TextStyle(
+                      color: cor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700)),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  // ── Timeline ──────────────────────────────────────────────────────────────
+
+  Widget _buildTimeline() {
+    final hasAbast = _ultimoAbastecimento != null;
+    final hasManut = _ultimaManutencao != null;
+    if (!hasAbast && !hasManut) {
+      return _vazio('Nenhuma atividade recente registrada.');
+    }
+    return Column(
+      children: [
+        if (hasAbast)
+          _timelineItem(
+            icon: Icons.local_gas_station_rounded,
+            cor: const Color(0xFFF59E0B),
+            titulo: 'Último Abastecimento',
+            subtitulo: _placaLabel(_ultimoAbastecimento!),
+            extra: _ultimoAbastecimento!['liters'] != null
+                ? '${_ultimoAbastecimento!['liters']} L'
+                : null,
+            data: _ultimoAbastecimento!['created_at']?.toString(),
+            isLast: !hasManut,
+          ),
+        if (hasManut)
+          _timelineItem(
+            icon: Icons.build_rounded,
+            cor: const Color(0xFFEC4899),
+            titulo: 'Última Troca de Óleo',
+            subtitulo:
+                'Próxima: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
+            data: _ultimaManutencao!['created_at']?.toString(),
+            isLast: true,
+          ),
+      ],
+    );
+  }
+
+  Widget _timelineItem({
+    required IconData icon,
+    required Color cor,
+    required String titulo,
+    required String subtitulo,
+    String? extra,
+    String? data,
+    bool isLast = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 22,
+          child: Column(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                margin: const EdgeInsets.only(top: 5),
+                decoration:
+                    BoxDecoration(color: cor, shape: BoxShape.circle),
+              ),
+              if (!isLast)
+                Container(
+                    width: 1.5, height: 38, color: AppColors.border),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border(left: BorderSide(color: cor, width: 2)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(titulo,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                        if (subtitulo.isNotEmpty)
+                          Text(subtitulo,
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (extra != null)
+                        Text(extra,
+                            style: TextStyle(
+                                color: cor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                      if (data != null)
+                        Text(_dataCurta(data),
+                            style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1365,63 +1582,83 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  Widget _kpi(String label, String valor, IconData icon, Color cor) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(color: cor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: cor, size: 18),
+  Widget _sectionHeader(String t) => Row(
+        children: [
+          Container(
+            width: 3,
+            height: 14,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1AA251),
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(valor, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
-                  Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          Text(t,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+        ],
+      );
+
+  Widget _kpiChip(IconData icon, String valor, String label, Color cor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cor.withOpacity(0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: cor, size: 13),
+          const SizedBox(width: 6),
+          Text(valor,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(width: 5),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 10)),
+        ],
       ),
     );
   }
 
-  Widget _acao(IconData icon, String label, Color cor, VoidCallback onTap) {
+  Widget _acaoTile(
+      IconData icon, String label, Color cor, VoidCallback onTap) {
     return Material(
       color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cor.withOpacity(0.22)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border(
+              top: BorderSide(color: cor, width: 2),
+              left: BorderSide(color: AppColors.border),
+              right: BorderSide(color: AppColors.border),
+              bottom: BorderSide(color: AppColors.border),
+            ),
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(color: cor.withOpacity(0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: cor, size: 20),
-              ),
-              const SizedBox(height: 7),
+              Icon(icon, color: cor, size: 18),
+              const SizedBox(height: 5),
               Text(label,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2)),
             ],
           ),
         ),
@@ -1429,7 +1666,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  Widget _alertaCard(Map<String, dynamic> alerta) {
+  Widget _alertaBanner(Map<String, dynamic> alerta) {
     final prioridade = alerta['priority']?.toString() ?? 'Media';
     final cor = prioridade == 'Alta'
         ? const Color(0xFFEF4444)
@@ -1438,71 +1675,32 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             : const Color(0xFF3B82F6);
     final titulo = alerta['problem_type']?.toString() ?? 'Alerta';
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: cor.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cor.withOpacity(0.25)),
+        borderRadius: BorderRadius.circular(7),
+        border: Border(
+          left: BorderSide(color: cor, width: 3),
+          top: BorderSide(color: cor.withOpacity(0.18)),
+          right: BorderSide(color: cor.withOpacity(0.18)),
+          bottom: BorderSide(color: cor.withOpacity(0.18)),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_rounded, color: cor, size: 16),
-          const SizedBox(width: 10),
+          Icon(Icons.warning_rounded, color: cor, size: 14),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(titulo,
-                style: TextStyle(color: cor, fontSize: 12, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    color: cor, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           Text(prioridade.toUpperCase(),
-              style: TextStyle(color: cor, fontSize: 9, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  Widget _atividadeCard({
-    required IconData icon,
-    required Color cor,
-    required String titulo,
-    required String subtitulo,
-    String? extra,
-    String? data,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: cor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: cor, size: 16),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(titulo, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                if (subtitulo.isNotEmpty)
-                  Text(subtitulo, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (extra != null)
-                Text(extra, style: TextStyle(color: cor, fontSize: 11, fontWeight: FontWeight.w600)),
-              if (data != null)
-                Text(_dataCurta(data), style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
-            ],
-          ),
+              style: TextStyle(
+                  color: cor.withOpacity(0.70),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -1517,12 +1715,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
-      child: Text(msg, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+      child: Text(msg,
+          style:
+              const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
     );
   }
-
-  Widget _sectionTitle(String t) =>
-      Text(t, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700));
 
   Widget _infoRow(String label, String valor) {
     return Padding(
@@ -1530,8 +1727,17 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 130, child: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13))),
-          Expanded(child: Text(valor, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500))),
+          SizedBox(
+              width: 130,
+              child: Text(label,
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 13))),
+          Expanded(
+              child: Text(valor,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -1559,10 +1765,18 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 }
 
 enum _Sec {
-  dashboard, meuVeiculo, viagem,
-  checklistSaida, checklistRetorno,
-  abastecimentos, manutencoes, ocorrencias,
-  documentos, pneus, multas, perfil,
+  dashboard,
+  meuVeiculo,
+  viagem,
+  checklistSaida,
+  checklistRetorno,
+  abastecimentos,
+  manutencoes,
+  ocorrencias,
+  documentos,
+  pneus,
+  multas,
+  perfil,
 }
 
 enum _MobileTab { dashboard, veiculo, atividades, perfil }
