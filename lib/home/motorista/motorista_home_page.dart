@@ -1347,38 +1347,44 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   Widget _buildSafetyBanner() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF071A0F),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1AA251).withOpacity(0.25)),
       ),
+      // Usa spaceBetween + Row interno para evitar Expanded no Flutter web
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1AA251).withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.shield_rounded,
-                color: Color(0xFF1AA251), size: 22),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Dirija com segurança!',
-                    style: TextStyle(
-                        color: Color(0xFF1AA251),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700)),
-                Text('Seus registros fazem a diferença.',
-                    style: TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12)),
-              ],
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1AA251).withOpacity(0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.shield_rounded,
+                    color: Color(0xFF1AA251), size: 22),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Dirija com segurança!',
+                      style: TextStyle(
+                          color: Color(0xFF1AA251),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700)),
+                  Text('Seus registros fazem a diferença.',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 12)),
+                ],
+              ),
+            ],
           ),
           OutlinedButton.icon(
             onPressed: () => _push(const HistoricoChecklistPage()),
@@ -1386,7 +1392,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             label: const Text('Ver dicas'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              side: BorderSide(color: Colors.white.withOpacity(0.20)),
+              side: BorderSide(color: Colors.white.withOpacity(0.22)),
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               textStyle: const TextStyle(fontSize: 12),
@@ -1705,7 +1711,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   Icons.notifications_rounded,
                   'Notificações',
                   const Color(0xFF8B5CF6),
-                  () {},
+                  _abrirNotificacoes,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1764,26 +1770,30 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: cor.withOpacity(0.25)),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(9),
+                padding: const EdgeInsets.all(11),
                 decoration: BoxDecoration(
-                    color: cor.withOpacity(0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: cor, size: 20),
+                  color: cor.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: cor.withOpacity(0.30), width: 1.5),
+                ),
+                child: Icon(icon, color: cor, size: 22),
               ),
-              const SizedBox(height: 7),
+              const SizedBox(height: 8),
               Text(label,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: cor.withOpacity(0.90),
                       fontSize: 10,
-                      fontWeight: FontWeight.w500)),
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -1799,6 +1809,53 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               color: Colors.white,
               fontSize: size,
               height: 1)),
+    );
+  }
+
+  void _abrirNotificacoes() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(
+          children: [
+            Icon(Icons.notifications_rounded,
+                color: Color(0xFF8B5CF6), size: 20),
+            SizedBox(width: 10),
+            Text('Notificações',
+                style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 4),
+            Icon(Icons.notifications_off_outlined,
+                color: AppColors.textSecondary, size: 40),
+            SizedBox(height: 12),
+            Text(
+              'Nenhuma notificação no momento.',
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Você será avisado sobre alertas do veículo, vencimento de documentos e tarefas pendentes.',
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar',
+                style: TextStyle(color: Color(0xFF8B5CF6))),
+          ),
+        ],
+      ),
     );
   }
 
