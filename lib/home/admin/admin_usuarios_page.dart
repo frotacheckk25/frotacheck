@@ -718,6 +718,8 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   Widget build(BuildContext context) {
     final auth = context.watch<AppAuthProvider>();
     final canManage = auth.can(AppPermission.manageUsers);
+    final canVincular = auth.isMaster ||
+        auth.hasAnyRole([AppRole.adminEmpresa, AppRole.gestor]);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -727,9 +729,9 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          if (canManage)
+          if (canVincular)
             IconButton(
-              icon: const Icon(Icons.link),
+              icon: const Icon(Icons.link, color: AppColors.secondary),
               tooltip: 'Vincular motorista por e-mail',
               onPressed: () => _vincularPorEmail(auth),
             ),
