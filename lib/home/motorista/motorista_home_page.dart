@@ -557,11 +557,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                    color: cor.withOpacity(0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: cor, size: 18),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: cor,
+                child: Icon(icon, color: Colors.white, size: 18),
               ),
               const SizedBox(height: 6),
               Text(titulo,
@@ -693,12 +692,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                    color: cor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, color: cor, size: 22),
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: cor,
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
               const SizedBox(height: 7),
               Text(label,
@@ -1847,13 +1844,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  color: cor.withOpacity(0.18),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: cor.withOpacity(0.30), width: 1.5),
-                ),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: cor,
                 child: Icon(icon, color: Colors.white, size: 22),
               ),
               const SizedBox(height: 8),
@@ -2462,14 +2455,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: cor.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: cor, size: 24),
+              CircleAvatar(
+                radius: 27,
+                backgroundColor: cor,
+                child: Icon(icon, color: Colors.white, size: 26),
               ),
               const SizedBox(height: 10),
               Text(titulo,
