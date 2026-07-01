@@ -34,15 +34,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   int _totalChecklists = 0;
   int _totalOcorrencias = 0;
   int _totalManutencoes = 0;
-  double _mrr = 0;
 
   List<Map<String, dynamic>> _empresas = [];
 
-  static const _planoPrices = {
-    'basico': 99.0,
-    'profissional': 199.0,
-    'enterprise': 499.0,
-  };
 
   @override
   void initState() {
@@ -88,13 +82,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           .whereType<String>()
           .toSet();
 
-      double mrr = 0;
-      for (final e in empresas) {
-        if (e['status'] == 'ativo') {
-          mrr += _planoPrices[e['plano'] ?? 'basico'] ?? 99.0;
-        }
-      }
-
       if (!mounted) return;
       setState(() {
         _empresas = empresas;
@@ -111,7 +98,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _totalChecklists = (results[5] as List).length;
         _totalOcorrencias = (results[6] as List).length;
         _totalManutencoes = (results[7] as List).length;
-        _mrr = mrr;
         _loading = false;
         _lastUpdated = DateTime.now();
       });
@@ -286,8 +272,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         ? const Color(0xFF10B981)
                         : const Color(0xFF334155)),
                 const SizedBox(height: 4),
-                _resumoItem(Icons.trending_up_rounded,
-                    'R\$ ${_mrr.toStringAsFixed(0)}/mês', const Color(0xFF3B82F6)),
+                _resumoItem(Icons.business_rounded,
+                    '$_empresasAtivas ativas', const Color(0xFF3B82F6)),
               ],
             ),
           ),
@@ -499,11 +485,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           const Color(0xFFF97316)),
       _Kpi('Manutenções', '$_totalManutencoes', Icons.build_rounded,
           const Color(0xFF64748B)),
-      _Kpi('MRR', 'R\$ ${_mrr.toStringAsFixed(0)}',
-          Icons.trending_up_rounded, const Color(0xFF22C55E)),
-      _Kpi('Receita Anual',
-          'R\$ ${(_mrr * 12).toStringAsFixed(0)}',
-          Icons.account_balance_wallet_rounded, const Color(0xFF3B82F6)),
     ];
 
     return LayoutBuilder(builder: (ctx, c) {
@@ -701,7 +682,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       child: Row(
         children: const [
           Expanded(flex: 3, child: Text('EMPRESA', style: style)),
-          Expanded(flex: 2, child: Text('PLANO', style: style)),
           Expanded(flex: 2, child: Text('STATUS', style: style)),
           Expanded(flex: 2, child: Text('CADASTRO', style: style)),
           SizedBox(width: 150, child: Text('AÇÕES', style: style)),
@@ -713,7 +693,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   Widget _companyRow(Map<String, dynamic> empresa) {
     final nome = empresa['nome'] as String? ?? '—';
     final cnpj = empresa['cnpj'] as String? ?? '';
-    final plano = empresa['plano'] as String? ?? 'basico';
     final status = empresa['status'] as String? ?? 'ativo';
     final createdAt = empresa['created_at'] as String?;
 
@@ -725,10 +704,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}'
         : '—';
 
-    final planoColor = _planoColor(plano);
+    const iconColor = Color(0xFF3B82F6);
     final statusColor = _statusColor(status);
-    final inicial =
-        nome.isNotEmpty ? nome[0].toUpperCase() : '?';
+    final inicial = nome.isNotEmpty ? nome[0].toUpperCase() : '?';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -743,22 +721,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        planoColor.withOpacity(0.3),
-                        planoColor.withOpacity(0.1)
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: iconColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(9),
-                    border: Border.all(
-                        color: planoColor.withOpacity(0.3)),
+                    border: Border.all(color: iconColor.withOpacity(0.3)),
                   ),
                   alignment: Alignment.center,
                   child: Text(inicial,
-                      style: TextStyle(
-                          color: planoColor,
+                      style: const TextStyle(
+                          color: iconColor,
                           fontSize: 14,
                           fontWeight: FontWeight.w700)),
                 ),
@@ -782,28 +752,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   ),
                 ),
               ],
-            ),
-          ),
-
-          // Plano
-          Expanded(
-            flex: 2,
-            child: Container(
-              width: 80,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: planoColor.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                    color: planoColor.withOpacity(0.28)),
-              ),
-              child: Text(plano.toUpperCase(),
-                  style: TextStyle(
-                      color: planoColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5)),
             ),
           ),
 
@@ -881,12 +829,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         );
     // _MasterAwareRouter detecta isImpersonating=true e exibe HomePage
   }
-
-  Color _planoColor(String plano) => switch (plano) {
-        'profissional' => const Color(0xFF3B82F6),
-        'enterprise' => const Color(0xFF8B5CF6),
-        _ => const Color(0xFF64748B),
-      };
 
   Color _statusColor(String status) => switch (status) {
         'ativo' => const Color(0xFF22C55E),

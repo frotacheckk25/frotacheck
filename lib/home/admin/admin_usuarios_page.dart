@@ -345,10 +345,46 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       );
     }
 
-    return ListView.builder(
+    // Separa pendentes (sem empresa) dos demais — visível apenas ao MASTER
+    final pendentes = auth.isMaster
+        ? _usuarios.where((u) => u['empresa_id'] == null).toList()
+        : <Map<String, dynamic>>[];
+    final ativos = auth.isMaster
+        ? _usuarios.where((u) => u['empresa_id'] != null).toList()
+        : _usuarios;
+
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: _usuarios.length,
-      itemBuilder: (_, i) => _buildCard(_usuarios[i], auth, canManage, _drivers, _vehicles),
+      children: [
+        if (pendentes.isNotEmpty) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.warning.withOpacity(0.30)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.pending_actions, color: AppColors.warning, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Aguardando atribuição de empresa (${pendentes.length})',
+                  style: TextStyle(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...pendentes.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
+          const Divider(color: AppColors.border, height: 24),
+        ],
+        ...ativos.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
+      ],
     );
   }
 
