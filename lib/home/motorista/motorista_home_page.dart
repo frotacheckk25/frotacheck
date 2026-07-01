@@ -514,7 +514,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                         '$_viagensHoje', const Color(0xFF3B82F6))),
                 const SizedBox(width: 8),
                 Expanded(
-                    child: _resumoChip(Icons.compare_arrows, 'Distância',
+                    child: _resumoChip(Icons.place, 'Distância',
                         '${_distanciaHoje.toStringAsFixed(0)} km',
                         const Color(0xFF8B5CF6))),
               ],
@@ -523,7 +523,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             Row(
               children: [
                 Expanded(
-                    child: _resumoChip(Icons.more_time, 'Trânsito',
+                    child: _resumoChip(Icons.schedule, 'Trânsito',
                         _fmtTempo(_tempoTransitoMin),
                         const Color(0xFF06B6D4))),
                 const SizedBox(width: 8),
@@ -1207,11 +1207,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _resumoRow(Icons.directions, const Color(0xFF3B82F6),
               'Viagens', '$_viagensHoje'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.compare_arrows, const Color(0xFF8B5CF6),
+          _resumoRow(Icons.place, const Color(0xFF8B5CF6),
               'Distância',
               '${_distanciaHoje.toStringAsFixed(1)} km'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.more_time, const Color(0xFF06B6D4),
+          _resumoRow(Icons.schedule, const Color(0xFF06B6D4),
               'Tempo em trânsito', _fmtTempo(_tempoTransitoMin)),
           const Divider(color: AppColors.border, height: 1),
           _resumoRow(Icons.local_gas_station_rounded,
@@ -1758,7 +1758,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.vpn_key,
+                  Icons.fingerprint,
                   'Alterar senha',
                   const Color(0xFFF59E0B),
                   _alterarSenha,
@@ -1776,7 +1776,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.power_settings_new,
+                  Icons.close,
                   'Sair da conta',
                   const Color(0xFFEF4444),
                   () => _sairDaConta(auth),
