@@ -10,6 +10,8 @@ import '../checklists/selecionar_veiculo_checklist.dart';
 import '../checklists/historico_checklist_page.dart';
 import '../documentos/documentos_page.dart';
 import '../manutencoes/manutencoes_page.dart';
+import '../multas/multas_page.dart';
+import '../pneus/pneus_page.dart';
 import '../viagens/viagens_page.dart';
 import '../../pages/lista_ocorrencias_page.dart';
 
@@ -544,6 +546,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             const Color(0xFFEF4444), () => _push(const ListaOcorrenciasPage())),
         _itemAtividade(Icons.description_rounded, 'Documentos', 'Ver documentos do veículo',
             const Color(0xFF06B6D4), () => _push(const DocumentosPage())),
+        _itemAtividade(Icons.tire_repair_rounded, 'Controle de Pneus',
+            'Verificar e registrar estado dos pneus', const Color(0xFF10B981),
+            () => _push(const PneusPage())),
+        _itemAtividade(Icons.gavel_rounded, 'Multas',
+            'Registrar multas recebidas', const Color(0xFFDC2626),
+            () => _push(const MultasPage())),
         _itemAtividade(Icons.history_rounded, 'Histórico Checklists',
             'Ver todos os checklists realizados', const Color(0xFF6B7280),
             () => _push(const HistoricoChecklistPage())),
@@ -659,6 +667,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   _item(Icons.build_rounded, 'Manutenções', _Sec.manutencoes),
                   _item(Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias),
                   _item(Icons.description_rounded, 'Documentos', _Sec.documentos),
+                  _item(Icons.tire_repair_rounded, 'Controle de Pneus', _Sec.pneus),
+                  _item(Icons.gavel_rounded, 'Multas', _Sec.multas),
                   const SizedBox(height: 4),
                   _label('CONTA'),
                   _item(Icons.person_rounded, 'Meu Perfil', _Sec.perfil),
@@ -824,6 +834,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         return;
       case _Sec.documentos:
         _push(const DocumentosPage());
+        return;
+      case _Sec.pneus:
+        _push(const PneusPage());
+        return;
+      case _Sec.multas:
+        _push(const MultasPage());
         return;
     }
   }
@@ -1546,7 +1562,7 @@ enum _Sec {
   dashboard, meuVeiculo, viagem,
   checklistSaida, checklistRetorno,
   abastecimentos, manutencoes, ocorrencias,
-  documentos, perfil,
+  documentos, pneus, multas, perfil,
 }
 
 enum _MobileTab { dashboard, veiculo, atividades, perfil }
