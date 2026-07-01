@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/auth/app_auth_provider.dart';
 
 class TimelineVeiculoPage extends StatefulWidget {
   final String veiculoId;
@@ -29,32 +31,43 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
 
   Future<void> _carregarTimeline() async {
     try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+
       // Carregar abastecimentos
-      final abastecimentos = await supabase
+      var qAbastecimentos = supabase
           .from('fuelings')
           .select()
-          .eq('vehicle_id', widget.veiculoId)
+          .eq('vehicle_id', widget.veiculoId);
+      if (eid != null) qAbastecimentos = qAbastecimentos.eq('empresa_id', eid);
+      final abastecimentos = await qAbastecimentos
           .order('created_at', ascending: false);
 
       // Carregar trocas de óleo
-      final manutencoes = await supabase
+      var qManutencoes = supabase
           .from('oil_changes')
           .select()
-          .eq('vehicle_id', widget.veiculoId)
+          .eq('vehicle_id', widget.veiculoId);
+      if (eid != null) qManutencoes = qManutencoes.eq('empresa_id', eid);
+      final manutencoes = await qManutencoes
           .order('created_at', ascending: false);
 
       // Carregar checklists
-      final checklists = await supabase
+      var qChecklists = supabase
           .from('checklists')
           .select()
-          .eq('veiculo_id', widget.veiculoId)
+          .eq('veiculo_id', widget.veiculoId);
+      if (eid != null) qChecklists = qChecklists.eq('empresa_id', eid);
+      final checklists = await qChecklists
           .order('data', ascending: false);
 
       // Carregar multas
-      final multas = await supabase
+      var qMultas = supabase
           .from('multas')
           .select()
-          .eq('veiculo_id', widget.veiculoId)
+          .eq('veiculo_id', widget.veiculoId);
+      if (eid != null) qMultas = qMultas.eq('empresa_id', eid);
+      final multas = await qMultas
           .order('data', ascending: false);
 
       List<TimelineEvent> eventos = [];
@@ -174,8 +187,6 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
               itemCount: eventos.length,
               itemBuilder: (context, index) {
                 final evento = eventos[index];
-                // próximo evento removido (variável não usada)
-
                 return SizedBox(
                   height: 120,
                   child: Row(
@@ -198,7 +209,7 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: evento.cor.withValues(alpha: 0.2),
+                                color: evento.cor.withOpacity(0.2),
                                 shape: BoxShape.circle,
                                 border: Border.all(color: evento.cor, width: 2),
                               ),

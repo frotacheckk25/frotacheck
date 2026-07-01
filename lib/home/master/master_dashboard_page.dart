@@ -47,9 +47,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   @override
   void initState() {
     super.initState();
-    _loadAll();
-    _setupRealtime();
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _loadAll());
+    final auth = context.read<AppAuthProvider>();
+    if (auth.isMaster) {
+      _loadAll();
+      _setupRealtime();
+      _timer = Timer.periodic(const Duration(seconds: 30), (_) => _loadAll());
+    } else {
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _loadAll() async {
@@ -154,6 +159,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AppAuthProvider>();
+    if (!auth.isMaster) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF060C18),
+        body: Center(
+          child: Text(
+            'Acesso restrito ao MASTER',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFF060C18),
       body: Row(

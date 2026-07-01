@@ -785,7 +785,8 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         'status': 'aberta',
         'data': (dataMulta ?? DateTime.now()).toIso8601String().split('T')[0],
         if (selectedDriver != null) 'driver_id': selectedDriver,
-        'foto_url': ?fotoUrl,
+        // ignore: use_null_aware_elements
+        if (fotoUrl != null) 'foto_url': fotoUrl,
       };
 
       await supabase.from('multas').insert(injetar(payload));

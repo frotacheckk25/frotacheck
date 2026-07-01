@@ -47,10 +47,10 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
 
   String get _status => ocorrencia['status']?.toString() ?? 'Aberto';
 
-  String get _proximoStatus => switch (_status) {
-        'Aberto' => 'Em andamento',
-        'Em andamento' => 'Resolvido',
-        _ => 'Aberto',
+  String? get _proximoStatus => switch (_status.toLowerCase()) {
+        'aberto' => 'Em andamento',
+        'em andamento' => 'Resolvido',
+        _ => null,
       };
 
   Color _statusColor(String s) => switch (s.toLowerCase()) {
@@ -73,14 +73,16 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
   }
 
   Future<void> _avancarStatus() async {
+    final proximo = _proximoStatus;
+    if (proximo == null) return;
     setState(() => salvando = true);
     try {
       await supabase
           .from('occurrences')
-          .update({'status': _proximoStatus})
+          .update({'status': proximo})
           .eq('id', ocorrencia['id']);
 
-      if (_proximoStatus == 'Resolvido') {
+      if (proximo == 'Resolvido') {
         try {
           await supabase
               .from('alerts')
@@ -89,14 +91,14 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
         } catch (_) {}
       }
 
-      setState(() => ocorrencia['status'] = _proximoStatus);
+      setState(() => ocorrencia['status'] = proximo);
       widget.onStatusChanged?.call();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Status atualizado para: $_status'),
-            backgroundColor: _statusColor(_status),
+            content: Text('Status atualizado para: ${ocorrencia['status']}'),
+            backgroundColor: _statusColor(proximo),
           ),
         );
       }

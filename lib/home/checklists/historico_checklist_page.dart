@@ -21,6 +21,7 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
   bool _carregando = true;
   String _filtroTipo = 'todos';
   String _busca = '';
+  String? _erroCarregamento;
   final _buscaController = TextEditingController();
 
   @override
@@ -80,9 +81,15 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
         _veicMap = veicMap;
         _motMap = motMap;
         _carregando = false;
+        _erroCarregamento = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _carregando = false);
+      if (mounted) {
+        setState(() {
+          _carregando = false;
+          _erroCarregamento = 'Erro ao carregar checklists: ${e.toString()}';
+        });
+      }
     }
   }
 
@@ -497,6 +504,43 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
           Expanded(
             child: _carregando
                 ? const Center(child: CircularProgressIndicator())
+                : _erroCarregamento != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.error_outline,
+                                  color: AppColors.danger, size: 48),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Erro ao carregar',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _erroCarregamento!,
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton.icon(
+                                onPressed: _carregar,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Tentar novamente'),
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.secondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                 : lista.isEmpty
                     ? Center(
                         child: Column(

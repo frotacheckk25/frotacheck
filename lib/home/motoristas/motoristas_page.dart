@@ -73,6 +73,12 @@ class _MotoristasPageState extends State<MotoristasPage> {
       _snackErro('Selecione a data de validade da CNH');
       return;
     }
+    final hoje = DateTime.now();
+    final validadeLimite = DateTime(hoje.year, hoje.month, hoje.day);
+    if (cnhValidade!.isBefore(validadeLimite)) {
+      _snackErro('A data de validade da CNH não pode ser no passado');
+      return;
+    }
 
     setState(() => isSaving = true);
 
@@ -742,7 +748,10 @@ class _MotoristasPageState extends State<MotoristasPage> {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
-                onPressed: () => excluirMotorista(m['id'].toString(), nome),
+                onPressed: () {
+                  final id = m['id']?.toString();
+                  if (id != null) excluirMotorista(id, nome);
+                },
                 tooltip: 'Excluir',
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                 padding: EdgeInsets.zero,

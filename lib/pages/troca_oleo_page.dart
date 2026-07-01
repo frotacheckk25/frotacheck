@@ -150,10 +150,20 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       return;
     }
 
+    if (selectedServiceType == null) {
+      _snackErro('Selecione o tipo de serviço');
+      return;
+    }
+
+    final kmAtual = int.tryParse(kmController.text.trim()) ?? 0;
+    if (kmAtual < 0) {
+      _snackErro('Informe um KM atual válido (não negativo)');
+      return;
+    }
+
     setState(() => isSaving = true);
     final injetar = context.read<AppAuthProvider>().inject;
 
-    final kmAtual = int.tryParse(kmController.text.trim()) ?? 0;
     final intervalo = int.tryParse(selectedInterval) ?? 10000;
     final proximoKm = kmAtual + intervalo;
 

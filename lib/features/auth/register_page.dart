@@ -27,6 +27,7 @@ class _RegisterPageState extends State<RegisterPage> {
       final response = await Supabase.instance.client.auth.signUp(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
+        data: {'nome': nameController.text.trim()},
       );
 
       if (response.user != null) {

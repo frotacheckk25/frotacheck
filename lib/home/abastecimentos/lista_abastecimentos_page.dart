@@ -36,7 +36,7 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
           .from('fuelings')
           .select('*, vehicles (plate), drivers (name)');
       if (eid != null) q = q.eq('empresa_id', eid);
-      final dados = await q.order('created_at', ascending: false);
+      final dados = await q.order('fuel_date', ascending: false);
 
       setState(() {
         abastecimentos = List<Map<String, dynamic>>.from(
@@ -61,19 +61,17 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
                 .toLowerCase();
         if (!term.contains(query)) return false;
       }
+      if (periodoFiltro == 'Todos') return true;
+      final data = DateTime.tryParse(item['fuel_date'] ?? '');
+      if (data == null) return false;
       if (periodoFiltro == 'Hoje') {
-        return item['fuel_date']?.toString().startsWith(
-              '${hoje.year}-${hoje.month.toString().padLeft(2, '0')}-${hoje.day.toString().padLeft(2, '0')}',
-            ) ??
-            false;
+        return data.year == hoje.year && data.month == hoje.month && data.day == hoje.day;
       }
       if (periodoFiltro == 'Última semana') {
-        final data = DateTime.tryParse(item['fuel_date'] ?? '');
-        return data != null && hoje.difference(data).inDays <= 7;
+        return hoje.difference(data).inDays <= 7;
       }
       if (periodoFiltro == 'Este mês') {
-        final data = DateTime.tryParse(item['fuel_date'] ?? '');
-        return data != null && data.year == hoje.year && data.month == hoje.month;
+        return data.year == hoje.year && data.month == hoje.month;
       }
       return true;
     }).toList();

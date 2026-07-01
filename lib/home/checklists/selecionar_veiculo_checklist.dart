@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/veiculo_model.dart';
 import '../../core/models/motorista_model.dart';
 import '../../core/theme/app_theme.dart';
@@ -25,7 +27,7 @@ class _SelecionarVeiculoChecklistPageState
   String? erroCarregamento;
 
   String? veiculoSelecionado;
-  String? motoristaSelecioando;
+  String? motoristaSelecionado;
   String tipoChecklist = 'saida';
 
   @override
@@ -37,17 +39,28 @@ class _SelecionarVeiculoChecklistPageState
   Future<void> _carregarDados() async {
     setState(() { isLoading = true; erroCarregamento = null; });
     try {
-      final results = await Future.wait([
-        supabase.from('vehicles').select('id, plate, model').order('plate'),
-        supabase.from('drivers').select('id, name').order('name'),
-      ]);
+      final auth = context.read<AppAuthProvider>();
+      List<Map<String, dynamic>> veiculosResult;
+      if (auth.isMotorista && auth.driverId != null) {
+        veiculosResult = await supabase
+            .from('vehicles')
+            .select('id, plate, model')
+            .eq('driver_id', auth.driverId!)
+            .order('plate');
+      } else {
+        veiculosResult = await supabase
+            .from('vehicles')
+            .select('id, plate, model')
+            .order('plate');
+      }
+      final motoristasResult = await supabase.from('drivers').select('id, name').order('name');
 
       if (!mounted) return;
       setState(() {
-        veiculos = List<Map<String, dynamic>>.from(results[0])
+        veiculos = List<Map<String, dynamic>>.from(veiculosResult)
             .map((e) => Veiculo.fromMap(e))
             .toList();
-        motoristas = List<Map<String, dynamic>>.from(results[1])
+        motoristas = List<Map<String, dynamic>>.from(motoristasResult)
             .map((e) => Motorista.fromMap(e))
             .toList();
         isLoading = false;
@@ -63,7 +76,7 @@ class _SelecionarVeiculoChecklistPageState
   }
 
   Future<void> _iniciarChecklist() async {
-    if (veiculoSelecionado == null || motoristaSelecioando == null) {
+    if (veiculoSelecionado == null || motoristaSelecionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecione um veículo e um motorista')),
       );
@@ -77,12 +90,12 @@ class _SelecionarVeiculoChecklistPageState
         ? ChecklistSaidaPage(
             veiculoId: veiculoSelecionado!,
             veiculoPlaca: veiculo.placa ?? '',
-            motoristaId: motoristaSelecioando!,
+            motoristaId: motoristaSelecionado!,
           )
         : ChecklistRetornoPage(
             veiculoId: veiculoSelecionado!,
             veiculoPlaca: veiculo.placa ?? '',
-            motoristaId: motoristaSelecioando!,
+            motoristaId: motoristaSelecionado!,
           );
 
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
@@ -257,7 +270,7 @@ class _SelecionarVeiculoChecklistPageState
                             _label('Motorista *'),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
-                              value: motoristaSelecioando,
+                              value: motoristaSelecionado,
                               decoration: _dec('Selecione o motorista',
                                   Icons.person_outline),
                               dropdownColor: AppColors.surface,
@@ -271,7 +284,7 @@ class _SelecionarVeiculoChecklistPageState
                                 );
                               }).toList(),
                               onChanged: (v) =>
-                                  setState(() => motoristaSelecioando = v),
+                                  setState(() => motoristaSelecionado = v),
                             ),
                           ],
                         ),

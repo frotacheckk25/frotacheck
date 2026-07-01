@@ -378,6 +378,14 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
       return;
     }
 
+    final kmInicio = double.tryParse(kmInicioCtrl.text.replaceAll(',', '.'));
+    if (kmInicio == null || kmInicio < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Quilometragem inicial inválida')),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
     final injetar = context.read<AppAuthProvider>().inject;
     final localizacao = await _obterLocalizacao();
@@ -389,9 +397,10 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
         'data_inicio': DateTime.now().toIso8601String(),
         'origem': origemCtrl.text.trim(),
         'destino': destinoCtrl.text.trim(),
-        'quilometragem_inicio': double.parse(kmInicioCtrl.text),
+        'quilometragem_inicio': kmInicio,
         'status': 'em_progresso',
         'fotos_rota': [],
+        // ignore: use_null_aware_elements
         if (localizacao != null) 'localizacao_inicio': localizacao,
       }));
 
@@ -556,14 +565,26 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       );
       return;
     }
+    final kmFim = double.tryParse(kmFimCtrl.text.replaceAll(',', '.'));
+    if (kmFim == null || kmFim < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Quilometragem final inválida')),
+      );
+      return;
+    }
+    final kmInicio = (widget.viagem['quilometragem_inicio'] as num?)?.toDouble() ?? 0;
+    if (kmFim < kmInicio) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Quilometragem final não pode ser menor que a inicial ($kmInicio km)')),
+      );
+      return;
+    }
+    final kmPerc = kmFim - kmInicio;
+
     setState(() => isLoading = true);
     final localizacao = await _obterLocalizacao();
     if (!mounted) return;
     try {
-      final kmFim = double.parse(kmFimCtrl.text);
-      final kmInicio = (widget.viagem['quilometragem_inicio'] as num?)?.toDouble() ?? 0;
-      final kmPerc = kmFim - kmInicio;
-
       final dataInicio = DateTime.tryParse(widget.viagem['data_inicio']?.toString() ?? '');
       final dataFim = DateTime.now();
       final duracaoMinutos = dataInicio != null ? dataFim.difference(dataInicio).inMinutes : null;
@@ -575,6 +596,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
         'duracao_minutos': duracaoMinutos,
         'status': 'concluida',
         'observacoes': obsCtrl.text,
+        // ignore: use_null_aware_elements
         if (localizacao != null) 'localizacao_fim': localizacao,
       }).eq('id', widget.viagem['id']);
 
@@ -588,6 +610,48 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao concluir viagem: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _cancelar() async {
+    final conf = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cancelar viagem', style: TextStyle(color: Colors.white)),
+        content: const Text('Deseja realmente cancelar esta viagem?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Voltar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancelar viagem', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (conf != true || !mounted) return;
+    setState(() => isLoading = true);
+    try {
+      await supabase.from('viagens').update({
+        'status': 'cancelada',
+        'data_fim': DateTime.now().toIso8601String(),
+      }).eq('id', widget.viagem['id']);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Viagem cancelada'), backgroundColor: AppColors.success),
+      );
+      widget.onAtualizada();
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao cancelar viagem: $e')),
       );
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -732,21 +796,46 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
                       decoration: field('Observações', Icons.notes),
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: isLoading ? null : _concluir,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Concluir Viagem',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : _cancelar,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.danger,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Cancelar Viagem',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : _concluir,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.success,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Concluir Viagem',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

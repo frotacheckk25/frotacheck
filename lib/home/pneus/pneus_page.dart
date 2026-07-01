@@ -792,6 +792,12 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                 style: const TextStyle(color: Colors.white),
                 keyboardType: TextInputType.number,
                 decoration: _dec('KM na Instalação', Icons.speed_outlined),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  final km = int.tryParse(v.trim());
+                  if (km == null || km < 0) return 'Informe um KM válido (não negativo)';
+                  return null;
+                },
               ),
               const SizedBox(height: 14),
 

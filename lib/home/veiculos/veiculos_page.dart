@@ -115,6 +115,8 @@ class _VeiculosPageState extends State<VeiculosPage> {
       'driver_id': motoristaSelecionado,
     };
 
+    final injected = context.read<AppAuthProvider>().inject(payload);
+
     try {
       final isNew = editingId == null;
 
@@ -122,7 +124,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
         // Insert e retorna a linha criada para atualizar a lista imediatamente
         final result = await supabase
             .from('vehicles')
-            .insert(context.read<AppAuthProvider>().inject(payload))
+            .insert(injected)
             .select();
         if (!mounted) return;
         if (result.isNotEmpty) {
@@ -134,7 +136,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
           });
         }
       } else {
-        await supabase.from('vehicles').update(payload).eq('id', editingId!);
+        await supabase.from('vehicles').update(injected).eq('id', editingId!);
         if (!mounted) return;
         // Atualiza localmente
         setState(() {

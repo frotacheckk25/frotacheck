@@ -48,7 +48,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        fuelingsQ.order('created_at', ascending: false).limit(50),
+        fuelingsQ.order('fuel_date', ascending: false).limit(50),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);
@@ -560,43 +560,49 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
               ),
               const SizedBox(height: 14),
 
-              TextFormField(
-                controller: litrosController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: _dec('Litros abastecidos *', Icons.water_drop_outlined),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Informe a quantidade de litros';
-                  if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Valor inválido';
-                  return null;
-                },
-              ),
+               TextFormField(
+                 controller: litrosController,
+                 style: const TextStyle(color: Colors.white),
+                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                 decoration: _dec('Litros abastecidos *', Icons.water_drop_outlined),
+                 validator: (v) {
+                   if (v == null || v.trim().isEmpty) return 'Informe a quantidade de litros';
+                   final parsed = double.tryParse(v.replaceAll(',', '.'));
+                   if (parsed == null) return 'Valor inválido';
+                   if (parsed <= 0) return 'Litros deve ser maior que zero';
+                   return null;
+                 },
+               ),
               const SizedBox(height: 14),
 
-              TextFormField(
-                controller: valorController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: _dec('Valor total (R\$) *', Icons.attach_money),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Informe o valor total';
-                  if (double.tryParse(v.replaceAll(',', '.')) == null) return 'Valor inválido';
-                  return null;
-                },
-              ),
+               TextFormField(
+                 controller: valorController,
+                 style: const TextStyle(color: Colors.white),
+                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                 decoration: _dec('Valor total (R\$) *', Icons.attach_money),
+                 validator: (v) {
+                   if (v == null || v.trim().isEmpty) return 'Informe o valor total';
+                   final parsed = double.tryParse(v.replaceAll(',', '.'));
+                   if (parsed == null) return 'Valor inválido';
+                   if (parsed <= 0) return 'Valor deve ser maior que zero';
+                   return null;
+                 },
+               ),
               const SizedBox(height: 14),
 
-              TextFormField(
-                controller: odometroController,
-                style: const TextStyle(color: Colors.white),
-                keyboardType: TextInputType.number,
-                decoration: _dec('Odômetro (km) *', Icons.speed_outlined),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Informe o odômetro';
-                  if (int.tryParse(v) == null) return 'Valor inválido';
-                  return null;
-                },
-              ),
+               TextFormField(
+                 controller: odometroController,
+                 style: const TextStyle(color: Colors.white),
+                 keyboardType: TextInputType.number,
+                 decoration: _dec('Odômetro (km) *', Icons.speed_outlined),
+                 validator: (v) {
+                   if (v == null || v.trim().isEmpty) return 'Informe o odômetro';
+                   final parsed = int.tryParse(v);
+                   if (parsed == null) return 'Valor inválido';
+                   if (parsed < 0) return 'Odômetro não pode ser negativo';
+                   return null;
+                 },
+               ),
               const SizedBox(height: 20),
 
               const Text('Fotos (opcional)',

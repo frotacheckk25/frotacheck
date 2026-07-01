@@ -807,19 +807,26 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       case _Sec.meuVeiculo:
       case _Sec.perfil:
         setState(() => _activeSection = section);
+        return;
       case _Sec.viagem:
         _push(const ViagensPage());
+        return;
       case _Sec.checklistSaida:
       case _Sec.checklistRetorno:
         _push(const SelecionarVeiculoChecklistPage());
+        return;
       case _Sec.abastecimentos:
         _push(const AbastecimentosPage());
+        return;
       case _Sec.manutencoes:
         _push(const ManutencoesPage());
+        return;
       case _Sec.ocorrencias:
         _push(const ListaOcorrenciasPage());
+        return;
       case _Sec.documentos:
         _push(const DocumentosPage());
+        return;
     }
   }
 

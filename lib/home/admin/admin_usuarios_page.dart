@@ -78,13 +78,28 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     try {
       final auth = context.read<AppAuthProvider>();
 
-      // MASTER vê todos os usuários; demais papéis veem apenas a própria empresa (RLS garante)
-      var query = _supabase
-          .from('user_profiles')
-          .select('*, empresas(nome)')
-          .order('created_at', ascending: false);
-
-      final res = await query;
+      // Defense-in-depth: filtra por empresa_id para não-MASTER (RLS é fallback, não única camada)
+      List<Map<String, dynamic>> res;
+      if (auth.isMaster) {
+        res = await _supabase
+            .from('user_profiles')
+            .select('*, empresas(nome)')
+            .order('created_at', ascending: false);
+      } else {
+        final minhaEmpresa = auth.empresaId;
+        if (minhaEmpresa != null) {
+          res = await _supabase
+              .from('user_profiles')
+              .select('*, empresas(nome)')
+              .eq('empresa_id', minhaEmpresa)
+              .order('created_at', ascending: false);
+        } else {
+          res = await _supabase
+              .from('user_profiles')
+              .select('*, empresas(nome)')
+              .order('created_at', ascending: false);
+        }
+      }
       final lista = (res as List)
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
@@ -100,25 +115,35 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
             .toList();
       }
 
-      // Carrega motoristas (drivers) da empresa — para vinculação
       List<Map<String, dynamic>> drivers = [];
       try {
-        final drRes = await _supabase
+        var drQuery = _supabase
             .from('drivers')
-            .select('id, name')
-            .order('name');
+            .select('id, name');
+        if (!auth.isMaster) {
+          final minhaEmpresa = auth.empresaId;
+          if (minhaEmpresa != null) {
+            drQuery = drQuery.eq('empresa_id', minhaEmpresa);
+          }
+        }
+        final drRes = await drQuery.order('name');
         drivers = (drRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
       } catch (_) {}
 
-      // Carrega veículos da empresa — para vinculação ao motorista
       List<Map<String, dynamic>> vehicles = [];
       try {
-        final vRes = await _supabase
+        var vQuery = _supabase
             .from('vehicles')
-            .select('id, plate, model, brand, driver_id')
-            .order('plate');
+            .select('id, plate, model, brand, driver_id');
+        if (!auth.isMaster) {
+          final minhaEmpresa = auth.empresaId;
+          if (minhaEmpresa != null) {
+            vQuery = vQuery.eq('empresa_id', minhaEmpresa);
+          }
+        }
+        final vRes = await vQuery.order('plate');
         vehicles = (vRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -603,8 +628,9 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   String _initials(String name) {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    if (parts.isNotEmpty && parts[0].isNotEmpty)
+    if (parts.isNotEmpty && parts[0].isNotEmpty) {
       return parts[0][0].toUpperCase();
+    }
     return '?';
   }
 

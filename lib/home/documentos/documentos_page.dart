@@ -763,7 +763,11 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   }
 
   Future<void> _selecionarArquivo() async {
-    final resultado = await FilePicker.platform.pickFiles(withData: true);
+    final resultado = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      type: FileType.custom,
+    );
     if (resultado != null && resultado.files.isNotEmpty) {
       if (mounted) setState(() => arquivo = resultado.files.single);
     }
@@ -771,6 +775,15 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
 
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
+    if (dataEmissao != null && dataVencimento.isBefore(dataEmissao!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Data de vencimento não pode ser anterior à data de emissão'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
     setState(() => isSaving = true);
     final injetar = context.read<AppAuthProvider>().inject;
     try {
@@ -799,9 +812,12 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
         'descricao': descricaoCtrl.text.trim(),
         'data_vencimento': dataVencimento.toIso8601String().split('T')[0],
         'ativo': true,
+        // ignore: use_null_aware_elements
         if (veiculoId != null) 'vehicle_id': veiculoId,
-        'driver_id': ?motoristaId,
-        'file_url': ?fileUrl,
+        // ignore: use_null_aware_elements
+        if (motoristaId != null) 'driver_id': motoristaId,
+        // ignore: use_null_aware_elements
+        if (fileUrl != null) 'file_url': fileUrl,
         if (dataEmissao != null)
           'data_emissao': dataEmissao!.toIso8601String().split('T')[0],
         if (dataPagamento != null)
