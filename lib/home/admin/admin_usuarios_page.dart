@@ -167,6 +167,17 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   }
 
   Future<void> _alterarRole(String userId, AppRole novoRole) async {
+    // Ao atribuir admin_empresa a usuário sem empresa → criar empresa automaticamente
+    if (novoRole == AppRole.adminEmpresa) {
+      final perfil = _usuarios.firstWhere(
+        (u) => u['user_id']?.toString() == userId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (perfil['empresa_id'] == null) {
+        await _criarEmpresaParaAdmin(userId, perfil);
+        return;
+      }
+    }
     try {
       await _supabase
           .from('user_profiles')
@@ -178,6 +189,91 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _criarEmpresaParaAdmin(
+      String userId, Map<String, dynamic> perfil) async {
+    final nomeInicial =
+        perfil['nome']?.toString() ?? perfil['email']?.toString() ?? '';
+    final controller = TextEditingController(text: nomeInicial);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Criar empresa',
+            style: TextStyle(color: AppColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Uma empresa será criada para este admin. '
+              'O admin poderá editar o nome depois.',
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                labelText: 'Nome da empresa',
+                labelStyle: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Criar e vincular'),
+          ),
+        ],
+      ),
+    );
+
+    final nomeEmpresa = controller.text.trim();
+    controller.dispose();
+    if (confirmed != true || nomeEmpresa.isEmpty) return;
+
+    try {
+      final novaEmpresa = await _supabase
+          .from('empresas')
+          .insert({'nome': nomeEmpresa})
+          .select('id')
+          .single();
+
+      await _supabase.from('user_profiles').update({
+        'role': AppRole.adminEmpresa.label,
+        'empresa_id': novaEmpresa['id'],
+      }).eq('user_id', userId);
+
+      await _carregar();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Empresa "$nomeEmpresa" criada e admin vinculado!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao criar empresa: $e'),
             backgroundColor: AppColors.danger,
           ),
         );
@@ -658,8 +754,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                       onChanged: (s) => _alterarStatus(userId, s),
                     ),
                   ),
-                  // Empresa dropdown (MASTER only)
-                  if (auth.isMaster && _empresas.isNotEmpty) ...[
+                  // Empresa dropdown — apenas para motorista/gestor (admin_empresa cria a própria)
+                  if (auth.isMaster &&
+                      _empresas.isNotEmpty &&
+                      role != AppRole.adminEmpresa) ...[
                     const SizedBox(width: 8),
                     Expanded(
                       child: _EmpresaDropdown(
