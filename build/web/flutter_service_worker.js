@@ -7,7 +7,6 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      // Coleta clients ANTES de unregister para garantir auto-reload
       let clients = [];
       try {
         clients = await self.clients.matchAll({ type: 'window' });

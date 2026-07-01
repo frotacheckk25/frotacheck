@@ -458,6 +458,247 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   }
 
 
+  Future<void> _vincularPorEmail(AppAuthProvider auth) async {
+    final emailCtrl = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        Map<String, dynamic>? encontrado;
+        String? selectedVehicleId;
+        String? erroBusca;
+        bool buscou = false;
+
+        return StatefulBuilder(
+          builder: (ctx, setDialog) {
+            Future<void> buscar() async {
+              final email = emailCtrl.text.trim().toLowerCase();
+              if (email.isEmpty) return;
+
+              // Busca primeiro na lista já carregada
+              final localIdx = _usuarios.indexWhere(
+                (u) => (u['email']?.toString().toLowerCase() ?? '') == email,
+              );
+              Map<String, dynamic>? perfil = localIdx >= 0 ? _usuarios[localIdx] : null;
+
+              // Se não achou localmente, consulta o banco
+              if (perfil == null) {
+                try {
+                  final res = await _supabase
+                      .from('user_profiles')
+                      .select('*, empresas(nome)')
+                      .eq('email', email)
+                      .maybeSingle();
+                  if (res != null) perfil = Map<String, dynamic>.from(res as Map);
+                } catch (_) {}
+              }
+
+              // Descobre veículo atual do motorista (se houver driver_id)
+              String? veiculoAtual;
+              if (perfil?['driver_id'] != null) {
+                final dId = perfil!['driver_id'].toString();
+                final vIdx = _vehicles.indexWhere((v) => v['driver_id']?.toString() == dId);
+                if (vIdx >= 0) veiculoAtual = _vehicles[vIdx]['id']?.toString();
+              }
+
+              setDialog(() {
+                encontrado = perfil;
+                selectedVehicleId = veiculoAtual;
+                erroBusca = perfil == null ? 'Nenhum usuário encontrado com esse e-mail.' : null;
+                buscou = true;
+              });
+            }
+
+            final roleEncontrado = encontrado != null
+                ? AppRole.fromString(encontrado!['role']?.toString() ?? 'MOTORISTA')
+                : null;
+
+            return AlertDialog(
+              backgroundColor: AppColors.surface,
+              title: const Text('Vincular veículo por e-mail',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Digite o e-mail da conta do motorista para vincular um veículo.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(color: AppColors.textPrimary),
+                            decoration: const InputDecoration(
+                              labelText: 'E-mail do motorista',
+                              labelStyle: TextStyle(color: AppColors.textSecondary),
+                              prefixIcon: Icon(Icons.email_outlined,
+                                  color: AppColors.textSecondary, size: 18),
+                              enabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.border)),
+                              focusedBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.secondary)),
+                            ),
+                            onSubmitted: (_) => buscar(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          ),
+                          onPressed: buscar,
+                          child: const Icon(Icons.search, size: 20, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    if (buscou && erroBusca != null) ...[
+                      const SizedBox(height: 12),
+                      Text(erroBusca!,
+                          style: const TextStyle(color: AppColors.danger, fontSize: 13)),
+                    ],
+                    if (encontrado != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: roleEncontrado!.color.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                _initials(encontrado!['nome']?.toString() ??
+                                    encontrado!['email']?.toString() ?? '?'),
+                                style: TextStyle(
+                                    color: roleEncontrado.color,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    encontrado!['nome']?.toString().isNotEmpty == true
+                                        ? encontrado!['nome'].toString()
+                                        : encontrado!['email']?.toString() ?? '',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13),
+                                  ),
+                                  Text(roleEncontrado.label,
+                                      style: TextStyle(
+                                          color: roleEncontrado.color, fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (roleEncontrado != AppRole.motorista) ...[
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Este usuário não é motorista. Apenas motoristas podem ser vinculados a veículos.',
+                          style: TextStyle(color: AppColors.warning, fontSize: 12),
+                        ),
+                      ] else if (_vehicles.isEmpty) ...[
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Nenhum veículo cadastrado para esta empresa.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 14),
+                        const Text('Selecionar veículo:',
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12)),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String?>(
+                          value: selectedVehicleId,
+                          dropdownColor: AppColors.surface,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: const InputDecoration(
+                            enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: AppColors.border)),
+                            focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: AppColors.secondary)),
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('— Nenhum veículo —',
+                                  style: TextStyle(color: AppColors.textSecondary)),
+                            ),
+                            ..._vehicles.map((v) => DropdownMenuItem<String?>(
+                                  value: v['id']?.toString(),
+                                  child: Text(
+                                    '${v['plate']}  ${v['brand'] ?? ''} ${v['model'] ?? ''}',
+                                    style: const TextStyle(color: AppColors.textPrimary),
+                                  ),
+                                )),
+                          ],
+                          onChanged: (v) => setDialog(() => selectedVehicleId = v),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                if (encontrado != null && roleEncontrado == AppRole.motorista)
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _vincularVeiculoDireto(
+                        encontrado!['user_id'].toString(),
+                        selectedVehicleId,
+                        encontrado!,
+                      );
+                    },
+                    child: Text(
+                      selectedVehicleId == null ? 'Desvincular veículo' : 'Vincular',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    emailCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AppAuthProvider>();
@@ -471,6 +712,12 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          if (canManage)
+            IconButton(
+              icon: const Icon(Icons.link),
+              tooltip: 'Vincular motorista por e-mail',
+              onPressed: () => _vincularPorEmail(auth),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Atualizar',
