@@ -1079,8 +1079,21 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(p?.nome ?? 'Sem nome',
-                              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(p?.nome ?? 'Sem nome',
+                                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                              ),
+                              IconButton(
+                                onPressed: () => _editarNome(auth, p?.nome ?? ''),
+                                icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.textSecondary),
+                                tooltip: 'Editar nome',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 2),
                           Text(p?.email ?? '', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                           const SizedBox(height: 6),
@@ -1118,6 +1131,55 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         ],
       ),
     );
+  }
+
+  Future<void> _editarNome(AppAuthProvider auth, String nomeAtual) async {
+    final ctrl = TextEditingController(text: nomeAtual);
+    final salvo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Editar nome', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Seu nome completo',
+            labelStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.secondary)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Salvar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (salvo == null || salvo.isEmpty || !mounted) return;
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      await _supabase.from('user_profiles').update({'nome': salvo}).eq('user_id', userId);
+      await auth.reload();
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 
   // ── Cartão de Veículo ─────────────────────────────────────────────────────

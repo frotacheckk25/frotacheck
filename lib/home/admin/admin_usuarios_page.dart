@@ -220,6 +220,53 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     }
   }
 
+  Future<void> _editarNome(String userId, String nomeAtual) async {
+    final ctrl = TextEditingController(text: nomeAtual);
+    final salvo = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Editar nome', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Nome completo',
+            labelStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.secondary)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Salvar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (salvo == null || salvo.isEmpty) return;
+    try {
+      await _supabase.from('user_profiles').update({'nome': salvo}).eq('user_id', userId);
+      await _carregar();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
   Future<void> _vincularVeiculo(String driverId, String? vehicleId) async {
     try {
       // Remove vínculo atual deste motorista de qualquer veículo
@@ -485,6 +532,18 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (canEdit) ...[
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => _editarNome(userId, u['nome']?.toString() ?? ''),
+                              borderRadius: BorderRadius.circular(4),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.edit_rounded,
+                                    size: 14, color: AppColors.textSecondary),
+                              ),
+                            ),
+                          ],
                           if (isMe) ...[
                             const SizedBox(width: 6),
                             Container(

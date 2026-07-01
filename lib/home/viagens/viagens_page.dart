@@ -51,29 +51,81 @@ class _ViagensPageState extends State<ViagensPage> {
     try {
       final auth = context.read<AppAuthProvider>();
       final isMotorista = auth.isMotorista;
-      final driverId = auth.driverId;
       final eid = auth.effectiveEmpresaId;
 
-      var veicQ2 = supabase.from('vehicles').select('id, plate, brand, model');
-      var drivQ2 = supabase.from('drivers').select('id, name');
-      if (eid != null) {
-        veicQ2 = veicQ2.eq('empresa_id', eid);
-        drivQ2 = drivQ2.eq('empresa_id', eid);
+      // Busca driverId fresco para motorista (cache pode estar desatualizado)
+      String? driverId = auth.driverId;
+      if (isMotorista && driverId == null) {
+        final uid = supabase.auth.currentUser?.id;
+        if (uid != null) {
+          final fresh = await supabase.from('user_profiles')
+              .select('driver_id').eq('user_id', uid).maybeSingle();
+          driverId = fresh?['driver_id']?.toString();
+        }
       }
-      final results = await Future.wait([
-        veicQ2.order('plate'),
-        drivQ2.order('name'),
-      ]);
 
       final vMap = <String, Map<String, dynamic>>{};
-      for (final v in (results[0] as List)) {
-        final row = Map<String, dynamic>.from(v as Map);
-        vMap[row['id'].toString()] = row;
-      }
       final mMap = <String, Map<String, dynamic>>{};
-      for (final m in (results[1] as List)) {
-        final row = Map<String, dynamic>.from(m as Map);
-        mMap[row['id'].toString()] = row;
+
+      if (isMotorista) {
+        // MOTORISTA: veículo via RPC SECURITY DEFINER (burla RLS)
+        try {
+          final res = await supabase.rpc('get_my_vehicle') as List?;
+          if (res != null && res.isNotEmpty) {
+            final v = Map<String, dynamic>.from(res.first as Map);
+            vMap[v['id'].toString()] = v;
+          }
+        } catch (_) {}
+        // Fallback: query direta por empresa
+        if (vMap.isEmpty && eid != null) {
+          try {
+            final vs = await supabase.from('vehicles')
+                .select('id, plate, brand, model').eq('empresa_id', eid);
+            for (final v in vs as List) {
+              final row = Map<String, dynamic>.from(v as Map);
+              vMap[row['id'].toString()] = row;
+            }
+          } catch (_) {}
+        }
+        // Próprio motorista: query por ID específico (RLS permite)
+        if (driverId != null) {
+          try {
+            final dr = await supabase.from('drivers')
+                .select('id, name').eq('id', driverId).maybeSingle();
+            if (dr != null) mMap[driverId] = Map<String, dynamic>.from(dr as Map);
+          } catch (_) {}
+        }
+      } else if (eid != null) {
+        // ADMIN/GESTOR: veículos por empresa
+        try {
+          final vs = await supabase.from('vehicles')
+              .select('id, plate, brand, model').eq('empresa_id', eid).order('plate');
+          for (final v in vs as List) {
+            final row = Map<String, dynamic>.from(v as Map);
+            vMap[row['id'].toString()] = row;
+          }
+        } catch (_) {}
+        // Motoristas: via user_profiles (não depende de drivers.empresa_id)
+        try {
+          final profiles = await supabase.from('user_profiles')
+              .select('driver_id, nome, email')
+              .eq('empresa_id', eid)
+              .eq('role', 'MOTORISTA')
+              .not('driver_id', 'is', null);
+          for (final p in profiles as List) {
+            final dId = p['driver_id']?.toString();
+            if (dId == null) continue;
+            try {
+              final dr = await supabase.from('drivers')
+                  .select('id, name').eq('id', dId).maybeSingle();
+              mMap[dId] = dr != null
+                  ? Map<String, dynamic>.from(dr as Map)
+                  : {'id': dId, 'name': p['nome'] ?? p['email'] ?? dId};
+            } catch (_) {
+              mMap[dId] = {'id': dId, 'name': p['nome'] ?? p['email'] ?? dId};
+            }
+          }
+        } catch (_) {}
       }
 
       var viaQ = supabase.from('viagens').select();
@@ -303,6 +355,7 @@ class _ViagensPageState extends State<ViagensPage> {
   }
 
   void _abrirNovaViagem() {
+    final auth = context.read<AppAuthProvider>();
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -310,6 +363,8 @@ class _ViagensPageState extends State<ViagensPage> {
           veiculosMap: veiculosMap,
           motoristasMap: motoristasMap,
           onSalva: _carregarDados,
+          isMotorista: auth.isMotorista,
+          ownDriverId: auth.driverId,
         ),
       ),
     );
@@ -336,11 +391,15 @@ class _NovaViagemPage extends StatefulWidget {
   final Map<String, Map<String, dynamic>> veiculosMap;
   final Map<String, Map<String, dynamic>> motoristasMap;
   final VoidCallback onSalva;
+  final bool isMotorista;
+  final String? ownDriverId;
 
   const _NovaViagemPage({
     required this.veiculosMap,
     required this.motoristasMap,
     required this.onSalva,
+    this.isMotorista = false,
+    this.ownDriverId,
   });
 
   @override
@@ -357,6 +416,16 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
   final origemCtrl = TextEditingController();
   final destinoCtrl = TextEditingController();
   final kmInicioCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // MOTORISTA: auto-preenche com seu próprio driver e único veículo
+    if (widget.isMotorista) {
+      if (widget.ownDriverId != null) motoristaId = widget.ownDriverId;
+      if (widget.veiculosMap.length == 1) veiculoId = widget.veiculosMap.keys.first;
+    }
+  }
 
   @override
   void dispose() {
@@ -452,36 +521,59 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DropdownButtonFormField<String>(
-              value: veiculoId,
-              dropdownColor: AppColors.surface,
-              style: const TextStyle(color: Colors.white),
-              decoration: field('Veículo *', Icons.directions_car),
-              items: veiculos.map((e) {
-                final v = e.value;
-                final plate = v['plate']?.toString() ?? '';
-                final desc = '${v['brand'] ?? ''} ${v['model'] ?? ''}'.trim();
-                return DropdownMenuItem(
-                  value: e.key,
-                  child: Text('$plate${desc.isNotEmpty ? ' — $desc' : ''}'),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => veiculoId = val),
-            ),
+            // Veículo: dropdown editável para admin/gestor, readonly para motorista
+            if (widget.isMotorista && veiculoId != null)
+              _ReadonlyField(
+                label: 'Veículo',
+                value: () {
+                  final v = widget.veiculosMap[veiculoId];
+                  if (v == null) return veiculoId!;
+                  final plate = v['plate']?.toString() ?? '';
+                  final desc = '${v['brand'] ?? ''} ${v['model'] ?? ''}'.trim();
+                  return '$plate${desc.isNotEmpty ? ' — $desc' : ''}';
+                }(),
+                icon: Icons.directions_car,
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: veiculoId,
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                decoration: field('Veículo *', Icons.directions_car),
+                items: veiculos.map((e) {
+                  final v = e.value;
+                  final plate = v['plate']?.toString() ?? '';
+                  final desc = '${v['brand'] ?? ''} ${v['model'] ?? ''}'.trim();
+                  return DropdownMenuItem(
+                    value: e.key,
+                    child: Text('$plate${desc.isNotEmpty ? ' — $desc' : ''}'),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => veiculoId = val),
+              ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: motoristaId,
-              dropdownColor: AppColors.surface,
-              style: const TextStyle(color: Colors.white),
-              decoration: field('Motorista *', Icons.person),
-              items: motoristas
-                  .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value['name']?.toString() ?? ''),
-                      ))
-                  .toList(),
-              onChanged: (val) => setState(() => motoristaId = val),
-            ),
+            // Motorista: readonly para motorista (sempre é ele mesmo), dropdown para admin
+            if (widget.isMotorista)
+              _ReadonlyField(
+                label: 'Motorista',
+                value: widget.motoristasMap[motoristaId]?['name']?.toString()
+                    ?? motoristaId ?? 'Você',
+                icon: Icons.person,
+              )
+            else
+              DropdownButtonFormField<String>(
+                value: motoristaId,
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                decoration: field('Motorista *', Icons.person),
+                items: motoristas
+                    .map((e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value['name']?.toString() ?? ''),
+                        ))
+                    .toList(),
+                onChanged: (val) => setState(() => motoristaId = val),
+              ),
             const SizedBox(height: 16),
             TextField(
               controller: origemCtrl,
@@ -855,6 +947,46 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
         children: [
           Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           Text(value, style: TextStyle(fontSize: 14, color: color ?? Colors.white)),
+        ],
+      ),
+    );
+  }
+}
+
+// Campo readonly estilizado para exibir veículo/motorista fixo do MOTORISTA
+class _ReadonlyField extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _ReadonlyField({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundSoft,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textSecondary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 11)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            ),
+          ),
         ],
       ),
     );
