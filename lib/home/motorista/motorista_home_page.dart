@@ -465,7 +465,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                           : const Color(0xFF94A3B8),
                       () => _push(const SelecionarVeiculoChecklistPage())),
                   const SizedBox(width: 8),
-                  _taskCardMobile(Icons.assignment_turned_in,
+                  _taskCardMobile(Icons.check_circle,
                       'Checklist\nRetorno', const Color(0xFF3B82F6),
                       _checklistRetornoHoje ? 'Concluído' : 'Não iniciado',
                       _checklistRetornoHoje
@@ -514,7 +514,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                         '$_viagensHoje', const Color(0xFF3B82F6))),
                 const SizedBox(width: 8),
                 Expanded(
-                    child: _resumoChip(Icons.straighten, 'Distância',
+                    child: _resumoChip(Icons.compare_arrows, 'Distância',
                         '${_distanciaHoje.toStringAsFixed(0)} km',
                         const Color(0xFF8B5CF6))),
               ],
@@ -523,7 +523,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             Row(
               children: [
                 Expanded(
-                    child: _resumoChip(Icons.hourglass_top, 'Trânsito',
+                    child: _resumoChip(Icons.more_time, 'Trânsito',
                         _fmtTempo(_tempoTransitoMin),
                         const Color(0xFF06B6D4))),
                 const SizedBox(width: 8),
@@ -641,7 +641,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 const Color(0xFF1AA251),
                 () => _push(const SelecionarVeiculoChecklistPage())),
             _atividadeGrid(
-                Icons.assignment_turned_in,
+                Icons.check_circle,
                 'Checklist Retorno',
                 const Color(0xFF3B82F6),
                 () => _push(const SelecionarVeiculoChecklistPage())),
@@ -763,7 +763,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   _item(Icons.directions, 'Minha Viagem', _Sec.viagem),
                   _item(Icons.checklist_rtl, 'Checklist Saída',
                       _Sec.checklistSaida),
-                  _item(Icons.assignment_turned_in,
+                  _item(Icons.check_circle,
                       'Checklist Retorno', _Sec.checklistRetorno),
                   _item(Icons.local_gas_station_rounded, 'Abastecimentos',
                       _Sec.abastecimentos),
@@ -1102,7 +1102,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _taskCard(
-                      icon: Icons.assignment_turned_in,
+                      icon: Icons.check_circle,
                       cor: const Color(0xFF3B82F6),
                       titulo: 'Checklist Retorno',
                       status:
@@ -1207,11 +1207,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _resumoRow(Icons.directions, const Color(0xFF3B82F6),
               'Viagens', '$_viagensHoje'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.straighten, const Color(0xFF8B5CF6),
+          _resumoRow(Icons.compare_arrows, const Color(0xFF8B5CF6),
               'Distância',
               '${_distanciaHoje.toStringAsFixed(1)} km'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.hourglass_top, const Color(0xFF06B6D4),
+          _resumoRow(Icons.more_time, const Color(0xFF06B6D4),
               'Tempo em trânsito', _fmtTempo(_tempoTransitoMin)),
           const Divider(color: AppColors.border, height: 1),
           _resumoRow(Icons.local_gas_station_rounded,
@@ -1758,7 +1758,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.lock,
+                  Icons.vpn_key,
                   'Alterar senha',
                   const Color(0xFFF59E0B),
                   _alterarSenha,
@@ -1776,7 +1776,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.exit_to_app,
+                  Icons.power_settings_new,
                   'Sair da conta',
                   const Color(0xFFEF4444),
                   () => _sairDaConta(auth),
