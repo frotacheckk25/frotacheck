@@ -1231,10 +1231,21 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: cor.withOpacity(0.10),
+              color: cor.withOpacity(0.18),
               borderRadius: BorderRadius.circular(7),
             ),
-            child: Icon(icon, color: cor, size: 15),
+            child: Center(
+              child: Text(
+                String.fromCharCode(icon.codePoint),
+                style: TextStyle(
+                  fontFamily: icon.fontFamily ?? 'MaterialIcons',
+                  package: icon.fontPackage,
+                  fontSize: 15,
+                  color: cor,
+                  height: 1.0,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1851,22 +1862,24 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  // Stack-based icon circle: círculo colorido + ícone branco sobrepostos
-  // (CircleAvatar clippa o filho no Flutter web, escondendo o Icon)
+  // Renderiza ícone como Text com codepoint direto — mais confiável no Flutter web
+  // (Icon widget pode ter problemas de renderização dentro de Stack no CanvasKit)
   Widget _iconCircle(IconData icon, Color cor, double size, double iconSize) {
-    return SizedBox(
+    return Container(
       width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+      child: Center(
+        child: Text(
+          String.fromCharCode(icon.codePoint),
+          style: TextStyle(
+            fontFamily: icon.fontFamily ?? 'MaterialIcons',
+            package: icon.fontPackage,
+            fontSize: iconSize,
+            color: Colors.white,
+            height: 1.0,
           ),
-          Icon(icon, color: Colors.white, size: iconSize),
-        ],
+        ),
       ),
     );
   }
