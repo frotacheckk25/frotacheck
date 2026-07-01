@@ -718,11 +718,13 @@ class _HomePageState extends State<HomePage> {
       // Carrega ocorrências críticas (Alta prioridade, não resolvidas)
       List<Map<String, dynamic>> criticas = [];
       try {
-        final critRes = await supabase
+        var critQ = supabase
             .from('occurrences')
             .select('id, problem_type, priority, status, location, vehicle_id, created_at')
             .neq('status', 'Resolvido')
-            .eq('priority', 'Alta')
+            .eq('priority', 'Alta');
+        if (_empresaId != null) critQ = critQ.eq('empresa_id', _empresaId!);
+        final critRes = await critQ
             .order('created_at', ascending: false)
             .limit(5);
         criticas = List<Map<String, dynamic>>.from(
@@ -914,11 +916,13 @@ class _HomePageState extends State<HomePage> {
     String cols = 'created_at',
   }) async {
     try {
-      final r = await supabase
+      var q = supabase
           .from(table)
           .select(cols)
           .gte(dateCol, start)
-          .lte(dateCol, '${end}T23:59:59') as List;
+          .lte(dateCol, '${end}T23:59:59');
+      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+      final r = await q as List;
       return r.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {
       return [];
@@ -1037,10 +1041,12 @@ class _HomePageState extends State<HomePage> {
     required List<Map<String, dynamic>> motoristas,
   }) async {
     try {
-      final supAlerts = await supabase
+      var alertsQ = supabase
           .from('alerts')
           .select()
-          .eq('status', 'ativo')
+          .eq('status', 'ativo');
+      if (_empresaId != null) alertsQ = alertsQ.eq('empresa_id', _empresaId!);
+      final supAlerts = await alertsQ
           .order('created_at', ascending: false)
           .limit(8);
       final supAlertsList = supAlerts as List;
