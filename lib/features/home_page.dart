@@ -234,6 +234,9 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> pneusData = [];
   List<int> _modulePulseVersions = List.filled(10, 0);
 
+  // empresa_id do usuário logado (null = MASTER, vê tudo)
+  String? _empresaId;
+
   // Sparkline state — 6-month buckets, loaded async after main data
   List<double> sparkVeiculos = [];
   List<double> sparkMotoristas = [];
@@ -577,6 +580,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> carregarDashboard() async {
     setState(() => carregando = true);
+    // Captura empresa do usuário logado (null = MASTER, sem filtro)
+    if (mounted) {
+      final auth = context.read<AppAuthProvider>();
+      _empresaId = auth.effectiveEmpresaId;
+    }
 
     // Snapshot antes do carregamento para detectar mudanças por módulo
     final prevVeiculos        = totalVeiculos;
@@ -604,29 +612,46 @@ class _HomePageState extends State<HomePage> {
         _safeSelectFiltered('ocorrencias', dateStart, dateEnd), // 7
         _safeSelect('documentos'), // 8
         _safeQueryDirect(
-          supabase
-              .from('fuelings')
-              .select('id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)')
-              .gte('fuel_date', dateStart)
-              .lte('fuel_date', dateEnd)
-              .order('created_at', ascending: false)
-              .limit(3),
+          _empresaId != null
+              ? supabase
+                  .from('fuelings')
+                  .select('id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)')
+                  .eq('empresa_id', _empresaId!)
+                  .gte('fuel_date', dateStart)
+                  .lte('fuel_date', dateEnd)
+                  .order('created_at', ascending: false)
+                  .limit(3)
+              : supabase
+                  .from('fuelings')
+                  .select('id, liters, total_value, fuel_date, fuel_time, vehicles (plate), drivers (name)')
+                  .gte('fuel_date', dateStart)
+                  .lte('fuel_date', dateEnd)
+                  .order('created_at', ascending: false)
+                  .limit(3),
           'fuelings-recent',
         ), // 9
         _safeQueryDirect(
-          supabase.from('oil_changes').select('id,service_type,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          _empresaId != null
+              ? supabase.from('oil_changes').select('id,service_type,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
+              : supabase.from('oil_changes').select('id,service_type,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
           'oil_changes-alltime',
         ), // 10
         _safeQueryDirect(
-          supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          _empresaId != null
+              ? supabase.from('occurrences').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
+              : supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
           'occurrences-alltime',
         ), // 11
         _safeQueryDirect(
-          supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          _empresaId != null
+              ? supabase.from('ocorrencias').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
+              : supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
           'ocorrencias-alltime',
         ), // 12
         _safeQueryDirect(
-          supabase.from('manutencoes').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
+          _empresaId != null
+              ? supabase.from('manutencoes').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
+              : supabase.from('manutencoes').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
           'manutencoes-alltime',
         ), // 13
       ]);
@@ -759,7 +784,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<List<Map<String, dynamic>>> _safeSelect(String table) async {
     try {
-      final response = await supabase.from(table).select() as List;
+      var q = supabase.from(table).select();
+      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+      final response = await q as List;
       return response
           .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
           .toList();
@@ -785,19 +812,23 @@ class _HomePageState extends State<HomePage> {
     String dateEnd,
   ) async {
     try {
-      final response = await supabase
+      var q = supabase
           .from('fuelings')
           .select('*, vehicles (plate), drivers (name)')
           .gte('fuel_date', dateStart)
-          .lte('fuel_date', dateEnd) as List;
+          .lte('fuel_date', dateEnd);
+      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+      final response = await q as List;
       return response
           .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
       try {
-        final response = await supabase
+        var q = supabase
             .from('fuelings')
-            .select('*, vehicles (plate), drivers (name)') as List;
+            .select('*, vehicles (plate), drivers (name)');
+        if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+        final response = await q as List;
         return response
             .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
             .toList();
@@ -814,11 +845,13 @@ class _HomePageState extends State<HomePage> {
     String dateCol = 'created_at',
   }) async {
     try {
-      final response = await supabase
+      var q = supabase
           .from(table)
           .select()
           .gte(dateCol, dateStart)
-          .lte(dateCol, '${dateEnd}T23:59:59') as List;
+          .lte(dateCol, '${dateEnd}T23:59:59');
+      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+      final response = await q as List;
       return response
           .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
           .toList();
