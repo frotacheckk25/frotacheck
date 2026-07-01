@@ -13,6 +13,7 @@ class UserProfile {
   final String? email;
   final DateTime? createdAt;
   final String? driverId; // FK para drivers.id — vincula usuário auth ao registro de motorista
+  final String? avatarUrl;
 
   const UserProfile({
     required this.userId,
@@ -26,6 +27,7 @@ class UserProfile {
     this.email,
     this.createdAt,
     this.driverId,
+    this.avatarUrl,
   });
 
   bool can(AppPermission permission) {
@@ -73,6 +75,7 @@ class UserProfile {
           ? DateTime.tryParse(map['created_at'].toString())
           : null,
       driverId: map['driver_id']?.toString(),
+      avatarUrl: map['avatar_url']?.toString(),
     );
   }
 
@@ -95,6 +98,7 @@ class UserProfile {
     String? nome,
     String? email,
     Object? driverId = _sentinel,
+    Object? avatarUrl = _sentinel,
   }) {
     return UserProfile(
       userId: userId,
@@ -108,6 +112,7 @@ class UserProfile {
       email: email ?? this.email,
       createdAt: createdAt,
       driverId: driverId == _sentinel ? this.driverId : driverId as String?,
+      avatarUrl: avatarUrl == _sentinel ? this.avatarUrl : avatarUrl as String?,
     );
   }
 }

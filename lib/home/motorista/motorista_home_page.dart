@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -46,8 +47,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   double _distanciaHoje = 0;
   int _tempoTransitoMin = 0;
 
-  // Perfil — dados do driver record
+  // Perfil — dados do driver record e avatar
   Map<String, dynamic>? _driverRecord;
+  String? _avatarUrl;
+  bool _uploadingAvatar = false;
 
   @override
   void initState() {
@@ -255,6 +258,23 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         } catch (_) {}
       }
 
+      // ── Avatar URL (da coluna avatar_url em user_profiles) ────────────────
+      String? avatarUrl;
+      if (userId != null) {
+        try {
+          final perfil = await _supabase
+              .from('user_profiles')
+              .select('avatar_url')
+              .eq('user_id', userId)
+              .maybeSingle();
+          avatarUrl = perfil?['avatar_url']?.toString();
+          // cache-bust para forçar reload após upload
+          if (avatarUrl != null && avatarUrl.isNotEmpty) {
+            avatarUrl = _addCacheBust(avatarUrl);
+          }
+        } catch (_) {}
+      }
+
       if (!mounted) return;
       setState(() {
         _veiculo = veiculo;
@@ -270,6 +290,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         _tempoTransitoMin = tempoTransitoMin;
         _manutencaoStatus = manutencaoStatus;
         _driverRecord = driverRec;
+        _avatarUrl = avatarUrl;
         _loadingVeiculo = false;
       });
     } catch (e) {
@@ -1547,32 +1568,80 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                       alignment: Alignment.centerLeft,
                       child: Row(
                         children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1AA251),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: Colors.white.withOpacity(0.22),
-                                  width: 2.5),
-                              boxShadow: [
-                                BoxShadow(
-                                    color: const Color(0xFF1AA251)
-                                        .withOpacity(0.35),
-                                    blurRadius: 14,
-                                    spreadRadius: 2),
+                          GestureDetector(
+                            onTap: _pickAvatar,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1AA251),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white.withOpacity(0.22),
+                                        width: 2.5),
+                                    boxShadow: [
+                                      BoxShadow(
+                                          color: const Color(0xFF1AA251)
+                                              .withOpacity(0.35),
+                                          blurRadius: 14,
+                                          spreadRadius: 2),
+                                    ],
+                                    image: (_avatarUrl != null &&
+                                            _avatarUrl!.isNotEmpty)
+                                        ? DecorationImage(
+                                            image:
+                                                NetworkImage(_avatarUrl!),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: (_avatarUrl == null ||
+                                          _avatarUrl!.isEmpty)
+                                      ? Text(
+                                          nome.isNotEmpty
+                                              ? nome[0].toUpperCase()
+                                              : 'M',
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.w800),
+                                        )
+                                      : null,
+                                ),
+                                // Câmera overlay
+                                Positioned(
+                                  bottom: 0,
+                                  right: -2,
+                                  child: Container(
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1AA251),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white.withOpacity(0.85),
+                                          width: 2),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: _uploadingAvatar
+                                        ? const SizedBox(
+                                            width: 12,
+                                            height: 12,
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2),
+                                          )
+                                        : const Icon(
+                                            Icons.camera_alt_rounded,
+                                            color: Colors.white,
+                                            size: 13),
+                                  ),
+                                ),
                               ],
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              nome.isNotEmpty
-                                  ? nome[0].toUpperCase()
-                                  : 'M',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w800),
                             ),
                           ),
                           const SizedBox(width: 18),
@@ -1785,15 +1854,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   shape: BoxShape.circle,
                   border: Border.all(color: cor.withOpacity(0.30), width: 1.5),
                 ),
-                child: Icon(icon, color: cor, size: 22),
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
               const SizedBox(height: 8),
               Text(label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      color: cor.withOpacity(0.90),
+                      color: cor,
                       fontSize: 10,
-                      fontWeight: FontWeight.w600)),
+                      fontWeight: FontWeight.w700)),
             ],
           ),
         ),
@@ -1913,6 +1982,115 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   String _capitalize(String s) =>
       s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  // Adiciona ?t=timestamp à URL para forçar reload no browser após upload
+  String _addCacheBust(String url) {
+    final t = DateTime.now().millisecondsSinceEpoch;
+    return url.contains('?') ? '$url&t=$t' : '$url?t=$t';
+  }
+
+  // ── Upload de foto de perfil ──────────────────────────────────────────────
+
+  Future<void> _pickAvatar() async {
+    // Dialogo para escolher câmera ou galeria
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(
+          children: [
+            Icon(Icons.add_a_photo_rounded,
+                color: Color(0xFF1AA251), size: 20),
+            SizedBox(width: 10),
+            Text('Foto de perfil',
+                style: TextStyle(color: Colors.white, fontSize: 15)),
+          ],
+        ),
+        content: const Text(
+          'Escolha a origem da foto.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.camera),
+            icon: const Icon(Icons.camera_alt_rounded, size: 16),
+            label: const Text('Câmera'),
+            style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1AA251)),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_rounded, size: 16),
+            label: const Text('Galeria'),
+            style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF3B82F6)),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    try {
+      final picker = ImagePicker();
+      final XFile? picked = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+
+      setState(() => _uploadingAvatar = true);
+
+      final bytes = await picked.readAsBytes();
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final ext = picked.name.split('.').last.toLowerCase();
+      final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
+      final path = '$userId.$ext';
+
+      // Upload para Supabase Storage bucket "avatars"
+      await _supabase.storage.from('avatars').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: mime, upsert: true),
+          );
+
+      final rawUrl =
+          _supabase.storage.from('avatars').getPublicUrl(path);
+
+      // Salva URL em user_profiles
+      await _supabase
+          .from('user_profiles')
+          .update({'avatar_url': rawUrl})
+          .eq('user_id', userId);
+
+      final urlComBust = _addCacheBust(rawUrl);
+      if (mounted) {
+        setState(() {
+          _avatarUrl = urlComBust;
+          _uploadingAvatar = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Foto atualizada com sucesso!'),
+          backgroundColor: Color(0xFF1AA251),
+        ));
+      }
+    } catch (e) {
+      debugPrint('Avatar upload: $e');
+      if (mounted) {
+        setState(() => _uploadingAvatar = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            'Erro ao enviar foto. Verifique se o bucket "avatars" existe no Supabase Storage.',
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ));
+      }
+    }
+  }
 
   Future<void> _editarNome(AppAuthProvider auth, String nomeAtual) async {
     final ctrl = TextEditingController(text: nomeAtual);
