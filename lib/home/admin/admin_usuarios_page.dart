@@ -37,6 +37,8 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   bool _loading = true;
   String? _erro;
   RealtimeChannel? _channel;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -66,6 +68,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   @override
   void dispose() {
     _channel?.unsubscribe();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -498,15 +501,6 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   }
 
   Widget _buildLista(AppAuthProvider auth, bool canManage) {
-    if (_usuarios.isEmpty) {
-      return const Center(
-        child: Text(
-          'Nenhum usuário encontrado.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
-
     // Separa pendentes (sem empresa) dos demais — visível apenas ao MASTER
     final pendentes = auth.isMaster
         ? _usuarios.where((u) => u['empresa_id'] == null).toList()
@@ -515,37 +509,104 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         ? _usuarios.where((u) => u['empresa_id'] != null).toList()
         : _usuarios;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    // Aplica filtro de busca por nome ou e-mail
+    List<Map<String, dynamic>> filtrar(List<Map<String, dynamic>> lista) {
+      if (_searchQuery.trim().isEmpty) return lista;
+      final q = _searchQuery.toLowerCase().trim();
+      return lista.where((u) {
+        final nome = (u['nome']?.toString() ?? '').toLowerCase();
+        final email = (u['email']?.toString() ?? '').toLowerCase();
+        return nome.contains(q) || email.contains(q);
+      }).toList();
+    }
+
+    final pendentesFiltrados = filtrar(pendentes);
+    final ativosFiltrados = filtrar(ativos);
+
+    return Column(
       children: [
-        if (pendentes.isNotEmpty) ...[
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.warning.withOpacity(0.30)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            controller: _searchController,
+            style: const TextStyle(color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Buscar por nome ou e-mail...',
+              hintStyle: const TextStyle(color: AppColors.textSecondary),
+              prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: AppColors.surface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.secondary),
+              ),
             ),
-            child: Row(
-              children: [
-                Icon(Icons.pending_actions, color: AppColors.warning, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  'Aguardando atribuição de empresa (${pendentes.length})',
-                  style: TextStyle(
-                    color: AppColors.warning,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
+            onChanged: (value) => setState(() => _searchQuery = value),
           ),
-          ...pendentes.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
-          const Divider(color: AppColors.border, height: 24),
-        ],
-        ...ativos.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
+        ),
+        Expanded(
+          child: (pendentesFiltrados.isEmpty && ativosFiltrados.isEmpty)
+              ? Center(
+                  child: Text(
+                    _searchQuery.isNotEmpty
+                        ? 'Nenhum usuário encontrado para "$_searchQuery".'
+                        : 'Nenhum usuário encontrado.',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [
+                    if (pendentesFiltrados.isNotEmpty) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.warning.withOpacity(0.30)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.pending_actions, color: AppColors.warning, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Aguardando atribuição de empresa (${pendentesFiltrados.length})',
+                              style: TextStyle(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ...pendentesFiltrados.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
+                      const Divider(color: AppColors.border, height: 24),
+                    ],
+                    ...ativosFiltrados.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
+                  ],
+                ),
+        ),
       ],
     );
   }
