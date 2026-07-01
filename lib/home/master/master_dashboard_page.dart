@@ -154,6 +154,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     super.dispose();
   }
 
+  // ── Helper: query segura (nunca derruba o Future.wait) ────────────────────
+  Future<List<Map<String, dynamic>>> _safeQ(Future<dynamic> query) async {
+    try {
+      final r = await query;
+      return List<Map<String, dynamic>>.from(
+          (r as List).map((e) => Map<String, dynamic>.from(e as Map)));
+    } catch (e) {
+      debugPrint('Dashboard query error: $e');
+      return [];
+    }
+  }
+
   // ── Carregamento de dados ───────────────────────────────────────────────────
   Future<void> _loadAll() async {
     try {
@@ -164,52 +176,54 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final in30Days = now.add(const Duration(days: 30));
       final sevenDaysAgo = now.subtract(const Duration(days: 7));
 
+      // Cada query é independente — falha isolada não derruba as demais
       final results = await Future.wait([
         // 0: empresas completas
-        _supabase.from('empresas').select(),
-        // 1: user_profiles (id + last_access + empresa_id)
-        _supabase.from('user_profiles').select('user_id, last_access, empresa_id, created_at'),
-        // 2: veículos (id + empresa_id + created_at)
-        _supabase.from('vehicles').select('id, empresa_id, created_at'),
-        // 3: motoristas (id + empresa_id + cnh_expiration + created_at)
-        _supabase.from('drivers').select('id, empresa_id, cnh_expiration, created_at'),
+        _safeQ(_supabase.from('empresas').select()),
+        // 1: user_profiles
+        _safeQ(_supabase.from('user_profiles').select('user_id, last_access, empresa_id, created_at')),
+        // 2: veículos
+        _safeQ(_supabase.from('vehicles').select('id, empresa_id, created_at')),
+        // 3: motoristas
+        _safeQ(_supabase.from('drivers').select('id, empresa_id, cnh_expiration, created_at')),
         // 4: abastecimentos últimos 6 meses
-        _supabase.from('fuelings')
+        _safeQ(_supabase.from('fuelings')
             .select('id, empresa_id, total_value, fuel_date, vehicle_id, created_at')
             .gte('fuel_date', sixMonthsAgo.toIso8601String().split('T')[0])
-            .order('created_at', ascending: false),
+            .order('created_at', ascending: false)),
         // 5: checklists
-        _supabase.from('checklists')
+        _safeQ(_supabase.from('checklists')
             .select('id, empresa_id, tipo, vehicle_id, driver_id, created_at')
             .order('created_at', ascending: false)
-            .limit(200),
+            .limit(200)),
         // 6: ocorrências
-        _supabase.from('occurrences')
+        _safeQ(_supabase.from('occurrences')
             .select('id, empresa_id, status, created_at')
             .order('created_at', ascending: false)
-            .limit(200),
-        // 7: manutenções / oil_changes (total count)
-        _supabase.from('oil_changes').select('id, vehicle_id, created_at'),
-        // 8: usuários online
-        _supabase.from('user_profiles')
+            .limit(200)),
+        // 7: oil_changes (manutenções)
+        _safeQ(_supabase.from('oil_changes').select('id, vehicle_id, created_at')),
+        // 8: usuários online (last_access recente)
+        _safeQ(_supabase.from('user_profiles')
             .select('empresa_id')
             .not('empresa_id', 'is', null)
             .gte('last_access',
-                now.subtract(const Duration(minutes: 30)).toIso8601String()),
-        // 9: manutencoes (conta total)
-        _supabase.from('manutencoes').select('id').limit(1000),
+                now.subtract(const Duration(minutes: 30)).toIso8601String())),
+        // 9: manutencoes (tabela opcional — safeQ retorna [] se não existir)
+        _safeQ(_supabase.from('manutencoes').select('id').limit(500)),
       ]);
 
-      final empresas = List<Map<String, dynamic>>.from(results[0] as List);
-      final profiles = List<Map<String, dynamic>>.from(results[1] as List);
-      final veiculos = List<Map<String, dynamic>>.from(results[2] as List);
-      final motoristas = List<Map<String, dynamic>>.from(results[3] as List);
-      final fuelings = List<Map<String, dynamic>>.from(results[4] as List);
-      final checklists = List<Map<String, dynamic>>.from(results[5] as List);
-      final ocorrencias = List<Map<String, dynamic>>.from(results[6] as List);
-      final oilChanges = List<Map<String, dynamic>>.from(results[7] as List);
-      final online = List<Map<String, dynamic>>.from(results[8] as List);
-      final manutTotal = (results[9] as List).length + oilChanges.length;
+      final empresas = results[0];
+      final profiles = results[1];
+      final veiculos = results[2];
+      final motoristas = results[3];
+      final fuelings = results[4];
+      final checklists = results[5];
+      final ocorrencias = results[6];
+      final oilChanges = results[7];
+      final online = results[8];
+      final manutExtra = results[9];
+      final manutTotal = manutExtra.length + oilChanges.length;
 
       final onlineIds = online.map((p) => p['empresa_id']).whereType<String>().toSet();
 
@@ -392,7 +406,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       for (final o in ocorrencias.take(3)) {
         final hora = _fmtHora(o['created_at']?.toString());
         activities.add(_ActivityItem(
-          hora, Icons.warning_amber_rounded, const Color(0xFFEF4444),
+          hora, Icons.report_problem_rounded, const Color(0xFFEF4444),
           'Ocorrência ${(o['status'] ?? 'aberta').toString().toLowerCase()} registrada',
         ));
       }
@@ -447,7 +461,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final sparkVeic = _weeklyCount(veiculos, 'created_at');
       final sparkMot = _weeklyCount(motoristas, 'created_at');
       final sparkAb = _weeklyCount(fuelings, 'fuel_date');
-      final sparkCk = _weeklyCount(checklists, 'created_at');
+      final sparkManutWeekly = _weeklyCount(oilChanges, 'created_at');
       final sparkOc = _weeklyCount(ocorrencias, 'created_at');
       final sparkRec = _weeklySum(fuelings, 'total_value', 'fuel_date');
       // Online e novas: use total count as flat sparkline with slight variation
@@ -507,7 +521,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _sparkVeiculos = sparkVeic;
         _sparkMotoristas = sparkMot;
         _sparkAbast = sparkAb;
-        _sparkManut = sparkCk;
+        _sparkManut = sparkManutWeekly;
         _sparkOcorr = sparkOc;
         _sparkReceita = sparkRec;
         _sparkOnline = sparkOnl;
@@ -570,7 +584,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildSidebar(AppAuthProvider auth) {
     void nav(Widget page) =>
-        Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        Navigator.push(context, MaterialPageRoute(builder: (_) => page))
+            .then((_) { if (mounted) setState(() => _activeSection = _Sec.painel); });
 
     final items = <(IconData, String, _Sec, VoidCallback?)>[
       (Icons.dashboard_rounded, 'Painel Geral', _Sec.painel, null),
@@ -580,7 +595,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       (Icons.badge_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
       (Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
       (Icons.build_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
-      (Icons.warning_amber_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
+      (Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
       (Icons.checklist_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
       (Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
       (Icons.account_balance_wallet_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
@@ -782,7 +797,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           const SizedBox(width: 12),
 
           // Actions
-          _headerIconBtn(Icons.notifications_outlined, count: _ocorrenciasAbertas),
+          _headerIconBtn(Icons.notifications_rounded, count: _ocorrenciasAbertas),
           const SizedBox(width: 6),
           _headerIconBtn(Icons.help_outline_rounded),
           const SizedBox(width: 10),
@@ -864,9 +879,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           color: const Color(0xFF8B5CF6), trend: trend(_tendAbast), trendUp: _tendAbast >= 0, spark: _sparkAbast),
       _KpiData(label: 'Manutenções', value: _fmtNum(_totalManutencoes), icon: Icons.build_rounded,
           color: const Color(0xFFF97316), trend: trend(_tendChecks), trendUp: _tendChecks >= 0, spark: _sparkManut),
-      _KpiData(label: 'Ocorrências', value: '$_totalOcorrencias', icon: Icons.warning_amber_rounded,
+      _KpiData(label: 'Ocorrências', value: '$_totalOcorrencias', icon: Icons.report_problem_rounded,
           color: const Color(0xFFEF4444), trend: trend(_tendOcorr), trendUp: _tendOcorr <= 0, spark: _sparkOcorr),
-      _KpiData(label: 'Online Agora', value: '$_empresasOnline', icon: Icons.wifi_rounded,
+      _KpiData(label: 'Online Agora', value: '$_empresasOnline', icon: Icons.people_rounded,
           color: const Color(0xFF10B981), spark: _sparkOnline),
       _KpiData(label: 'Receita Mês', value: 'R\$ ${_fmtMoney(_receitaMes)}', icon: Icons.attach_money_rounded,
           color: const Color(0xFF22C55E), trend: trend(_tendReceita), trendUp: _tendReceita >= 0, spark: _sparkReceita),
@@ -1022,11 +1037,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
   Widget _buildResumoAlertas() {
     final alertas = [
-      _AlertItem(Icons.wifi_off_rounded, const Color(0xFF3B82F6), 'Veículos offline', _veiculosOffline),
+      _AlertItem(Icons.directions_car_rounded, const Color(0xFF3B82F6), 'Veículos offline', _veiculosOffline),
       _AlertItem(Icons.build_circle_rounded, const Color(0xFFF97316), 'Manutenções vencidas', _manutencoesVencidas),
       _AlertItem(Icons.credit_card_rounded, const Color(0xFFF59E0B), 'CNHs vencendo', _cnhsVencendo),
       _AlertItem(Icons.receipt_long_rounded, const Color(0xFFEF4444), 'Mensalidades atrasadas', _mensalidadesAtrasadas),
-      _AlertItem(Icons.warning_amber_rounded, const Color(0xFFEF4444), 'Ocorrências abertas', _ocorrenciasAbertas),
+      _AlertItem(Icons.report_problem_rounded, const Color(0xFFEF4444), 'Ocorrências abertas', _ocorrenciasAbertas),
     ];
 
     return Container(
@@ -1639,20 +1654,23 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         title: const Text('Logs do Sistema', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
         content: SizedBox(
           width: 500, height: 320,
-          child: Column(
-            children: _atividades.isEmpty
-                ? [const Text('Nenhum log disponível.', style: TextStyle(color: Color(0xFF475569)))]
-                : _atividades.map((a) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(children: [
-                      Icon(a.icon, color: a.color, size: 15),
-                      const SizedBox(width: 8),
-                      Text(a.hora, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(a.texto, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
-                    ]),
-                  )).toList(),
-          ),
+          child: _atividades.isEmpty
+              ? const Center(child: Text('Nenhum log disponível.', style: TextStyle(color: Color(0xFF475569))))
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _atividades.map((a) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(children: [
+                        Icon(a.icon, color: a.color, size: 15),
+                        const SizedBox(width: 8),
+                        Text(a.hora, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(a.texto, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+                      ]),
+                    )).toList(),
+                  ),
+                ),
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(logCtx), child: const Text('Fechar', style: TextStyle(color: Color(0xFF3B82F6))))],
       ),
@@ -1683,7 +1701,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}:${dt.second.toString().padLeft(2,'0')}';
 
   String _fmtNum(int n) {
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1).replaceAll('.', '.')}.${(n % 1000).toString().padLeft(3, '0')}';
+    if (n >= 1000) return '${n ~/ 1000}.${(n % 1000).toString().padLeft(3, '0')}';
     return '$n';
   }
 
