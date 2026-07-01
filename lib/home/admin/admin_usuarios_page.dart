@@ -534,17 +534,31 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                         Expanded(
                           child: TextField(
                             controller: emailCtrl,
+                            autofocus: true,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(color: AppColors.textPrimary),
-                            decoration: const InputDecoration(
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'motorista@email.com',
+                              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.6)),
                               labelText: 'E-mail do motorista',
-                              labelStyle: TextStyle(color: AppColors.textSecondary),
-                              prefixIcon: Icon(Icons.email_outlined,
-                                  color: AppColors.textSecondary, size: 18),
+                              labelStyle: const TextStyle(color: AppColors.textSecondary),
+                              prefixIcon: const Icon(Icons.email_outlined,
+                                  color: AppColors.secondary, size: 18),
+                              filled: true,
+                              fillColor: AppColors.background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppColors.border),
+                              ),
                               enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.border)),
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
+                              ),
                               focusedBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.secondary)),
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+                              ),
                             ),
                             onSubmitted: (_) => buscar(),
                           ),
@@ -553,7 +567,8 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondary,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: buscar,
                           child: const Icon(Icons.search, size: 20, color: Colors.white),
