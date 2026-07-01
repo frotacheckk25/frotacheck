@@ -209,6 +209,9 @@ class _MotoristasPageState extends State<MotoristasPage> {
     );
     if (!mounted || conf != true) return;
     try {
+      // Limpar FK antes de excluir (vehicles.driver_id → drivers.id)
+      await supabase.from('vehicles').update({'driver_id': null}).eq('driver_id', id);
+      await supabase.from('user_profiles').update({'driver_id': null}).eq('driver_id', id);
       await supabase.from('drivers').delete().eq('id', id);
       if (!mounted) return;
       setState(() => motoristas.removeWhere((m) => m['id']?.toString() == id));
