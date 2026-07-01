@@ -281,6 +281,97 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     }
   }
 
+  /// Vincula diretamente um veículo a um motorista.
+  /// Cria o registro de driver automaticamente se ainda não existir.
+  Future<void> _vincularVeiculoDireto(
+      String userId, String? vehicleId, Map<String, dynamic> perfil) async {
+    try {
+      final currentDriverId = perfil['driver_id']?.toString();
+      final empresaId = perfil['empresa_id']?.toString();
+      final userName =
+          perfil['nome']?.toString().isNotEmpty == true
+              ? perfil['nome'].toString()
+              : perfil['email']?.toString() ?? 'Motorista';
+
+      if (vehicleId == null) {
+        // Desvincular veículo
+        if (currentDriverId != null) {
+          await _supabase
+              .from('vehicles')
+              .update({'driver_id': null})
+              .eq('driver_id', currentDriverId);
+        }
+        await _supabase
+            .from('user_profiles')
+            .update({'driver_id': null})
+            .eq('user_id', userId);
+        await _carregar();
+        return;
+      }
+
+      // Obter ou criar driver para este usuário
+      String driverId;
+      if (currentDriverId != null) {
+        driverId = currentDriverId;
+      } else {
+        // Criar registro de driver com os dados básicos do usuário
+        final driverInsert = <String, dynamic>{'name': userName};
+        if (empresaId != null) driverInsert['empresa_id'] = empresaId;
+        final novoDriver = await _supabase
+            .from('drivers')
+            .insert(driverInsert)
+            .select('id')
+            .single();
+        driverId = novoDriver['id'].toString();
+
+        // Sincronizar user_profiles.driver_id
+        await _supabase
+            .from('user_profiles')
+            .update({'driver_id': driverId})
+            .eq('user_id', userId);
+
+        // Tentar sincronizar drivers.user_id (coluna opcional)
+        try {
+          await _supabase
+              .from('drivers')
+              .update({'user_id': userId})
+              .eq('id', driverId);
+        } catch (_) {}
+      }
+
+      // Remover este driver de qualquer outro veículo antes de vincular
+      await _supabase
+          .from('vehicles')
+          .update({'driver_id': null})
+          .eq('driver_id', driverId);
+
+      // Vincular o veículo ao driver
+      await _supabase
+          .from('vehicles')
+          .update({'driver_id': driverId})
+          .eq('id', vehicleId);
+
+      await _carregar();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veículo vinculado com sucesso!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao vincular veículo: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _alterarStatus(String userId, String novoStatus) async {
     try {
       await _supabase
@@ -363,79 +454,6 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     }
   }
 
-  Future<void> _vincularVeiculo(String driverId, String? vehicleId) async {
-    try {
-      // Remove vínculo atual deste motorista de qualquer veículo
-      await _supabase
-          .from('vehicles')
-          .update({'driver_id': null})
-          .eq('driver_id', driverId);
-      // Atribui o novo veículo (se selecionado)
-      if (vehicleId != null) {
-        await _supabase
-            .from('vehicles')
-            .update({'driver_id': driverId})
-            .eq('id', vehicleId);
-      }
-      await _carregar();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(vehicleId != null
-                ? 'Veículo vinculado ao motorista!'
-                : 'Veículo desvinculado.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao vincular veículo: $e'), backgroundColor: AppColors.danger),
-        );
-      }
-    }
-  }
-
-  Future<void> _vincularDriver(String userId, String? driverId) async {
-    try {
-      await _supabase
-          .from('user_profiles')
-          .update({'driver_id': driverId})
-          .eq('user_id', userId);
-      // Mantém drivers.user_id em sincronia (coluna opcional — ignora se não existir)
-      try {
-        if (driverId != null) {
-          await _supabase
-              .from('drivers')
-              .update({'user_id': userId})
-              .eq('id', driverId);
-        } else {
-          await _supabase
-              .from('drivers')
-              .update({'user_id': null})
-              .eq('user_id', userId);
-        }
-      } catch (_) {}
-      await _carregar();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(driverId != null
-                ? 'Motorista vinculado com sucesso!'
-                : 'Vínculo removido.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao vincular: $e'), backgroundColor: AppColors.danger),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -769,24 +787,14 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                   ],
                 ],
               ),
-              // Vinculação de motorista (apenas para role MOTORISTA)
-              if (role == AppRole.motorista && drivers.isNotEmpty) ...[
+              // Vinculação direta de veículo (para role MOTORISTA com empresa atribuída)
+              if (role == AppRole.motorista && u['empresa_id'] != null) ...[
                 const SizedBox(height: 8),
-                _DriverDropdown(
-                  drivers: drivers,
+                _VehicleDirectDropdown(
+                  vehicles: vehicles,
                   currentDriverId: u['driver_id']?.toString(),
-                  onChanged: (id) => _vincularDriver(userId, id),
+                  onChanged: (vId) => _vincularVeiculoDireto(userId, vId, u),
                 ),
-                // Vinculação de veículo (apenas quando driver já está vinculado)
-                if (u['driver_id'] != null && vehicles.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _VehicleDropdown(
-                    vehicles: vehicles,
-                    driverId: u['driver_id'].toString(),
-                    onChanged: (vId) =>
-                        _vincularVeiculo(u['driver_id'].toString(), vId),
-                  ),
-                ],
               ],
             ],
           ],
@@ -949,85 +957,14 @@ class _EmpresaDropdown extends StatelessWidget {
   }
 }
 
-class _DriverDropdown extends StatelessWidget {
-  final List<Map<String, dynamic>> drivers;
+class _VehicleDirectDropdown extends StatelessWidget {
+  final List<Map<String, dynamic>> vehicles;
   final String? currentDriverId;
   final void Function(String?) onChanged;
 
-  const _DriverDropdown({
-    required this.drivers,
-    required this.currentDriverId,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final validId = drivers.any((d) => d['id']?.toString() == currentDriverId)
-        ? currentDriverId
-        : null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B1528),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: validId != null
-              ? const Color(0xFF1AA251).withOpacity(0.45)
-              : AppColors.border,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.local_shipping_rounded, color: Color(0xFF1AA251), size: 14),
-          const SizedBox(width: 6),
-          Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String?>(
-                value: validId,
-                isExpanded: true,
-                hint: const Text(
-                  'Vincular registro de motorista',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                ),
-                dropdownColor: const Color(0xFF0B1528),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-                icon: const Icon(Icons.unfold_more_rounded, color: AppColors.textSecondary, size: 14),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('— Nenhum —',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                  ),
-                  ...drivers.map(
-                    (d) => DropdownMenuItem<String?>(
-                      value: d['id']?.toString(),
-                      child: Text(
-                        d['name']?.toString() ?? '—',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                ],
-                onChanged: onChanged,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VehicleDropdown extends StatelessWidget {
-  final List<Map<String, dynamic>> vehicles;
-  final String driverId;
-  final void Function(String?) onChanged;
-
-  const _VehicleDropdown({
+  const _VehicleDirectDropdown({
     required this.vehicles,
-    required this.driverId,
+    required this.currentDriverId,
     required this.onChanged,
   });
 
@@ -1036,7 +973,7 @@ class _VehicleDropdown extends StatelessWidget {
     // Veículo atualmente atribuído a este motorista
     String? currentVehicleId;
     for (final v in vehicles) {
-      if (v['driver_id']?.toString() == driverId) {
+      if (v['driver_id']?.toString() == currentDriverId) {
         currentVehicleId = v['id']?.toString();
         break;
       }
