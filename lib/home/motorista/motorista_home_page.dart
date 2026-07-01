@@ -341,7 +341,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 ),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.local_shipping_rounded,
+              child: const Icon(Icons.local_shipping,
                   color: Colors.white, size: 14),
             ),
             const SizedBox(width: 8),
@@ -358,7 +358,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               alignment: Alignment.center,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_rounded,
+                  icon: const Icon(Icons.notifications,
                       color: AppColors.textSecondary, size: 20),
                   onPressed: _carregar,
                 ),
@@ -376,7 +376,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             )
           else
             IconButton(
-              icon: const Icon(Icons.refresh_rounded,
+              icon: const Icon(Icons.refresh,
                   color: AppColors.textSecondary, size: 20),
               onPressed: _carregar,
             ),
@@ -412,14 +412,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       onTap: (i) => setState(() => _activeTab = _MobileTab.values[i]),
       items: const [
         BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_rounded, size: 22), label: 'Início'),
+            icon: Icon(Icons.dashboard, size: 22), label: 'Início'),
         BottomNavigationBarItem(
-            icon: Icon(Icons.directions_car_rounded, size: 22),
+            icon: Icon(Icons.directions_car, size: 22),
             label: 'Veículo'),
         BottomNavigationBarItem(
-            icon: Icon(Icons.apps_rounded, size: 22), label: 'Atividades'),
+            icon: Icon(Icons.apps, size: 22), label: 'Atividades'),
         BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded, size: 22), label: 'Perfil'),
+            icon: Icon(Icons.person, size: 22), label: 'Perfil'),
       ],
     );
   }
@@ -457,7 +457,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  _taskCardMobile(Icons.checklist_rtl_rounded, 'Checklist\nSaída',
+                  _taskCardMobile(Icons.checklist_rtl, 'Checklist\nSaída',
                       const Color(0xFF1AA251),
                       _checklistSaidaHoje ? 'Concluído' : 'Não iniciado',
                       _checklistSaidaHoje
@@ -465,7 +465,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                           : const Color(0xFF94A3B8),
                       () => _push(const SelecionarVeiculoChecklistPage())),
                   const SizedBox(width: 8),
-                  _taskCardMobile(Icons.assignment_turned_in_rounded,
+                  _taskCardMobile(Icons.assignment_turned_in,
                       'Checklist\nRetorno', const Color(0xFF3B82F6),
                       _checklistRetornoHoje ? 'Concluído' : 'Não iniciado',
                       _checklistRetornoHoje
@@ -510,11 +510,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             Row(
               children: [
                 Expanded(
-                    child: _resumoChip(Icons.route_rounded, 'Viagens',
+                    child: _resumoChip(Icons.directions, 'Viagens',
                         '$_viagensHoje', const Color(0xFF3B82F6))),
                 const SizedBox(width: 8),
                 Expanded(
-                    child: _resumoChip(Icons.straighten_rounded, 'Distância',
+                    child: _resumoChip(Icons.straighten, 'Distância',
                         '${_distanciaHoje.toStringAsFixed(0)} km',
                         const Color(0xFF8B5CF6))),
               ],
@@ -523,7 +523,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             Row(
               children: [
                 Expanded(
-                    child: _resumoChip(Icons.timer_rounded, 'Trânsito',
+                    child: _resumoChip(Icons.hourglass_top, 'Trânsito',
                         _fmtTempo(_tempoTransitoMin),
                         const Color(0xFF06B6D4))),
                 const SizedBox(width: 8),
@@ -633,15 +633,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           crossAxisSpacing: 10,
           childAspectRatio: 1.15,
           children: [
-            _atividadeGrid(Icons.route_rounded, 'Minha Viagem',
+            _atividadeGrid(Icons.directions, 'Minha Viagem',
                 const Color(0xFF8B5CF6), () => _push(const ViagensPage())),
             _atividadeGrid(
-                Icons.checklist_rtl_rounded,
+                Icons.checklist_rtl,
                 'Checklist Saída',
                 const Color(0xFF1AA251),
                 () => _push(const SelecionarVeiculoChecklistPage())),
             _atividadeGrid(
-                Icons.assignment_turned_in_rounded,
+                Icons.assignment_turned_in,
                 'Checklist Retorno',
                 const Color(0xFF3B82F6),
                 () => _push(const SelecionarVeiculoChecklistPage())),
@@ -656,14 +656,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             _atividadeGrid(Icons.report_problem_rounded, 'Ocorrências',
                 const Color(0xFFEF4444),
                 () => _push(const ListaOcorrenciasPage())),
-            _atividadeGrid(Icons.description_rounded, 'Documentos',
+            _atividadeGrid(Icons.description, 'Documentos',
                 const Color(0xFF06B6D4),
                 () => _push(const DocumentosPage())),
-            _atividadeGrid(Icons.tire_repair_rounded, 'Pneus',
+            _atividadeGrid(Icons.settings, 'Pneus',
                 const Color(0xFF10B981), () => _push(const PneusPage())),
-            _atividadeGrid(Icons.gavel_rounded, 'Multas',
+            _atividadeGrid(Icons.gavel, 'Multas',
                 const Color(0xFFDC2626), () => _push(const MultasPage())),
-            _atividadeGrid(Icons.history_rounded, 'Histórico',
+            _atividadeGrid(Icons.history, 'Histórico',
                 const Color(0xFF6B7280),
                 () => _push(const HistoricoChecklistPage())),
           ],
@@ -726,7 +726,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.local_shipping_rounded,
+                  child: const Icon(Icons.local_shipping,
                       color: Colors.white, size: 18),
                 ),
                 const SizedBox(width: 10),
@@ -755,15 +755,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Column(
                 children: [
-                  _item(Icons.dashboard_rounded, 'Dashboard', _Sec.dashboard),
-                  _item(Icons.directions_car_rounded, 'Meu Veículo',
+                  _item(Icons.dashboard, 'Dashboard', _Sec.dashboard),
+                  _item(Icons.directions_car, 'Meu Veículo',
                       _Sec.meuVeiculo),
                   const SizedBox(height: 4),
                   _label('OPERAÇÕES'),
-                  _item(Icons.route_rounded, 'Minha Viagem', _Sec.viagem),
-                  _item(Icons.checklist_rtl_rounded, 'Checklist Saída',
+                  _item(Icons.directions, 'Minha Viagem', _Sec.viagem),
+                  _item(Icons.checklist_rtl, 'Checklist Saída',
                       _Sec.checklistSaida),
-                  _item(Icons.assignment_turned_in_rounded,
+                  _item(Icons.assignment_turned_in,
                       'Checklist Retorno', _Sec.checklistRetorno),
                   _item(Icons.local_gas_station_rounded, 'Abastecimentos',
                       _Sec.abastecimentos),
@@ -772,14 +772,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                       _Sec.ocorrencias),
                   const SizedBox(height: 4),
                   _label('DOCUMENTOS'),
-                  _item(Icons.description_rounded, 'Documentos',
+                  _item(Icons.description, 'Documentos',
                       _Sec.documentos),
-                  _item(Icons.tire_repair_rounded, 'Controle de Pneus',
+                  _item(Icons.settings, 'Controle de Pneus',
                       _Sec.pneus),
-                  _item(Icons.gavel_rounded, 'Multas', _Sec.multas),
+                  _item(Icons.gavel, 'Multas', _Sec.multas),
                   const SizedBox(height: 4),
                   _label('CONTA'),
-                  _item(Icons.person_rounded, 'Meu Perfil', _Sec.perfil),
+                  _item(Icons.person, 'Meu Perfil', _Sec.perfil),
                 ],
               ),
             ),
@@ -1044,7 +1044,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   children: [
                     IconButton(
                       onPressed: _carregar,
-                      icon: const Icon(Icons.notifications_rounded,
+                      icon: const Icon(Icons.notifications,
                           color: AppColors.textSecondary, size: 22),
                       tooltip: 'Atualizar',
                     ),
@@ -1089,7 +1089,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 children: [
                   Expanded(
                     child: _taskCard(
-                      icon: Icons.checklist_rtl_rounded,
+                      icon: Icons.checklist_rtl,
                       cor: const Color(0xFF1AA251),
                       titulo: 'Checklist Saída',
                       status: _checklistSaidaHoje ? 'Concluído' : 'Não iniciado',
@@ -1102,7 +1102,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _taskCard(
-                      icon: Icons.assignment_turned_in_rounded,
+                      icon: Icons.assignment_turned_in,
                       cor: const Color(0xFF3B82F6),
                       titulo: 'Checklist Retorno',
                       status:
@@ -1178,7 +1178,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             const SizedBox(height: 14),
             TextButton.icon(
               onPressed: () => _push(const HistoricoChecklistPage()),
-              icon: const Icon(Icons.history_rounded,
+              icon: const Icon(Icons.history,
                   size: 13, color: Color(0xFF1AA251)),
               label: const Text('Ver histórico de checklists',
                   style:
@@ -1204,14 +1204,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _sectionHeader('Resumo do dia'),
           const SizedBox(height: 12),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.route_rounded, const Color(0xFF3B82F6),
+          _resumoRow(Icons.directions, const Color(0xFF3B82F6),
               'Viagens', '$_viagensHoje'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.straighten_rounded, const Color(0xFF8B5CF6),
+          _resumoRow(Icons.straighten, const Color(0xFF8B5CF6),
               'Distância',
               '${_distanciaHoje.toStringAsFixed(1)} km'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.timer_rounded, const Color(0xFF06B6D4),
+          _resumoRow(Icons.hourglass_top, const Color(0xFF06B6D4),
               'Tempo em trânsito', _fmtTempo(_tempoTransitoMin)),
           const Divider(color: AppColors.border, height: 1),
           _resumoRow(Icons.local_gas_station_rounded,
@@ -1433,7 +1433,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               IconButton(
                 onPressed: _carregar,
                 icon:
-                    const Icon(Icons.refresh_rounded, color: Colors.white70),
+                    const Icon(Icons.refresh, color: Colors.white70),
                 tooltip: 'Atualizar',
               ),
             ],
@@ -1661,7 +1661,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                                           color: Colors.white.withOpacity(0.08),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.edit_rounded,
+                                        child: const Icon(Icons.edit,
                                             color: Colors.white54, size: 13),
                                       ),
                                     ),
@@ -1749,7 +1749,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             children: [
               Expanded(
                 child: _actionBtn(
-                  Icons.edit_rounded,
+                  Icons.edit,
                   'Editar dados',
                   const Color(0xFF3B82F6),
                   () => _editarNome(auth, p?.nome ?? ''),
@@ -1758,7 +1758,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.lock_rounded,
+                  Icons.lock,
                   'Alterar senha',
                   const Color(0xFFF59E0B),
                   _alterarSenha,
@@ -1767,7 +1767,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.notifications_rounded,
+                  Icons.notifications,
                   'Notificações',
                   const Color(0xFF8B5CF6),
                   _abrirNotificacoes,
@@ -1776,7 +1776,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: _actionBtn(
-                  Icons.exit_to_app_rounded,
+                  Icons.exit_to_app,
                   'Sair da conta',
                   const Color(0xFFEF4444),
                   () => _sairDaConta(auth),
@@ -1883,7 +1883,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         backgroundColor: AppColors.surface,
         title: const Row(
           children: [
-            Icon(Icons.notifications_rounded,
+            Icon(Icons.notifications,
                 color: Color(0xFF8B5CF6), size: 20),
             SizedBox(width: 10),
             Text('Notificações',
@@ -2206,7 +2206,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(
         children: [
-          Icon(Icons.directions_car_rounded, color: cor, size: 18),
+          Icon(Icons.directions_car, color: cor, size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Row(
@@ -2314,7 +2314,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child:
-                  Icon(Icons.directions_car_rounded, color: cor, size: 28),
+                  Icon(Icons.directions_car, color: cor, size: 28),
             ),
             const SizedBox(width: 14),
             Expanded(
