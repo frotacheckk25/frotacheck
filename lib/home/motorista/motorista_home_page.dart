@@ -46,6 +46,9 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   double _distanciaHoje = 0;
   int _tempoTransitoMin = 0;
 
+  // Perfil — dados do driver record
+  Map<String, dynamic>? _driverRecord;
+
   @override
   void initState() {
     super.initState();
@@ -240,6 +243,18 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         } catch (_) {}
       }
 
+      // ── Dados do driver (CNH, telefone, categoria) ────────────────────────
+      Map<String, dynamic>? driverRec;
+      if (driverId != null) {
+        try {
+          driverRec = await _supabase
+              .from('drivers')
+              .select('name, cnh_number, cnh_expiration, cnh_category, phone')
+              .eq('id', driverId)
+              .maybeSingle();
+        } catch (_) {}
+      }
+
       if (!mounted) return;
       setState(() {
         _veiculo = veiculo;
@@ -254,6 +269,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         _distanciaHoje = distanciaHoje;
         _tempoTransitoMin = tempoTransitoMin;
         _manutencaoStatus = manutencaoStatus;
+        _driverRecord = driverRec;
         _loadingVeiculo = false;
       });
     } catch (e) {
@@ -1452,155 +1468,394 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   Widget _buildPerfil(AppAuthProvider auth) {
     final p = auth.profile;
-    final nome = p?.nome ?? p?.email ?? 'M';
-    return Stack(
-      children: [
-        Positioned(
-          top: -20,
-          right: -40,
-          child: Opacity(
-            opacity: 0.07,
-            child: Image.asset('assets/images/frotacheckkk.png',
-                width: 360, fit: BoxFit.fitWidth),
-          ),
-        ),
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.65, -0.45),
-                radius: 0.65,
-                colors: [
-                  const Color(0xFF1AA251).withOpacity(0.06),
-                  Colors.transparent,
-                ],
+    final nome = p?.nome ?? _driverRecord?['name']?.toString() ?? 'Motorista';
+    final email = p?.email ?? '';
+    final status = p?.status ?? 'ativo';
+    final statusCor = status == 'ativo'
+        ? const Color(0xFF1AA251)
+        : status == 'bloqueado'
+            ? const Color(0xFFEF4444)
+            : const Color(0xFFF59E0B);
+
+    final cnhNumero = _driverRecord?['cnh_number']?.toString() ?? '—';
+    final cnhCategoria = _driverRecord?['cnh_category']?.toString() ?? '—';
+    final cnhValidade = _driverRecord?['cnh_expiration']?.toString();
+    final telefone = _driverRecord?['phone']?.toString() ?? '—';
+
+    final placa = _veiculo?['plate']?.toString() ?? '';
+    final marca = _veiculo?['brand']?.toString() ?? '';
+    final modelo = _veiculo?['model']?.toString() ?? '';
+    final veiculoStr = _veiculo != null
+        ? '$placa — $marca $modelo'.trim()
+        : 'Não vinculado';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Header card com imagem de fundo ──────────────────────────────
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 185,
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/images/meuperfilogo.jpeg'),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      const Color(0xFF060F1C).withOpacity(0.88),
+                      const Color(0xFF060F1C).withOpacity(0.55),
+                    ],
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
+                child: Stack(
+                  children: [
+                    // Sparkles
+                    Positioned(
+                        top: 22,
+                        right: 30,
+                        child: _sparkle(18, opacity: 0.80)),
+                    Positioned(
+                        top: 55,
+                        right: 72,
+                        child: _sparkle(9, opacity: 0.55)),
+                    Positioned(
+                        top: 14,
+                        right: 110,
+                        child: _sparkle(6, opacity: 0.40)),
+                    Positioned(
+                        top: 42,
+                        right: 120,
+                        child: _sparkle(5, opacity: 0.30)),
+                    // Avatar + info
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1AA251),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: Colors.white.withOpacity(0.22),
+                                  width: 2.5),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: const Color(0xFF1AA251)
+                                        .withOpacity(0.35),
+                                    blurRadius: 14,
+                                    spreadRadius: 2),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              nome.isNotEmpty
+                                  ? nome[0].toUpperCase()
+                                  : 'M',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        nome.toUpperCase(),
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.3),
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () =>
+                                          _editarNome(auth, p?.nome ?? ''),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.08),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.edit_rounded,
+                                            color: Colors.white54, size: 13),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  email,
+                                  style: TextStyle(
+                                      color: Colors.white.withOpacity(0.60),
+                                      fontSize: 12),
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1AA251)
+                                        .withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                        color: const Color(0xFF1AA251)
+                                            .withOpacity(0.55)),
+                                  ),
+                                  child: const Text('MOTORISTA',
+                                      style: TextStyle(
+                                          color: Color(0xFF1AA251),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.8)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionHeader('Meu Perfil'),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+          const SizedBox(height: 14),
+
+          // ── Informações da conta ──────────────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
+                  child: Text('Informações da conta',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF1AA251).withOpacity(0.25),
-                                const Color(0xFF0D6B35).withOpacity(0.15),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: const Color(0xFF1AA251)
-                                    .withOpacity(0.30)),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            nome[0].toUpperCase(),
-                            style: const TextStyle(
-                                color: Color(0xFF1AA251),
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(p?.nome ?? 'Sem nome',
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700)),
-                                  ),
-                                  IconButton(
-                                    onPressed: () =>
-                                        _editarNome(auth, p?.nome ?? ''),
-                                    icon: const Icon(Icons.edit_rounded,
-                                        size: 16,
-                                        color: AppColors.textSecondary),
-                                    tooltip: 'Editar nome',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(p?.email ?? '',
-                                  style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12)),
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1AA251)
-                                      .withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                      color: const Color(0xFF1AA251)
-                                          .withOpacity(0.30)),
-                                ),
-                                child: const Text('MOTORISTA',
-                                    style: TextStyle(
-                                        color: Color(0xFF1AA251),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    const Divider(color: AppColors.border),
-                    const SizedBox(height: 12),
-                    _infoRow('Empresa', p?.empresaNome ?? '—'),
-                    _infoRow('Status', p?.status ?? '—'),
-                    _infoRow(
-                      'Veículo',
-                      _veiculo != null
-                          ? '${_veiculo!['plate'] ?? ''} — ${_veiculo!['brand'] ?? ''} ${_veiculo!['model'] ?? ''}'
-                              .trim()
-                          : 'Nenhum vinculado',
-                    ),
-                    if (p?.lastAccess != null)
-                      _infoRow('Último acesso',
-                          _dataFull(p!.lastAccess!.toLocal())),
-                  ],
+                const Divider(color: AppColors.border, height: 1),
+                _perfilInfoRow('Empresa', p?.empresaNome ?? '—'),
+                _perfilInfoRow('Veículo vinculado', veiculoStr),
+                _perfilInfoRow('Status', _capitalize(status),
+                    valueColor: statusCor),
+                _perfilInfoRow('CNH', cnhNumero),
+                _perfilInfoRow('Categoria', cnhCategoria),
+                _perfilInfoRow(
+                    'Validade da CNH', _fmtDataISO(cnhValidade)),
+                _perfilInfoRow('Telefone',
+                    (telefone.isEmpty || telefone == 'null') ? '—' : telefone),
+                if (p?.lastAccess != null)
+                  _perfilInfoRow('Último acesso',
+                      _dataFull(p!.lastAccess!.toLocal()),
+                      isLast: true),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Botões de ação ────────────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: _actionBtn(
+                  Icons.edit_rounded,
+                  'Editar dados',
+                  const Color(0xFF3B82F6),
+                  () => _editarNome(auth, p?.nome ?? ''),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _actionBtn(
+                  Icons.lock_rounded,
+                  'Alterar senha',
+                  const Color(0xFFF59E0B),
+                  _alterarSenha,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _actionBtn(
+                  Icons.notifications_rounded,
+                  'Notificações',
+                  const Color(0xFF8B5CF6),
+                  () {},
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _actionBtn(
+                  Icons.exit_to_app_rounded,
+                  'Sair da conta',
+                  const Color(0xFFEF4444),
+                  () => _sairDaConta(auth),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
+
+  Widget _perfilInfoRow(String label, String valor,
+      {Color? valueColor, bool isLast = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label,
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(valor,
+                style: TextStyle(
+                    color: valueColor ?? Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionBtn(
+      IconData icon, String label, Color cor, VoidCallback onTap) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                    color: cor.withOpacity(0.12), shape: BoxShape.circle),
+                child: Icon(icon, color: cor, size: 20),
+              ),
+              const SizedBox(height: 7),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sparkle(double size, {double opacity = 0.70}) {
+    return Opacity(
+      opacity: opacity,
+      child: Text('✦',
+          style: TextStyle(
+              color: Colors.white,
+              fontSize: size,
+              height: 1)),
+    );
+  }
+
+  Future<void> _alterarSenha() async {
+    final email = _supabase.auth.currentUser?.email ?? '';
+    if (email.isEmpty) return;
+    try {
+      await _supabase.auth.resetPasswordForEmail(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Email de redefinição de senha enviado!'),
+            backgroundColor: Color(0xFF1AA251)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Erro: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _sairDaConta(AppAuthProvider auth) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Sair da conta',
+            style: TextStyle(color: Colors.white)),
+        content: const Text('Tem certeza que deseja sair?',
+            style: TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFEF4444)),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) await auth.signOut();
+  }
+
+  String _fmtDataISO(String? iso) {
+    if (iso == null || iso.isEmpty) return '—';
+    final parts = iso.split('-');
+    if (parts.length == 3) return '${parts[2]}/${parts[1]}/${parts[0]}';
+    return iso;
+  }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
   Future<void> _editarNome(AppAuthProvider auth, String nomeAtual) async {
     final ctrl = TextEditingController(text: nomeAtual);
@@ -2096,28 +2351,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             style: const TextStyle(
                 color: AppColors.textSecondary, fontSize: 12)),
       );
-
-  Widget _infoRow(String label, String valor) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-              width: 130,
-              child: Text(label,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 13))),
-          Expanded(
-              child: Text(valor,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500))),
-        ],
-      ),
-    );
-  }
 
   String _fmtTempo(int minutos) {
     final h = minutos ~/ 60;
