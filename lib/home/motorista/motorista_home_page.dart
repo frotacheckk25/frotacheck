@@ -1230,22 +1230,12 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           Container(
             width: 30,
             height: 30,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: cor.withOpacity(0.18),
               borderRadius: BorderRadius.circular(7),
             ),
-            child: Center(
-              child: Text(
-                String.fromCharCode(icon.codePoint),
-                style: TextStyle(
-                  fontFamily: icon.fontFamily ?? 'MaterialIcons',
-                  package: icon.fontPackage,
-                  fontSize: 15,
-                  color: cor,
-                  height: 1.0,
-                ),
-              ),
-            ),
+            child: Icon(icon, color: cor, size: 15),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1862,25 +1852,16 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     );
   }
 
-  // Renderiza ícone como Text com codepoint direto — mais confiável no Flutter web
-  // (Icon widget pode ter problemas de renderização dentro de Stack no CanvasKit)
   Widget _iconCircle(IconData icon, Color cor, double size, double iconSize) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
-      child: Center(
-        child: Text(
-          String.fromCharCode(icon.codePoint),
-          style: TextStyle(
-            fontFamily: icon.fontFamily ?? 'MaterialIcons',
-            package: icon.fontPackage,
-            fontSize: iconSize,
-            color: Colors.white,
-            height: 1.0,
-          ),
-        ),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: cor,
+        borderRadius: BorderRadius.circular(size / 2),
       ),
+      child: Icon(icon, color: Colors.white, size: iconSize),
     );
   }
 
