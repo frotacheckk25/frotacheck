@@ -41,10 +41,12 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         fuelingsQ = fuelingsQ.eq('empresa_id', eid);
       }
 
-      // Sem filtro Dart por empresa_id: a RLS devolve apenas os veículos e
-      // motoristas acessíveis (da empresa ou vinculados aos seus motoristas).
       var veicQ = supabase.from('vehicles').select('id, plate, model');
       var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
         fuelingsQ.order('fuel_date', ascending: false).limit(50),
         veicQ.order('plate'),

@@ -76,9 +76,12 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         ocorrQ = ocorrQ.eq('empresa_id', eid);
       }
 
-      // Sem filtro Dart: RLS retorna apenas veículos/motoristas acessíveis.
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
       var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
         ocorrQ.order('created_at', ascending: false).limit(100),
         veicQ.order('plate'),

@@ -137,13 +137,16 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
       List<Map<String, dynamic>> vehicles = [];
       try {
-        // RLS handles empresa_id filtering (including vehicles linked to empresa's
-        // motoristas even when vehicle.empresa_id is NULL after migration).
-        // Do NOT add Dart-side empresa_id filter here — it would hide those vehicles.
-        final vRes = await _supabase
+        var vQuery = _supabase
             .from('vehicles')
-            .select('id, plate, model, brand, driver_id')
-            .order('plate');
+            .select('id, plate, model, brand, driver_id');
+        if (!auth.isMaster) {
+          final minhaEmpresa = auth.empresaId;
+          if (minhaEmpresa != null) {
+            vQuery = vQuery.eq('empresa_id', minhaEmpresa);
+          }
+        }
+        final vRes = await vQuery.order('plate');
         vehicles = (vRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
