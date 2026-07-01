@@ -557,11 +557,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: cor,
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
+              _iconCircle(icon, cor, 40, 18),
               const SizedBox(height: 6),
               Text(titulo,
                   textAlign: TextAlign.center,
@@ -692,11 +688,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: cor,
-                child: Icon(icon, color: Colors.white, size: 22),
-              ),
+              _iconCircle(icon, cor, 44, 22),
               const SizedBox(height: 7),
               Text(label,
                   textAlign: TextAlign.center,
@@ -1844,11 +1836,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: cor,
-                child: Icon(icon, color: Colors.white, size: 22),
-              ),
+              _iconCircle(icon, cor, 48, 22),
               const SizedBox(height: 8),
               Text(label,
                   textAlign: TextAlign.center,
@@ -1859,6 +1847,26 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Stack-based icon circle: círculo colorido + ícone branco sobrepostos
+  // (CircleAvatar clippa o filho no Flutter web, escondendo o Icon)
+  Widget _iconCircle(IconData icon, Color cor, double size, double iconSize) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+          ),
+          Icon(icon, color: Colors.white, size: iconSize),
+        ],
       ),
     );
   }
@@ -2455,11 +2463,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 27,
-                backgroundColor: cor,
-                child: Icon(icon, color: Colors.white, size: 26),
-              ),
+              _iconCircle(icon, cor, 54, 26),
               const SizedBox(height: 10),
               Text(titulo,
                   textAlign: TextAlign.center,
