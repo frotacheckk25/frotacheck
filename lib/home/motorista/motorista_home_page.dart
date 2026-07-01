@@ -90,17 +90,16 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       final hoje = DateTime.now();
       final inicioHoje = DateTime(hoje.year, hoje.month, hoje.day).toIso8601String();
 
-      // Veículo vinculado ao motorista (via vehicles.driver_id)
+      // Busca veículo via RPC SECURITY DEFINER para burlar RLS policies.
+      // A função get_my_vehicle() usa driver_id do user_profiles do usuário
+      // autenticado, sem depender de nenhuma policy de isolamento.
       Map<String, dynamic>? veiculo;
-      if (driverId != null) {
-        veiculo = await _supabase
-            .from('vehicles')
-            .select('id, plate, model, year, brand, status')
-            .eq('driver_id', driverId)
-            .limit(1)
-            .maybeSingle()
-            .catchError((_) => null);
-      }
+      try {
+        final rpcResult = await _supabase.rpc('get_my_vehicle') as List?;
+        if (rpcResult != null && rpcResult.isNotEmpty) {
+          veiculo = Map<String, dynamic>.from(rpcResult.first as Map);
+        }
+      } catch (_) {}
 
       // KPIs do dia (filtrados pelo driverId do motorista)
       int checklistsHoje = 0;
