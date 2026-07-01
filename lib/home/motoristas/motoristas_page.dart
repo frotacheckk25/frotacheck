@@ -209,7 +209,12 @@ class _MotoristasPageState extends State<MotoristasPage> {
     );
     if (!mounted || conf != true) return;
     try {
-      // Limpar FK antes de excluir (vehicles.driver_id → drivers.id)
+      // Limpar todas as FKs antes de excluir
+      for (final t in ['fuelings', 'occurrences', 'viagens', 'checklists']) {
+        try {
+          await supabase.from(t).update({'driver_id': null}).eq('driver_id', id);
+        } catch (_) {}
+      }
       await supabase.from('vehicles').update({'driver_id': null}).eq('driver_id', id);
       await supabase.from('user_profiles').update({'driver_id': null}).eq('driver_id', id);
       await supabase.from('drivers').delete().eq('id', id);

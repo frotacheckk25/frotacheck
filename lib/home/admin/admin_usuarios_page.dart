@@ -317,23 +317,50 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       if (currentDriverId != null) {
         driverId = currentDriverId;
       } else {
-        // Criar registro de driver com os dados básicos do usuário
-        final driverInsert = <String, dynamic>{'name': userName};
-        if (empresaId != null) driverInsert['empresa_id'] = empresaId;
-        final novoDriver = await _supabase
-            .from('drivers')
-            .insert(driverInsert)
-            .select('id')
-            .single();
-        driverId = novoDriver['id'].toString();
+        // Antes de criar, tenta achar um driver existente para este usuário
+        String? existingId;
+        try {
+          final byUid = await _supabase
+              .from('drivers')
+              .select('id')
+              .eq('user_id', userId)
+              .maybeSingle();
+          if (byUid != null) existingId = byUid['id']?.toString();
+        } catch (_) {}
 
-        // Sincronizar user_profiles.driver_id
+        if (existingId == null) {
+          final userEmail = perfil['email']?.toString() ?? '';
+          if (userEmail.isNotEmpty) {
+            try {
+              final byEmail = await _supabase
+                  .from('drivers')
+                  .select('id')
+                  .eq('email', userEmail)
+                  .maybeSingle();
+              if (byEmail != null) existingId = byEmail['id']?.toString();
+            } catch (_) {}
+          }
+        }
+
+        if (existingId != null) {
+          driverId = existingId;
+        } else {
+          // Criar apenas se realmente não existe
+          final driverInsert = <String, dynamic>{'name': userName};
+          if (empresaId != null) driverInsert['empresa_id'] = empresaId;
+          final novoDriver = await _supabase
+              .from('drivers')
+              .insert(driverInsert)
+              .select('id')
+              .single();
+          driverId = novoDriver['id'].toString();
+        }
+
+        // Sincronizar user_profiles.driver_id e drivers.user_id
         await _supabase
             .from('user_profiles')
             .update({'driver_id': driverId})
             .eq('user_id', userId);
-
-        // Tentar sincronizar drivers.user_id (coluna opcional)
         try {
           await _supabase
               .from('drivers')

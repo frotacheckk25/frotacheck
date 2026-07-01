@@ -217,7 +217,6 @@ class _HomePageState extends State<HomePage> {
   int totalMotoristas = 0;
   int totalAbastecimentos = 0;
   int totalEmManutencao = 0;
-  int _veiculosEmManutencaoAtiva = 0;
   int totalOcorrenciasAbertas = 0; // total geral (mostra no KPI)
   int _ocorrenciasAbertasCount = 0; // só as não resolvidas (badge + insights)
   double totalGasto = 0;
@@ -254,7 +253,7 @@ class _HomePageState extends State<HomePage> {
 
   // ── KPI getters — always show real data; 0 / R$ 0,00 when no records ──────
   int get _kpiTotalVeiculos  => totalVeiculos;
-  int get _kpiVeiculosAtivos => (totalVeiculos - _veiculosEmManutencaoAtiva).clamp(0, totalVeiculos);
+  int get _kpiVeiculosAtivos => totalVeiculos;
   int get _kpiEmManutencao   => totalEmManutencao;
   int get _kpiMotoristas     => totalMotoristas;
   String get _kpiGastoMensal => 'R\$ ${_fmt(totalGasto)}';
@@ -704,8 +703,6 @@ class _HomePageState extends State<HomePage> {
       final openOcorrenciasCount = allTimeAllOcorrencias
           .where((e) => _isOpenStatus(e))
           .length;
-      // Fleet Index: veículos com manutenção ativa no período (tabela manutencoes filtrada)
-      final veiculosEmManutencaoCount = _countActiveMaintenance(manutencoes);
       // "Em Manutenção": total de registros em oil_changes (fonte real dos dados de manutenção)
       final activeMaintenanceCount = allTimeOilChanges.length;
       final alerts = await _loadAlertas(
@@ -747,7 +744,6 @@ class _HomePageState extends State<HomePage> {
         totalMotoristas = motoristas.length;
         totalAbastecimentos = abastecimentos.length;
         totalEmManutencao = activeMaintenanceCount;
-        _veiculosEmManutencaoAtiva = veiculosEmManutencaoCount;
         totalOcorrenciasAbertas = totalOcorrenciasCount;
         _ocorrenciasAbertasCount = openOcorrenciasCount;
         totalGasto = dashboardTotalGasto;
@@ -1014,10 +1010,6 @@ class _HomePageState extends State<HomePage> {
            s != 'cancelado' && s != 'canceled';
   }
 
-  // Conta registros ativos na tabela manutencoes usando a mesma denylist.
-  int _countActiveMaintenance(List<Map<String, dynamic>> manutencoes) {
-    return manutencoes.where(_isOpenStatus).length;
-  }
 
   double _calculateTotalCost(
     List<Map<String, dynamic>> abastecimentos,

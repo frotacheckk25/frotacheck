@@ -40,6 +40,7 @@ class _SelecionarVeiculoChecklistPageState
     setState(() { isLoading = true; erroCarregamento = null; });
     try {
       final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
       List<Map<String, dynamic>> veiculosResult;
       if (auth.isMotorista && auth.driverId != null) {
         veiculosResult = await supabase
@@ -48,12 +49,13 @@ class _SelecionarVeiculoChecklistPageState
             .eq('driver_id', auth.driverId!)
             .order('plate');
       } else {
-        veiculosResult = await supabase
-            .from('vehicles')
-            .select('id, plate, model')
-            .order('plate');
+        var veiQ = supabase.from('vehicles').select('id, plate, model');
+        if (eid != null) veiQ = veiQ.eq('empresa_id', eid);
+        veiculosResult = await veiQ.order('plate');
       }
-      final motoristasResult = await supabase.from('drivers').select('id, name').order('name');
+      var motorQ = supabase.from('drivers').select('id, name');
+      if (eid != null) motorQ = motorQ.eq('empresa_id', eid);
+      final motoristasResult = await motorQ.order('name');
 
       if (!mounted) return;
       setState(() {
