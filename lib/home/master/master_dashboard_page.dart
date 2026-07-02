@@ -1174,8 +1174,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             child: Row(children: [
               const Text('Atividade em tempo real', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
               const Spacer(),
-              GestureDetector(
-                onTap: _loadAll,
+              TextButton(
+                onPressed: _loadAll,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 child: const Text('Atualizar', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 11)),
               ),
             ]),
@@ -1650,6 +1655,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     final emailCtrl = TextEditingController();
     bool saving = false;
     String? error;
+    String? successMsg;
 
     showDialog(
       context: context,
@@ -1659,18 +1665,39 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFF1E293B))),
           title: const Text('Nova Empresa', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
           content: SizedBox(
-            width: 380,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+            width: 400,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               if (error != null) ...[
-                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Text(error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12))),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Text(error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (successMsg != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFF22C55E).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Text(successMsg!, style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12)),
+                ),
                 const SizedBox(height: 12),
               ],
               _formField('Nome da empresa *', nomeCtrl),
               const SizedBox(height: 12),
               _formField('CNPJ', cnpjCtrl, hint: '00.000.000/0001-00'),
-              const SizedBox(height: 12),
-              _formField('E-mail de contato', emailCtrl, hint: 'contato@empresa.com.br'),
+              const SizedBox(height: 16),
+              const Text(
+                'E-mail do administrador',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Informe o e-mail da conta já cadastrada no app. O usuário será vinculado automaticamente como admin desta empresa.',
+                style: TextStyle(color: Color(0xFF475569), fontSize: 11),
+              ),
+              const SizedBox(height: 8),
+              _formField('E-mail do administrador *', emailCtrl, hint: 'admin@empresa.com.br'),
             ]),
           ),
           actions: [
@@ -1680,23 +1707,69 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             ),
             ElevatedButton(
               onPressed: saving ? null : () async {
-                if (nomeCtrl.text.trim().isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
-                setS(() { saving = true; error = null; });
+                final nome = nomeCtrl.text.trim();
+                final email = emailCtrl.text.trim().toLowerCase();
+                if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
+                if (email.isEmpty) { setS(() => error = 'E-mail do administrador é obrigatório'); return; }
+                setS(() { saving = true; error = null; successMsg = null; });
                 try {
-                  await _supabase.from('empresas').insert({
-                    'nome': nomeCtrl.text.trim(),
-                    'cnpj': cnpjCtrl.text.trim().isEmpty ? null : cnpjCtrl.text.trim(),
-                    'email': emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-                    'status': 'ativo',
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
+                  // 1. Verifica se o usuário com esse e-mail existe
+                  final userRes = await _supabase
+                      .from('user_profiles')
+                      .select('user_id, nome, role')
+                      .eq('email', email)
+                      .maybeSingle();
+
+                  if (userRes == null) {
+                    setS(() { saving = false; error = 'Nenhuma conta encontrada com o e-mail "$email". Peça ao administrador para criar a conta no app primeiro.'; });
+                    return;
+                  }
+
+                  // 2. Cria a empresa
+                  final empRes = await _supabase
+                      .from('empresas')
+                      .insert({
+                        'nome': nome,
+                        'cnpj': cnpjCtrl.text.trim().isEmpty ? null : cnpjCtrl.text.trim(),
+                        'email': email,
+                        'status': 'ativo',
+                      })
+                      .select('id')
+                      .single();
+
+                  final empresaId = empRes['id']?.toString();
+                  if (empresaId == null) throw Exception('Falha ao obter ID da empresa criada');
+
+                  // 3. Vincula o usuário à empresa e define role como admin
+                  final userId = userRes['user_id']?.toString();
+                  if (userId != null) {
+                    await _supabase
+                        .from('user_profiles')
+                        .update({
+                          'empresa_id': empresaId,
+                          'role': 'ADMIN_EMPRESA',
+                        })
+                        .eq('user_id', userId);
+                  }
+
+                  final nomeUsuario = userRes['nome']?.toString() ?? email;
+                  if (ctx.mounted) {
+                    setS(() {
+                      saving = false;
+                      successMsg = 'Empresa "$nome" criada e "$nomeUsuario" vinculado como administrador!';
+                    });
+                    await Future.delayed(const Duration(seconds: 2));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  }
                   _loadAll();
                 } catch (e) {
-                  setS(() { saving = false; error = 'Erro ao criar empresa: $e'; });
+                  setS(() { saving = false; error = 'Erro: $e'; });
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Criar Empresa'),
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Criar Empresa'),
             ),
           ],
         ),
