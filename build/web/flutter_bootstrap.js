@@ -35,18 +35,8 @@ if (!window._flutter) {
 }
 _flutter.buildConfig = {"engineRevision":"3452d735bd38224ef2db85ca763d862d6326b17f","builds":[{"compileTarget":"dart2js","renderer":"canvaskit","mainJsPath":"main.dart.js"},{}]};
 
-
-// Force HTML renderer — CanvasKit fails to render specific MaterialIcon glyphs.
-// HTML renderer uses browser CSS font-face which renders all icons correctly.
-(function() {
-  var bc = window._flutter && window._flutter.buildConfig;
-  if (bc && bc.builds) {
-    bc.builds.forEach(function(b) {
-      if (b.renderer) b.renderer = 'html';
-    });
-  }
-})();
-
 _flutter.loader.load({
-  config: { renderer: 'html' }
+  serviceWorkerSettings: {
+    serviceWorkerVersion: "2175074101" /* Flutter's service worker is deprecated and will be removed in a future Flutter release. */
+  }
 });
