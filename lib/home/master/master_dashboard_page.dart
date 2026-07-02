@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/config/supabase_config.dart';
 import '../admin/admin_usuarios_page.dart';
 import '../veiculos/veiculos_page.dart';
 import '../motoristas/motoristas_page.dart';
@@ -1592,8 +1593,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               children: [
                 _acaoBtn(Icons.build_rounded, const Color(0xFF3B82F6), 'Nova Empresa', _showNovaEmpresaDialog),
                 const SizedBox(width: 10),
-                _acaoBtn(Icons.settings_rounded, const Color(0xFF22C55E), 'Novo Usuário',
-                    () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsuariosPage()))),
+                _acaoBtn(Icons.settings_rounded, const Color(0xFF22C55E), 'Novo Motorista',
+                    _showNovoMotoristaDialog),
                 const SizedBox(width: 10),
                 _acaoBtn(Icons.directions_car_rounded, const Color(0xFF8B5CF6), 'Novo Veículo',
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()))),
@@ -1649,6 +1650,313 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   // ═══════════════════════════════════════════════════════════════════════════
   // DIALOGS
   // ═══════════════════════════════════════════════════════════════════════════
+
+  void _showNovoMotoristaDialog() {
+    final nomeCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final telefoneCtrl = TextEditingController();
+    final senhaCtrl = TextEditingController();
+    final confirmarCtrl = TextEditingController();
+    bool mostrarSenha = false;
+    bool mostrarConfirmar = false;
+    bool saving = false;
+    String? error;
+    String? successMsg;
+    String? empresaSelecionadaId;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: const Color(0xFF0A1628),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xFF1E293B)),
+          ),
+          title: const Text('Novo Motorista',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (error != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12))),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (successMsg != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.build_rounded, color: Color(0xFF22C55E), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(successMsg!, style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12))),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Nome
+                _formField('Nome completo *', nomeCtrl),
+                const SizedBox(height: 12),
+
+                // Email
+                _fieldLabel('E-mail da conta *'),
+                const SizedBox(height: 4),
+                const Text(
+                  'Use o e-mail com que o motorista criou a conta no app. Se ainda não tem conta, preencha a senha abaixo para criar uma.',
+                  style: TextStyle(color: Color(0xFF475569), fontSize: 11),
+                ),
+                const SizedBox(height: 6),
+                _formField('Email', emailCtrl, hint: 'motorista@email.com'),
+                const SizedBox(height: 12),
+
+                // Telefone
+                _formField('Telefone', telefoneCtrl, hint: '(11) 99999-9999'),
+                const SizedBox(height: 12),
+
+                // Empresa
+                _fieldLabel('Empresa'),
+                const SizedBox(height: 6),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1C30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: empresaSelecionadaId,
+                      hint: const Text('Selecionar empresa', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                      dropdownColor: const Color(0xFF0F1C30),
+                      isExpanded: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      items: _empresasList.map((e) {
+                        return DropdownMenuItem<String>(
+                          value: e['id']?.toString(),
+                          child: Text(e['nome']?.toString() ?? '—',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        );
+                      }).toList(),
+                      onChanged: (v) => setS(() => empresaSelecionadaId = v),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Divider senha
+                Row(children: [
+                  const Expanded(child: Divider(color: Color(0xFF1E293B))),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('Criar senha (opcional)', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                  ),
+                  const Expanded(child: Divider(color: Color(0xFF1E293B))),
+                ]),
+                const SizedBox(height: 4),
+                const Text(
+                  'Preencha apenas se quiser criar uma conta nova para este motorista.',
+                  style: TextStyle(color: Color(0xFF475569), fontSize: 11),
+                ),
+                const SizedBox(height: 10),
+
+                // Senha
+                TextField(
+                  controller: senhaCtrl,
+                  obscureText: !mostrarSenha,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Senha (mín. 6 caracteres)',
+                    hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+                    filled: true,
+                    fillColor: const Color(0xFF0F1C30),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    suffixIcon: IconButton(
+                      icon: Icon(mostrarSenha ? Icons.settings_rounded : Icons.build_rounded,
+                          color: const Color(0xFF475569), size: 18),
+                      onPressed: () => setS(() => mostrarSenha = !mostrarSenha),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Confirmar senha
+                TextField(
+                  controller: confirmarCtrl,
+                  obscureText: !mostrarConfirmar,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Confirmar senha',
+                    hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+                    filled: true,
+                    fillColor: const Color(0xFF0F1C30),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    suffixIcon: IconButton(
+                      icon: Icon(mostrarConfirmar ? Icons.settings_rounded : Icons.build_rounded,
+                          color: const Color(0xFF475569), size: 18),
+                      onPressed: () => setS(() => mostrarConfirmar = !mostrarConfirmar),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: saving ? null : () async {
+                final nome = nomeCtrl.text.trim();
+                final email = emailCtrl.text.trim().toLowerCase();
+                final telefone = telefoneCtrl.text.trim();
+                final senha = senhaCtrl.text;
+                final confirmar = confirmarCtrl.text;
+
+                if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
+                if (email.isEmpty) { setS(() => error = 'E-mail é obrigatório'); return; }
+                if (senha.isNotEmpty) {
+                  if (senha.length < 6) { setS(() => error = 'Senha deve ter pelo menos 6 caracteres'); return; }
+                  if (senha != confirmar) { setS(() => error = 'As senhas não coincidem'); return; }
+                }
+
+                setS(() { saving = true; error = null; successMsg = null; });
+
+                try {
+                  String? userId;
+
+                  if (senha.isNotEmpty) {
+                    // ── Criar conta nova via cliente secundário ──────────────
+                    final url = await SupabaseConfig.getUrl();
+                    final key = await SupabaseConfig.getPublishableKey();
+                    final tmpClient = SupabaseClient(url, key);
+                    try {
+                      final signUpRes = await tmpClient.auth.signUp(
+                        email: email,
+                        password: senha,
+                      );
+                      userId = signUpRes.user?.id;
+                      if (userId == null) {
+                        await tmpClient.dispose();
+                        setS(() { saving = false; error = 'Falha ao criar conta. Verifique se o e-mail já está cadastrado.'; });
+                        return;
+                      }
+                    } finally {
+                      await tmpClient.dispose();
+                    }
+
+                    // Inserir perfil do usuário (master tem permissão)
+                    try {
+                      await _supabase.from('user_profiles').upsert({
+                        'user_id': userId,
+                        'email': email,
+                        'nome': nome,
+                        'role': 'MOTORISTA',
+                        'empresa_id': empresaSelecionadaId,
+                        'status': 'ativo',
+                      }, onConflict: 'user_id');
+                    } catch (_) {}
+                  } else {
+                    // ── Vincular conta existente por e-mail ──────────────────
+                    final existing = await _supabase
+                        .from('user_profiles')
+                        .select('user_id')
+                        .eq('email', email)
+                        .maybeSingle();
+                    if (existing != null) {
+                      userId = existing['user_id']?.toString();
+                    }
+                  }
+
+                  // ── Criar registro de motorista (drivers) ────────────────
+                  final driverPayload = <String, dynamic>{
+                    'name': nome,
+                    'email': email,
+                    if (telefone.isNotEmpty) 'phone': telefone,
+                  };
+                  if (empresaSelecionadaId != null) driverPayload['empresa_id'] = empresaSelecionadaId;
+                  if (userId != null) driverPayload['user_id'] = userId;
+
+                  final driverRes = await _supabase
+                      .from('drivers')
+                      .insert(driverPayload)
+                      .select('id')
+                      .single();
+
+                  final driverId = driverRes['id']?.toString();
+
+                  // ── Sincronizar driver_id no perfil do usuário ───────────
+                  if (userId != null && driverId != null) {
+                    final profileUpdate = <String, dynamic>{
+                      'driver_id': driverId,
+                      'role': 'MOTORISTA',
+                    };
+                    if (empresaSelecionadaId != null) profileUpdate['empresa_id'] = empresaSelecionadaId;
+                    await _supabase
+                        .from('user_profiles')
+                        .update(profileUpdate)
+                        .eq('user_id', userId);
+                  }
+
+                  final msg = senha.isNotEmpty
+                      ? 'Conta criada e motorista "$nome" cadastrado com sucesso!'
+                      : userId != null
+                          ? 'Motorista "$nome" cadastrado e vinculado à conta $email!'
+                          : 'Motorista "$nome" cadastrado! Conta "$email" não encontrada — vínculo pendente quando fizer login.';
+
+                  if (ctx.mounted) {
+                    setS(() { saving = false; successMsg = msg; });
+                    await Future.delayed(const Duration(seconds: 2));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  }
+                  _loadAll();
+                } catch (e) {
+                  setS(() { saving = false; error = 'Erro: $e'; });
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3B82F6),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Cadastrar Motorista'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String text) => Text(
+    text,
+    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
+  );
+
   void _showNovaEmpresaDialog() {
     final nomeCtrl = TextEditingController();
     final cnpjCtrl = TextEditingController();
