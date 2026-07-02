@@ -49,11 +49,22 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao conectar: $e')),
+        SnackBar(content: Text(_loginError(e.toString()))),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _loginError(String raw) {
+    final r = raw.toLowerCase();
+    if (r.contains('invalid login credentials')) return 'E-mail ou senha incorretos.';
+    if (r.contains('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+    if (r.contains('too many requests')) return 'Muitas tentativas. Aguarde alguns minutos.';
+    if (r.contains('user not found')) return 'Conta não encontrada.';
+    if (r.contains('network') || r.contains('socketexception')) return 'Sem conexão. Verifique sua internet.';
+    if (r.contains('invalid email')) return 'E-mail inválido.';
+    return 'Não foi possível entrar. Tente novamente.';
   }
 
   Future<void> _forgotPassword() async {

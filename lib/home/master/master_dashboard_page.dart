@@ -74,6 +74,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   final _supabase = Supabase.instance.client;
   RealtimeChannel? _channel;
   Timer? _timer;
+  Timer? _realtimeDebounce;
 
   // ── Estado ─────────────────────────────────────────────────────────────────
   bool _loading = true;
@@ -143,7 +144,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     if (auth.isMaster) {
       _loadAll();
       _setupRealtime();
-      _timer = Timer.periodic(const Duration(seconds: 30), (_) => _loadAll());
+      _timer = Timer.periodic(const Duration(seconds: 60), (_) => _loadAll());
     } else {
       setState(() => _loading = false);
     }
@@ -153,7 +154,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   void dispose() {
     _channel?.unsubscribe();
     _timer?.cancel();
+    _realtimeDebounce?.cancel();
     super.dispose();
+  }
+
+  void _debounceLoad() {
+    _realtimeDebounce?.cancel();
+    _realtimeDebounce = Timer(const Duration(milliseconds: 500), _loadAll);
   }
 
   // ── Helper: query segura (nunca derruba o Future.wait) ────────────────────
@@ -545,15 +552,15 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         .channel('master_dash_v2')
         .onPostgresChanges(
           event: PostgresChangeEvent.all, schema: 'public', table: 'empresas',
-          callback: (_) => _loadAll(),
+          callback: (_) => _debounceLoad(),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all, schema: 'public', table: 'vehicles',
-          callback: (_) => _loadAll(),
+          callback: (_) => _debounceLoad(),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all, schema: 'public', table: 'occurrences',
-          callback: (_) => _loadAll(),
+          callback: (_) => _debounceLoad(),
         )
         .subscribe();
   }
@@ -598,9 +605,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       (Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
       (Icons.directions_car_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
       (Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
-      (Icons.build_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
+      (Icons.local_gas_station_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
       (Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
-      (Icons.build_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
+      (Icons.dashboard_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
       (Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
       (Icons.bar_chart_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
       (Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
@@ -2355,7 +2362,7 @@ class _SearchDialogState extends State<_SearchDialog> {
       // BUG-18: join drivers with empresas so MASTER can see which company each driver belongs to
       final [emp, veic, mot] = await Future.wait([
         widget.supabase.from('empresas').select('id, nome, status').ilike('nome', like).limit(5),
-        widget.supabase.from('vehicles').select('id, plate, model, empresa_id').ilike('plate', like).limit(5),
+        widget.supabase.from('vehicles').select('id, plate, model, empresa_id, empresas(nome)').ilike('plate', like).limit(5),
         widget.supabase.from('drivers').select('id, name, empresa_id, empresas(nome)').ilike('name', like).limit(5),
       ]);
       for (final e in (emp as List)) {
@@ -2363,8 +2370,12 @@ class _SearchDialogState extends State<_SearchDialog> {
             (e['status'] ?? '').toString(), Icons.bar_chart_rounded, const Color(0xFF3B82F6)));
       }
       for (final v in (veic as List)) {
+        final empNome = (v['empresas'] is Map)
+            ? (v['empresas'] as Map)['nome']?.toString() ?? ''
+            : '';
         final desc = '${v['plate'] ?? ''} · ${v['model'] ?? ''}'.trim();
-        results.add(_SearchResult('veiculo', desc, 'Veículo',
+        final subtitle = empNome.isNotEmpty ? 'Veículo · $empNome' : 'Veículo';
+        results.add(_SearchResult('veiculo', desc, subtitle,
             Icons.directions_car_rounded, const Color(0xFF22C55E)));
       }
       for (final m in (mot as List)) {

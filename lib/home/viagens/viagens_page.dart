@@ -1,23 +1,40 @@
+import 'dart:async';
+import 'dart:js_interop';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Lê a localização atual via API de geolocalização do navegador.
-/// Best-effort: retorna null se indisponível, sem permissão, ou expirar —
-/// nunca deve bloquear o fluxo de iniciar/concluir viagem.
+extension type _GeoPosition(JSObject _) implements JSObject {
+  external _GeoCoords get coords;
+}
+
+extension type _GeoCoords(JSObject _) implements JSObject {
+  external double get latitude;
+  external double get longitude;
+}
+
+@JS('navigator.geolocation.getCurrentPosition')
+external void _jsGetPosition(JSFunction success, JSFunction error);
+
+/// Lê a localização atual via Geolocation API.
+/// Best-effort: retorna null se indisponível, sem permissão, ou expirar.
 Future<String?> _obterLocalizacao() async {
   try {
-    final pos = await html.window.navigator.geolocation
-        .getCurrentPosition(enableHighAccuracy: true)
-        .timeout(const Duration(seconds: 5));
-    final lat = pos.coords?.latitude;
-    final lng = pos.coords?.longitude;
-    if (lat == null || lng == null) return null;
-    return '$lat,$lng';
+    final completer = Completer<String?>();
+    void onSuccess(JSAny? pos) {
+      try {
+        final p = pos as _GeoPosition;
+        completer.complete('${p.coords.latitude},${p.coords.longitude}');
+      } catch (_) {
+        completer.complete(null);
+      }
+    }
+    void onError(JSAny? _) => completer.complete(null);
+    _jsGetPosition(onSuccess.toJS, onError.toJS);
+    return completer.future.timeout(const Duration(seconds: 5), onTimeout: () => null);
   } catch (_) {
     return null;
   }
@@ -105,25 +122,33 @@ class _ViagensPageState extends State<ViagensPage> {
             vMap[row['id'].toString()] = row;
           }
         } catch (_) {}
-        // Motoristas: via user_profiles (não depende de drivers.empresa_id)
+        // Motoristas: batch query ao invés de N+1
         try {
           final profiles = await supabase.from('user_profiles')
               .select('driver_id, nome, email')
               .eq('empresa_id', eid)
               .eq('role', 'MOTORISTA')
               .not('driver_id', 'is', null);
-          for (final p in profiles as List) {
-            final dId = p['driver_id']?.toString();
-            if (dId == null) continue;
-            try {
-              final dr = await supabase.from('drivers')
-                  .select('id, name').eq('id', dId).maybeSingle();
-              mMap[dId] = dr != null
-                  ? Map<String, dynamic>.from(dr as Map)
-                  : {'id': dId, 'name': p['nome'] ?? p['email'] ?? dId};
-            } catch (_) {
-              mMap[dId] = {'id': dId, 'name': p['nome'] ?? p['email'] ?? dId};
+          final pList = List<Map<String, dynamic>>.from(
+              (profiles as List).map((e) => Map<String, dynamic>.from(e as Map)));
+          final driverIds = pList
+              .map((p) => p['driver_id']?.toString())
+              .whereType<String>()
+              .toList();
+          if (driverIds.isNotEmpty) {
+            final drivers = await supabase.from('drivers')
+                .select('id, name')
+                .inFilter('id', driverIds);
+            for (final d in drivers as List) {
+              final row = Map<String, dynamic>.from(d as Map);
+              mMap[row['id'].toString()] = row;
             }
+          }
+          // Fallback: perfil como nome para motoristas sem driver record
+          for (final p in pList) {
+            final dId = p['driver_id']?.toString();
+            if (dId == null || mMap.containsKey(dId)) continue;
+            mMap[dId] = {'id': dId, 'name': p['nome'] ?? p['email'] ?? dId};
           }
         } catch (_) {}
       }
