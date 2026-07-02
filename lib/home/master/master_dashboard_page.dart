@@ -400,7 +400,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         final hora = _fmtHora(c['created_at']?.toString());
         final tipo = (c['tipo'] ?? 'saida').toString();
         activities.add(_ActivityItem(
-          hora, Icons.checklist_rounded, const Color(0xFF22C55E),
+          hora, Icons.request_page_rounded, const Color(0xFF22C55E),
           'Checklist de ${tipo == 'saida' ? 'saída' : 'retorno'} concluído',
         ));
       }
@@ -592,16 +592,16 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
     final items = <(IconData, String, _Sec, VoidCallback?)>[
       (Icons.dashboard_rounded, 'Painel Geral', _Sec.painel, null),
-      (Icons.apartment_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
-      (Icons.people_alt_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
+      (Icons.location_city_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
+      (Icons.recent_actors_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
       (Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
       (Icons.manage_accounts_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
       (Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
       (Icons.build_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
       (Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
-      (Icons.checklist_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
+      (Icons.request_page_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
       (Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
-      (Icons.credit_card_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
+      (Icons.local_atm_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
       (Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
     ];
 
@@ -915,9 +915,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   List<_KpiData> _buildKpiList() {
     String trend(double v) => v == 0 ? '' : '${v > 0 ? '+' : ''}${v.toStringAsFixed(1)}%';
     return [
-      _KpiData(label: 'Empresas', value: '$_totalEmpresas', icon: Icons.apartment_rounded,
+      _KpiData(label: 'Empresas', value: '$_totalEmpresas', icon: Icons.location_city_rounded,
           color: const Color(0xFFF59E0B), trend: trend(_tendEmpresas), trendUp: _tendEmpresas >= 0, spark: _sparkEmpresas),
-      _KpiData(label: 'Usuários', value: _fmtNum(_totalUsuarios), icon: Icons.people_alt_rounded,
+      _KpiData(label: 'Usuários', value: _fmtNum(_totalUsuarios), icon: Icons.recent_actors_rounded,
           color: const Color(0xFF3B82F6), trend: trend(_tendUsuarios), trendUp: _tendUsuarios >= 0, spark: _sparkUsuarios),
       _KpiData(label: 'Veículos', value: _fmtNum(_totalVeiculos), icon: Icons.directions_car_rounded,
           color: const Color(0xFF22C55E), trend: trend(_tendVeiculos), trendUp: _tendVeiculos >= 0, spark: _sparkVeiculos),
@@ -929,11 +929,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           color: const Color(0xFFF97316), trend: trend(_tendChecks), trendUp: _tendChecks >= 0, spark: _sparkManut),
       _KpiData(label: 'Ocorrências', value: '$_totalOcorrencias', icon: Icons.report_problem_rounded,
           color: const Color(0xFFEF4444), trend: trend(_tendOcorr), trendUp: _tendOcorr <= 0, spark: _sparkOcorr),
-      _KpiData(label: 'Online Agora', value: '$_empresasOnline', icon: Icons.people_alt_rounded,
+      _KpiData(label: 'Online Agora', value: '$_empresasOnline', icon: Icons.recent_actors_rounded,
           color: const Color(0xFF10B981), spark: _sparkOnline),
       _KpiData(label: 'Receita Mês', value: 'R\$ ${_fmtMoney(_receitaMes)}', icon: Icons.attach_money_rounded,
           color: const Color(0xFF22C55E), trend: trend(_tendReceita), trendUp: _tendReceita >= 0, spark: _sparkReceita),
-      _KpiData(label: 'Novas Empresas', value: '$_novasEmpresas', icon: Icons.add_circle_rounded,
+      _KpiData(label: 'Novas Empresas', value: '$_novasEmpresas', icon: Icons.home_work_rounded,
           color: const Color(0xFFEAB308), spark: _sparkNovas),
     ];
   }
@@ -1092,7 +1092,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           () => go(const ManutencoesPage())),
       (_AlertItem(Icons.manage_accounts_rounded, const Color(0xFFF59E0B), 'CNHs vencendo', _cnhsVencendo),
           () => go(const MotoristasPage())),
-      (_AlertItem(Icons.money_off_rounded, const Color(0xFFEF4444), 'Mensalidades atrasadas', _mensalidadesAtrasadas),
+      (_AlertItem(Icons.warning_amber_rounded, const Color(0xFFEF4444), 'Mensalidades atrasadas', _mensalidadesAtrasadas),
           () => _showEmpresasDialog()),
       (_AlertItem(Icons.report_problem_rounded, const Color(0xFFEF4444), 'Ocorrências abertas', _ocorrenciasAbertas),
           () => go(const ListaOcorrenciasPage())),
@@ -1585,7 +1585,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _acaoBtn(Icons.add_circle_rounded, const Color(0xFF3B82F6), 'Nova Empresa', _showNovaEmpresaDialog),
+                _acaoBtn(Icons.home_work_rounded, const Color(0xFF3B82F6), 'Nova Empresa', _showNovaEmpresaDialog),
                 const SizedBox(width: 10),
                 _acaoBtn(Icons.person_add_rounded, const Color(0xFF22C55E), 'Novo Usuário',
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsuariosPage()))),
@@ -1979,7 +1979,7 @@ class _SearchDialogState extends State<_SearchDialog> {
       ]);
       for (final e in (emp as List)) {
         results.add(_SearchResult('empresa', (e['nome'] ?? '').toString(),
-            (e['status'] ?? '').toString(), Icons.apartment_rounded, const Color(0xFF3B82F6)));
+            (e['status'] ?? '').toString(), Icons.location_city_rounded, const Color(0xFF3B82F6)));
       }
       for (final v in (veic as List)) {
         final desc = '${v['plate'] ?? ''} · ${v['model'] ?? ''}'.trim();
