@@ -57,7 +57,7 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        checkQ.order('criado_em', ascending: false).limit(200),
+        checkQ.order('criado_em', ascending: false).limit(500),
         veicQ,
         drivQ,
       ]);
@@ -566,8 +566,21 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                         onRefresh: _carregar,
                         child: ListView.builder(
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-                          itemCount: lista.length,
-                          itemBuilder: (_, i) => _buildCard(lista[i]),
+                          itemCount: lista.length + (_registros.length >= 500 ? 1 : 0),
+                          itemBuilder: (_, i) {
+                            if (i == lista.length && _registros.length >= 500) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  'Exibindo até 500 registros. Use filtros para refinar.',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary, fontSize: 12),
+                                  textAlign: TextAlign.center,
+                                ),
+                              );
+                            }
+                            return _buildCard(lista[i]);
+                          },
                         ),
                       ),
           ),

@@ -39,43 +39,34 @@ class _VeiculosPageState extends State<VeiculosPage> {
     _carregarTudo();
   }
 
+  // BUG-21: fetch vehicles and drivers together in a single Future.wait so
+  // there is no intermediate state that shows "Sem motorista" for assigned
+  // vehicles while drivers are still loading.
   Future<void> _carregarTudo() async {
-    await Future.wait([carregarMotoristas(), carregarVeiculos()]);
-  }
-
-  Future<void> carregarMotoristas() async {
-    try {
-      final auth = context.read<AppAuthProvider>();
-      final eid = auth.effectiveEmpresaId;
-      var q = supabase.from('drivers').select('id, name');
-      if (eid != null) q = q.eq('empresa_id', eid);
-      final response = await q.order('name');
-      if (!mounted) return;
-      setState(() {
-        motoristas = List<Map<String, dynamic>>.from(
-          (response as List).map((e) => Map<String, dynamic>.from(e as Map)),
-        );
-      });
-    } catch (e) {
-      debugPrint('Erro motoristas: $e');
-    }
-  }
-
-  Future<void> carregarVeiculos() async {
     if (!mounted) return;
     setState(() => carregandoVeiculos = true);
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
-      var q = supabase
+      var veicQ = supabase
           .from('vehicles')
           .select('id, plate, brand, model, year, color, odometer, driver_id');
-      if (eid != null) q = q.eq('empresa_id', eid);
-      final response = await q.order('plate');
+      var drivQ = supabase.from('drivers').select('id, name');
+      if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+        drivQ = drivQ.eq('empresa_id', eid);
+      }
+      final results = await Future.wait([
+        veicQ.order('plate'),
+        drivQ.order('name'),
+      ]);
       if (!mounted) return;
       setState(() {
         veiculos = List<Map<String, dynamic>>.from(
-          (response as List).map((e) => Map<String, dynamic>.from(e as Map)),
+          (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+        motoristas = List<Map<String, dynamic>>.from(
+          (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
         erroMsg = null;
         carregandoVeiculos = false;
@@ -88,6 +79,9 @@ class _VeiculosPageState extends State<VeiculosPage> {
       });
     }
   }
+
+  Future<void> carregarMotoristas() async => _carregarTudo();
+  Future<void> carregarVeiculos() async => _carregarTudo();
 
   String _nomeMotorista(Map<String, dynamic> veiculo) {
     final id = veiculo['driver_id']?.toString();

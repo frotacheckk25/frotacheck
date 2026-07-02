@@ -36,6 +36,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   List<Map<String, dynamic>> _vehicles = [];
   bool _loading = true;
   String? _erro;
+  bool _isEditing = false; // BUG-17: suppresses realtime rebuild during active edits
   RealtimeChannel? _channel;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -54,13 +55,14 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'user_profiles',
-          callback: (_) => _carregar(),
+          // BUG-17: don't rebuild while a dialog/form is being edited
+          callback: (_) { if (!_isEditing) _carregar(); },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'empresas',
-          callback: (_) => _carregar(),
+          callback: (_) { if (!_isEditing) _carregar(); },
         )
         .subscribe();
   }
@@ -87,7 +89,8 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         res = await _supabase
             .from('user_profiles')
             .select('*, empresas(nome)')
-            .order('created_at', ascending: false);
+            .order('created_at', ascending: false)
+            .limit(200);
       } else {
         final minhaEmpresa = auth.empresaId;
         if (minhaEmpresa != null) {
@@ -95,12 +98,14 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
               .from('user_profiles')
               .select('*, empresas(nome)')
               .eq('empresa_id', minhaEmpresa)
-              .order('created_at', ascending: false);
+              .order('created_at', ascending: false)
+              .limit(200);
         } else {
           res = await _supabase
               .from('user_profiles')
               .select('*, empresas(nome)')
-              .order('created_at', ascending: false);
+              .order('created_at', ascending: false)
+              .limit(200);
         }
       }
       final lista = (res as List)
@@ -205,6 +210,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         perfil['nome']?.toString() ?? perfil['email']?.toString() ?? '';
     final controller = TextEditingController(text: nomeInicial);
 
+    setState(() => _isEditing = true);
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -249,6 +255,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
     final nomeEmpresa = controller.text.trim();
     controller.dispose();
+    setState(() => _isEditing = false);
     if (confirmed != true || nomeEmpresa.isEmpty) return;
 
     try {
@@ -439,6 +446,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
   Future<void> _editarNome(String userId, String nomeAtual) async {
     final ctrl = TextEditingController(text: nomeAtual);
+    setState(() => _isEditing = true);
     final salvo = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -471,6 +479,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       ),
     );
     ctrl.dispose();
+    setState(() => _isEditing = false);
     if (salvo == null || salvo.isEmpty) return;
     try {
       await _supabase.from('user_profiles').update({'nome': salvo}).eq('user_id', userId);
@@ -487,7 +496,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
   Future<void> _vincularPorEmail(AppAuthProvider auth) async {
     final emailCtrl = TextEditingController();
-
+    setState(() => _isEditing = true);
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -739,6 +748,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       },
     );
     emailCtrl.dispose();
+    setState(() => _isEditing = false);
   }
 
   @override
@@ -895,6 +905,16 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                       const Divider(color: AppColors.border, height: 24),
                     ],
                     ...ativosFiltrados.map((u) => _buildCard(u, auth, canManage, _drivers, _vehicles)),
+                    // BUG-19: note when limit reached
+                    if (_usuarios.length >= 200)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'Exibindo primeiros 200 usuários.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                   ],
                 ),
         ),

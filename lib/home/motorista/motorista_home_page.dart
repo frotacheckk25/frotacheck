@@ -1400,7 +1400,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           OutlinedButton.icon(
             onPressed: () => _push(const HistoricoChecklistPage()),
             icon: const Icon(Icons.arrow_forward_rounded, size: 13),
-            label: const Text('Ver dicas'),
+            label: const Text('Ver histórico'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: BorderSide(color: Colors.white.withOpacity(0.22)),

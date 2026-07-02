@@ -61,7 +61,7 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        ocorrQ.order('created_at', ascending: false),
+        ocorrQ.order('created_at', ascending: false).limit(500),
         veicQ,
         drivQ,
       ]);

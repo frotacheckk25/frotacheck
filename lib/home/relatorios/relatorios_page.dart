@@ -94,9 +94,9 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         oilQ   = oilQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        fuelQ.order('fuel_date', ascending: true),
-        multaQ,
-        oilQ,
+        fuelQ.order('fuel_date', ascending: true).limit(1000),
+        multaQ.limit(1000),
+        oilQ.limit(1000),
       ]);
 
       final fuelings = List<Map<String, dynamic>>.from(results[0]);
@@ -473,7 +473,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
 
                   // ── KPIs Combustível ─────────────────────────────────────────
                   _sectionTitle(
-                      'Combustível', Icons.local_gas_station, AppColors.secondary),
+                      'Combustível (Total Geral)', Icons.local_gas_station, AppColors.secondary),
                   const SizedBox(height: 10),
                   Row(children: [
                     _kpi('Gasto Total', _fmtR(totalGastoFuel),
@@ -501,7 +501,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                   Row(children: [
                     _kpi(
                         'Multas Abertas',
-                        '$qtdMultasAbertas multa(s)\n${_fmtR(totalMultasAbertas)}',
+                        '$qtdMultasAbertas multa(s) · ${_fmtR(totalMultasAbertas)}',
                         AppColors.danger,
                         Icons.gavel),
                     const SizedBox(width: 10),

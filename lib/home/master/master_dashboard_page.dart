@@ -1966,10 +1966,11 @@ class _SearchDialogState extends State<_SearchDialog> {
     final like = '%${q.toLowerCase()}%';
     final results = <_SearchResult>[];
     try {
+      // BUG-18: join drivers with empresas so MASTER can see which company each driver belongs to
       final [emp, veic, mot] = await Future.wait([
         widget.supabase.from('empresas').select('id, nome, status').ilike('nome', like).limit(5),
         widget.supabase.from('vehicles').select('id, plate, model, empresa_id').ilike('plate', like).limit(5),
-        widget.supabase.from('drivers').select('id, nome, cpf, empresa_id').ilike('nome', like).limit(5),
+        widget.supabase.from('drivers').select('id, name, empresa_id, empresas(nome)').ilike('name', like).limit(5),
       ]);
       for (final e in (emp as List)) {
         results.add(_SearchResult('empresa', (e['nome'] ?? '').toString(),
@@ -1981,8 +1982,12 @@ class _SearchDialogState extends State<_SearchDialog> {
             Icons.directions_car_rounded, const Color(0xFF22C55E)));
       }
       for (final m in (mot as List)) {
-        results.add(_SearchResult('motorista', (m['nome'] ?? '').toString(),
-            'Motorista', Icons.badge_rounded, const Color(0xFFEC4899)));
+        final empNome = (m['empresas'] is Map)
+            ? (m['empresas'] as Map)['nome']?.toString() ?? ''
+            : '';
+        final subtitle = empNome.isNotEmpty ? 'Motorista · $empNome' : 'Motorista';
+        results.add(_SearchResult('motorista', (m['name'] ?? '').toString(),
+            subtitle, Icons.badge_rounded, const Color(0xFFEC4899)));
       }
     } catch (_) {}
     if (mounted) setState(() { _results = results; _loading = false; });

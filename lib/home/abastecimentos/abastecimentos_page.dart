@@ -43,7 +43,11 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
 
       var veicQ = supabase.from('vehicles').select('id, plate, model');
       var drivQ = supabase.from('drivers').select('id, name');
-      if (eid != null) {
+      if (auth.isMotorista && auth.driverId != null) {
+        // Motorista só vê o veículo atribuído a ele e somente a si mesmo
+        veicQ = veicQ.eq('driver_id', auth.driverId!);
+        drivQ = drivQ.eq('id', auth.driverId!);
+      } else if (eid != null) {
         veicQ = veicQ.eq('empresa_id', eid);
         drivQ = drivQ.eq('empresa_id', eid);
       }
@@ -75,6 +79,12 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
   }
 
   void _abrirFormulario() {
+    final auth = context.read<AppAuthProvider>();
+    final isMotorista = auth.isMotorista && auth.driverId != null;
+    final preSelectedVehicle =
+        isMotorista && vehicles.isNotEmpty ? vehicles.first['id']?.toString() : null;
+    final preSelectedDriver = isMotorista ? auth.driverId : null;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -85,6 +95,9 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
       builder: (ctx) => _AbastecimentoForm(
         vehicles: vehicles,
         drivers: drivers,
+        preSelectedVehicle: preSelectedVehicle,
+        preSelectedDriver: preSelectedDriver,
+        readOnly: isMotorista,
         onSaved: () {
           Navigator.pop(ctx);
           carregarDados();
@@ -406,11 +419,17 @@ class _AbastecimentoForm extends StatefulWidget {
   final List<Map<String, dynamic>> vehicles;
   final List<Map<String, dynamic>> drivers;
   final VoidCallback onSaved;
+  final String? preSelectedVehicle;
+  final String? preSelectedDriver;
+  final bool readOnly;
 
   const _AbastecimentoForm({
     required this.vehicles,
     required this.drivers,
     required this.onSaved,
+    this.preSelectedVehicle,
+    this.preSelectedDriver,
+    this.readOnly = false,
   });
 
   @override
@@ -429,6 +448,13 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
 
   String? selectedVehicle;
   String? selectedDriver;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedVehicle = widget.preSelectedVehicle;
+    selectedDriver = widget.preSelectedDriver;
+  }
 
   XFile? odometroPhoto;
   XFile? pumpPhoto;
@@ -542,7 +568,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                       style: const TextStyle(color: Colors.white)),
                 )).toList(),
                 validator: (v) => v == null ? 'Selecione um veículo' : null,
-                onChanged: (v) => setState(() => selectedVehicle = v),
+                onChanged: widget.readOnly ? null : (v) => setState(() => selectedVehicle = v),
               ),
               const SizedBox(height: 14),
 
@@ -556,7 +582,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                   child: Text(d['name'] ?? '', style: const TextStyle(color: Colors.white)),
                 )).toList(),
                 validator: (v) => v == null ? 'Selecione um motorista' : null,
-                onChanged: (v) => setState(() => selectedDriver = v),
+                onChanged: widget.readOnly ? null : (v) => setState(() => selectedDriver = v),
               ),
               const SizedBox(height: 14),
 
