@@ -313,7 +313,23 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       body: Row(
         children: [
           _buildSidebar(auth, primeiroNome),
-          Expanded(child: _buildContent(auth, primeiroNome)),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Imagem de fundo sutil atrás do conteúdo
+                Opacity(
+                  opacity: 0.06,
+                  child: Image.asset(
+                    'assets/images/lofoFROTA.png',
+                    fit: BoxFit.cover,
+                    alignment: Alignment.centerRight,
+                  ),
+                ),
+                _buildContent(auth, primeiroNome),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -382,7 +398,20 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ),
         ],
       ),
-      body: _buildMobileBody(auth, primeiroNome),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Opacity(
+            opacity: 0.06,
+            child: Image.asset(
+              'assets/images/lofoFROTA.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.centerRight,
+            ),
+          ),
+          _buildMobileBody(auth, primeiroNome),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
