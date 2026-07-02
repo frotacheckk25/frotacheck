@@ -1085,76 +1085,94 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 ),
               )
             else
-              Row(
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Expanded(
-                    child: _taskCard(
-                      icon: Icons.checklist_rtl,
-                      cor: const Color(0xFF1AA251),
-                      titulo: 'Checklist Saída',
-                      status: _checklistSaidaHoje ? 'Concluído' : 'Não iniciado',
-                      statusCor: _checklistSaidaHoje
-                          ? const Color(0xFF1AA251)
-                          : const Color(0xFF94A3B8),
-                      onTap: () => _onTap(_Sec.checklistSaida),
+                  // Imagem de fundo atrás dos cards
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Opacity(
+                        opacity: 0.07,
+                        child: Image.asset(
+                          'assets/images/lofoFROTA.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _taskCard(
-                      icon: Icons.check_circle,
-                      cor: const Color(0xFF3B82F6),
-                      titulo: 'Checklist Retorno',
-                      status:
-                          _checklistRetornoHoje ? 'Concluído' : 'Não iniciado',
-                      statusCor: _checklistRetornoHoje
-                          ? const Color(0xFF1AA251)
-                          : const Color(0xFF94A3B8),
-                      onTap: () => _onTap(_Sec.checklistRetorno),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _taskCard(
-                      icon: Icons.local_gas_station_rounded,
-                      cor: const Color(0xFFF59E0B),
-                      titulo: 'Abastecimento',
-                      status: _abastecimentosHoje > 0
-                          ? '$_abastecimentosHoje registrado(s)'
-                          : 'Não registrado',
-                      statusCor: _abastecimentosHoje > 0
-                          ? const Color(0xFF1AA251)
-                          : const Color(0xFFF59E0B),
-                      onTap: () => _onTap(_Sec.abastecimentos),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _taskCard(
-                      icon: Icons.build_rounded,
-                      cor: const Color(0xFF8B5CF6),
-                      titulo: 'Manutenção',
-                      status: _manutencaoStatus,
-                      statusCor: _manutencaoStatus == 'Em dia'
-                          ? const Color(0xFF1AA251)
-                          : const Color(0xFFF59E0B),
-                      onTap: () => _onTap(_Sec.manutencoes),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _taskCard(
-                      icon: Icons.report_problem_rounded,
-                      cor: const Color(0xFFEF4444),
-                      titulo: 'Ocorrências',
-                      status: _ocorrenciasAbertas == 0
-                          ? 'Nenhuma'
-                          : '$_ocorrenciasAbertas aberta(s)',
-                      statusCor: _ocorrenciasAbertas == 0
-                          ? const Color(0xFF1AA251)
-                          : const Color(0xFFEF4444),
-                      onTap: () => _onTap(_Sec.ocorrencias),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _taskCard(
+                          icon: Icons.checklist_rtl,
+                          cor: const Color(0xFF1AA251),
+                          titulo: 'Checklist Saída',
+                          status: _checklistSaidaHoje ? 'Concluído' : 'Não iniciado',
+                          statusCor: _checklistSaidaHoje
+                              ? const Color(0xFF1AA251)
+                              : const Color(0xFF94A3B8),
+                          onTap: () => _onTap(_Sec.checklistSaida),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _taskCard(
+                          icon: Icons.check_circle,
+                          cor: const Color(0xFF3B82F6),
+                          titulo: 'Checklist Retorno',
+                          status:
+                              _checklistRetornoHoje ? 'Concluído' : 'Não iniciado',
+                          statusCor: _checklistRetornoHoje
+                              ? const Color(0xFF1AA251)
+                              : const Color(0xFF94A3B8),
+                          onTap: () => _onTap(_Sec.checklistRetorno),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _taskCard(
+                          icon: Icons.local_gas_station_rounded,
+                          cor: const Color(0xFFF59E0B),
+                          titulo: 'Abastecimento',
+                          status: _abastecimentosHoje > 0
+                              ? '$_abastecimentosHoje registrado(s)'
+                              : 'Não registrado',
+                          statusCor: _abastecimentosHoje > 0
+                              ? const Color(0xFF1AA251)
+                              : const Color(0xFFF59E0B),
+                          onTap: () => _onTap(_Sec.abastecimentos),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _taskCard(
+                          icon: Icons.build_rounded,
+                          cor: const Color(0xFF8B5CF6),
+                          titulo: 'Manutenção',
+                          status: _manutencaoStatus,
+                          statusCor: _manutencaoStatus == 'Em dia'
+                              ? const Color(0xFF1AA251)
+                              : const Color(0xFFF59E0B),
+                          onTap: () => _onTap(_Sec.manutencoes),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _taskCard(
+                          icon: Icons.report_problem_rounded,
+                          cor: const Color(0xFFEF4444),
+                          titulo: 'Ocorrências',
+                          status: _ocorrenciasAbertas == 0
+                              ? 'Nenhuma'
+                              : '$_ocorrenciasAbertas aberta(s)',
+                          statusCor: _ocorrenciasAbertas == 0
+                              ? const Color(0xFF1AA251)
+                              : const Color(0xFFEF4444),
+                          onTap: () => _onTap(_Sec.ocorrencias),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

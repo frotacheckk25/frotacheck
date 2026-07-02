@@ -2997,29 +2997,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _pickDateRange() async {
-    final picked = await showDateRangePicker(
+    final result = await showDialog<DateTimeRange>(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      initialDateRange: DateTimeRange(start: _filterStart, end: _filterEnd),
-      locale: const Locale('pt', 'BR'),
-      builder: (context, child) => Theme(
-        // Usa tema claro explícito — o tema escuro do app tornava o picker invisível
-        data: ThemeData.light(useMaterial3: true).copyWith(
-          colorScheme: const ColorScheme.light().copyWith(
-            primary: AppColors.secondary,
-            onPrimary: Colors.white,
-            surface: Colors.white,
-            onSurface: Colors.black87,
-          ),
-        ),
-        child: child!,
-      ),
+      barrierColor: Colors.black54,
+      builder: (ctx) => _MonthPickerDialog(currentStart: _filterStart),
     );
-    if (picked != null) {
+    if (result != null) {
       setState(() {
-        _filterStart = picked.start;
-        _filterEnd = picked.end;
+        _filterStart = result.start;
+        _filterEnd = result.end;
       });
       carregarDashboard();
     }
@@ -5862,5 +5848,157 @@ class _GlobalConnectionPainter extends CustomPainter {
       if (old.modulePulses[i] != modulePulses[i]) return true;
     }
     return false;
+  }
+}
+
+/// Custom month/year picker — replaces showDateRangePicker (white screen on CanvasKit).
+/// Selects an entire month and returns a DateTimeRange covering that month.
+class _MonthPickerDialog extends StatefulWidget {
+  final DateTime currentStart;
+  const _MonthPickerDialog({required this.currentStart});
+
+  @override
+  State<_MonthPickerDialog> createState() => _MonthPickerDialogState();
+}
+
+class _MonthPickerDialogState extends State<_MonthPickerDialog> {
+  late int _year;
+  late int _selectedMonth;
+  late int _selectedYear;
+
+  static const _months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                           'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  @override
+  void initState() {
+    super.initState();
+    _year         = widget.currentStart.year;
+    _selectedMonth = widget.currentStart.month;
+    _selectedYear  = widget.currentStart.year;
+  }
+
+  void _confirm() {
+    final start = DateTime(_selectedYear, _selectedMonth);
+    final end   = DateTime(_selectedYear, _selectedMonth + 1, 0);
+    Navigator.pop(context, DateTimeRange(start: start, end: end));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF0D1520),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: 320,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Selecionar Período',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Navegação de ano ────────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left, color: Colors.white70),
+                    onPressed: () => setState(() => _year--),
+                  ),
+                  Text(
+                    '$_year',
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, color: Colors.white70),
+                    onPressed: () => setState(() {
+                      if (_year < DateTime.now().year) _year++;
+                    }),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // ── Grade de meses (4×3) ────────────────────────────────────
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  childAspectRatio: 1.8,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                ),
+                itemCount: 12,
+                itemBuilder: (_, i) {
+                  final isSelected =
+                      _year == _selectedYear && (i + 1) == _selectedMonth;
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      _selectedMonth = i + 1;
+                      _selectedYear  = _year;
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF2563EB)
+                            : const Color(0xFF131E2E),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF2563EB)
+                              : const Color(0xFF1E2D42),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _months[i],
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.white70,
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // ── Botão confirmar ─────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _confirm,
+                  child: Text(
+                    '${_months[_selectedMonth - 1]} $_selectedYear',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
