@@ -87,6 +87,25 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
     }
   }
 
+  Future<String?> _uploadComRetry(
+      Uint8List bytes, String fileName) async {
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await supabase.storage.from('checklists').uploadBinary(
+              fileName,
+              bytes,
+              fileOptions: const FileOptions(upsert: true),
+            );
+        return supabase.storage.from('checklists').getPublicUrl(fileName);
+      } catch (_) {
+        if (attempt < 3) {
+          await Future.delayed(Duration(seconds: attempt));
+        }
+      }
+    }
+    return null;
+  }
+
   Future<void> _salvarChecklist() async {
     if (kmFinalController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,27 +128,30 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
     final injetar = context.read<AppAuthProvider>().inject;
 
     try {
-      // Tenta fazer upload das fotos — falha silenciosa se o bucket não existir
       final List<String> fotoUrls = [];
-      bool uploadFalhou = false;
       for (int i = 0; i < fotosCapturadas.length; i++) {
-        try {
-          final Uint8List bytes = fotosCapturadas[i]['bytes'];
-          final label = (fotosCapturadas[i]['label'] as String)
-              .toLowerCase()
-              .replaceAll(' ', '_');
-          final fileName =
-              'retorno_${widget.veiculoId}_${label}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-          await supabase.storage.from('checklists').uploadBinary(
-                fileName,
-                bytes,
-                fileOptions: const FileOptions(upsert: true),
-              );
-          fotoUrls.add(
-              supabase.storage.from('checklists').getPublicUrl(fileName));
-        } catch (_) {
-          uploadFalhou = true;
+        final Uint8List bytes = fotosCapturadas[i]['bytes'];
+        final label = (fotosCapturadas[i]['label'] as String)
+            .toLowerCase()
+            .replaceAll(' ', '_');
+        final fileName =
+            'retorno_${widget.veiculoId}_${label}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final url = await _uploadComRetry(bytes, fileName);
+        if (url == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    'Falha ao enviar foto "${fotosCapturadas[i]['label']}". Tente novamente.'),
+                backgroundColor: AppColors.danger,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+            setState(() => isLoading = false);
+          }
+          return;
         }
+        fotoUrls.add(url);
       }
 
       await supabase.from('checklists').insert(injetar({
@@ -146,23 +168,12 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
       }));
 
       if (!mounted) return;
-      if (uploadFalhou) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Checklist salvo! Fotos não foram enviadas (bucket não configurado no Supabase).'),
-            backgroundColor: AppColors.warning,
-            duration: Duration(seconds: 5),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Checklist de retorno registrado!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Checklist de retorno registrado!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
       Navigator.pop(context);
     } catch (e) {
       if (mounted) {

@@ -21,19 +21,31 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
   Map<String, Map<String, dynamic>> motoristasMap = {};
 
   bool carregando = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
+  static const int _pageSize = 50;
   String? erroMsg;
   String statusFiltro = 'Todos';
   String prioridadeFiltro = 'Todos';
+  final ScrollController _scrollCtrl = ScrollController();
 
   @override
   void initState() {
     super.initState();
     carregarTudo();
+    _scrollCtrl.addListener(() {
+      if (_scrollCtrl.position.pixels >=
+          _scrollCtrl.position.maxScrollExtent - 300) {
+        _loadMais();
+      }
+    });
   }
 
   @override
   void dispose() {
     searchController.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -42,11 +54,17 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
     setState(() {
       carregando = true;
       erroMsg = null;
+      _offset = 0;
+      _hasMore = true;
+      ocorrencias = [];
+      veiculosMap = {};
+      motoristasMap = {};
     });
 
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
+
       var ocorrQ = supabase.from('occurrences').select('*');
       if (auth.isMotorista && auth.driverId != null) {
         ocorrQ = ocorrQ.eq('driver_id', auth.driverId!);
@@ -60,15 +78,16 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
         veicQ = veicQ.eq('empresa_id', eid);
         drivQ = drivQ.eq('empresa_id', eid);
       }
+
       final results = await Future.wait([
-        ocorrQ.order('created_at', ascending: false).limit(500),
+        ocorrQ.order('created_at', ascending: false).range(0, _pageSize - 1),
         veicQ,
         drivQ,
       ]);
 
       if (!mounted) return;
 
-      final rawOcorr = List<Map<String, dynamic>>.from(
+      final batch = List<Map<String, dynamic>>.from(
         (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
       );
 
@@ -87,9 +106,11 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
       }
 
       setState(() {
-        ocorrencias = rawOcorr;
+        ocorrencias = batch;
         veiculosMap = veicMap;
         motoristasMap = motMap;
+        _offset = batch.length;
+        _hasMore = batch.length == _pageSize;
         carregando = false;
         erroMsg = null;
       });
@@ -100,6 +121,36 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
         carregando = false;
         erroMsg = e.toString();
       });
+    }
+  }
+
+  Future<void> _loadMais() async {
+    if (!_hasMore || _loadingMore || carregando || !mounted) return;
+    setState(() => _loadingMore = true);
+    try {
+      final auth = context.read<AppAuthProvider>();
+      final eid = auth.effectiveEmpresaId;
+      var q = supabase.from('occurrences').select('*');
+      if (auth.isMotorista && auth.driverId != null) {
+        q = q.eq('driver_id', auth.driverId!);
+      } else if (eid != null) {
+        q = q.eq('empresa_id', eid);
+      }
+      final result = await q
+          .order('created_at', ascending: false)
+          .range(_offset, _offset + _pageSize - 1);
+      if (!mounted) return;
+      final batch = List<Map<String, dynamic>>.from(
+        (result as List).map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+      setState(() {
+        ocorrencias = [...ocorrencias, ...batch];
+        _offset += batch.length;
+        _hasMore = batch.length == _pageSize;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -130,17 +181,17 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
   }
 
   Future<void> _avancarStatus(Map<String, dynamic> item) async {
-    final atualRaw = (item['status']?.toString() ?? 'Aberto').trim();
-    final atual = switch (atualRaw.toLowerCase()) {
-      'aberto' => 'Aberto',
-      'em andamento' || 'em_andamento' => 'Em andamento',
-      'resolvido' => 'Resolvido',
-      _ => 'Aberto',
+    final atualRaw = (item['status']?.toString() ?? 'aberto').trim().toLowerCase();
+    final atual = switch (atualRaw) {
+      'aberto' => 'aberto',
+      'em andamento' || 'em_andamento' => 'em andamento',
+      'resolvido' => 'resolvido',
+      _ => 'aberto',
     };
     final proximo = switch (atual) {
-      'Aberto' => 'Em andamento',
-      'Em andamento' => 'Resolvido',
-      _ => 'Aberto',
+      'aberto' => 'em andamento',
+      'em andamento' => 'resolvido',
+      _ => 'aberto',
     };
     try {
       await supabase
@@ -293,6 +344,7 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
       body: RefreshIndicator(
         onRefresh: carregarTudo,
         child: CustomScrollView(
+          controller: _scrollCtrl,
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
@@ -493,8 +545,29 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, i) => _buildCard(lista[i]),
-                    childCount: lista.length,
+                    (context, i) {
+                      if (i == lista.length) {
+                        if (_loadingMore) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                                child: CircularProgressIndicator(strokeWidth: 2)),
+                          );
+                        }
+                        if (_hasMore) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: TextButton(
+                              onPressed: _loadMais,
+                              child: const Text('Carregar mais'),
+                            ),
+                          );
+                        }
+                        return const SizedBox(height: 16);
+                      }
+                      return _buildCard(lista[i]);
+                    },
+                    childCount: lista.length + 1,
                   ),
                 ),
               ),
