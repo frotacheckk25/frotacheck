@@ -82,9 +82,44 @@ class _MotoristasPageState extends State<MotoristasPage> {
       return;
     }
 
+    // Validar unicidade de CNH antes de salvar
+    final cnhNum = cnhController.text.trim();
+    if (cnhNum.isNotEmpty) {
+      try {
+        final existingCnh = await supabase.from('drivers')
+            .select('id').eq('cnh_number', cnhNum);
+        if (!mounted) return;
+        final others = (existingCnh as List)
+            .where((m) => m['id']?.toString() != editingId)
+            .toList();
+        if (others.isNotEmpty) {
+          _snackErro('Número de CNH já cadastrado para outro motorista');
+          return;
+        }
+      } catch (_) {}
+    }
+
+    // Validar unicidade de email
+    final emailConta = emailContaController.text.trim().toLowerCase();
+    if (emailConta.isNotEmpty && editingId == null) {
+      try {
+        final existingEmail = await supabase.from('user_profiles')
+            .select('user_id').eq('email', emailConta);
+        if (!mounted) return;
+        if ((existingEmail as List).isNotEmpty) {
+          final withDriver = await supabase.from('user_profiles')
+              .select('driver_id').eq('email', emailConta).not('driver_id', 'is', null);
+          if (!mounted) return;
+          if ((withDriver as List).isNotEmpty) {
+            _snackErro('Este e-mail já está vinculado a outro motorista');
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
     setState(() => isSaving = true);
 
-    final emailConta = emailContaController.text.trim().toLowerCase();
     final payload = <String, dynamic>{
       'name': nomeController.text.trim(),
       'cnh_number': cnhController.text.trim(),

@@ -598,20 +598,21 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         Navigator.push(context, MaterialPageRoute(builder: (_) => page))
             .then((_) { if (mounted) setState(() => _activeSection = _Sec.painel); });
 
-    final items = <(IconData, String, _Sec, VoidCallback?)>[
-      (Icons.dashboard_rounded, 'Painel Geral', _Sec.painel, null),
-      (Icons.bar_chart_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
-      (Icons.settings_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
-      (Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
-      (Icons.directions_car_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
-      (Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
-      (Icons.local_gas_station_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
-      (Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
-      (Icons.dashboard_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
-      (Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
-      (Icons.bar_chart_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
-      (Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
-    ];
+    Widget navItem(IconData icon, String label, _Sec sec, VoidCallback? action) {
+      final active = _activeSection == sec;
+      return _sidebarItem(icon, label, active: active, onTap: () {
+        setState(() => _activeSection = sec);
+        action?.call();
+      });
+    }
+
+    Widget catHeader(String label) => Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 3),
+      child: Text(label, style: const TextStyle(
+        color: Color(0xFF334155), fontSize: 9,
+        fontWeight: FontWeight.w700, letterSpacing: 1.4,
+      )),
+    );
 
     return Container(
       width: 220,
@@ -649,19 +650,31 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             ),
           ),
           Container(height: 1, color: const Color(0xFF0E1E33)),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
 
-          // Nav items
+          // Nav items agrupados por categoria
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
-              children: items.map((item) {
-                final active = _activeSection == item.$3;
-                return _sidebarItem(item.$1, item.$2, active: active, onTap: () {
-                  setState(() => _activeSection = item.$3);
-                  item.$4?.call();
-                });
-              }).toList(),
+              padding: const EdgeInsets.only(bottom: 8),
+              children: [
+                catHeader('PAINEL'),
+                navItem(Icons.dashboard_rounded, 'Painel Geral', _Sec.painel, null),
+                catHeader('OPERAÇÃO'),
+                navItem(Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
+                navItem(Icons.directions_car_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
+                navItem(Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
+                navItem(Icons.local_gas_station_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
+                catHeader('QUALIDADE'),
+                navItem(Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
+                navItem(Icons.dashboard_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),
+                catHeader('GESTÃO'),
+                navItem(Icons.bar_chart_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
+                navItem(Icons.settings_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
+                navItem(Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
+                navItem(Icons.bar_chart_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
+                catHeader('SISTEMA'),
+                navItem(Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
+              ],
             ),
           ),
 

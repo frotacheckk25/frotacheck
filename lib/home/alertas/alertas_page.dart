@@ -38,7 +38,7 @@ class _AlertasPageState extends State<AlertasPage> {
   void initState() {
     super.initState();
     _carregar();
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _carregar());
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _carregar());
   }
 
   @override

@@ -18,8 +18,8 @@ class AppColors {
   static const border = Color(0xFF13273A);
 
   static const textPrimary = Color(0xFFF8FAFC);
-  static const textSecondary = Color(0xFF94A3B8);
-  static const muted = Color(0xFF7B97B1);
+  static const textSecondary = Color(0xFFCBD5E1);
+  static const muted = Color(0xFF8BAABB);
 }
 
 class AppTheme {

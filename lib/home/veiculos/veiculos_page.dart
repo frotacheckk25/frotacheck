@@ -141,11 +141,17 @@ class _VeiculosPageState extends State<VeiculosPage> {
         });
       }
 
-      // Sincroniza user_profiles.driver_id quando um motorista é vinculado ao veículo.
-      // Garante que o motorista veja o veículo mesmo que o admin ainda não tenha
-      // feito o vínculo manualmente em Gestão de Usuários.
+      // Sincroniza driver_id quando um motorista é vinculado a este veículo.
       final newDriverId = motoristaSelecionado;
       if (newDriverId != null) {
+        try {
+          // Desvincular este motorista de qualquer veículo anterior (evita duplicidade)
+          await supabase
+              .from('vehicles')
+              .update({'driver_id': null})
+              .eq('driver_id', newDriverId)
+              .neq('id', editingId ?? '');
+        } catch (_) {}
         try {
           final driverRow = await supabase
               .from('drivers')

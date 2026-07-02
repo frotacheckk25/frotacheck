@@ -566,7 +566,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     carregarDashboard();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted) carregarDashboard();
     });
   }
