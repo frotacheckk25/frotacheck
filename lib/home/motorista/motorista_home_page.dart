@@ -543,7 +543,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                         '$_viagensHoje', const Color(0xFF3B82F6))),
                 const SizedBox(width: 8),
                 Expanded(
-                    child: _resumoChip(Icons.gps_fixed, 'Distância',
+                    child: _resumoChip(Icons.route, 'Distância',
                         '${_distanciaHoje.toStringAsFixed(0)} km',
                         const Color(0xFF8B5CF6))),
               ],
@@ -1254,7 +1254,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _resumoRow(Icons.directions, const Color(0xFF3B82F6),
               'Viagens', '$_viagensHoje'),
           const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.gps_fixed, const Color(0xFF8B5CF6),
+          _resumoRow(Icons.route, const Color(0xFF8B5CF6),
               'Distância',
               '${_distanciaHoje.toStringAsFixed(1)} km'),
           const Divider(color: AppColors.border, height: 1),

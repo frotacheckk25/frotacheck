@@ -171,7 +171,7 @@ class _SelecionarVeiculoChecklistPageState
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF0ea5e9), Color(0xFF6366f1)],
+                            colors: [Color(0xFF0D1F38), Color(0xFF1A3260)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
