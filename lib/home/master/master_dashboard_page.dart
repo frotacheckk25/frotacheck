@@ -78,7 +78,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   bool _loading = true;
   DateTime? _lastUpdated;
   _Sec _activeSection = _Sec.painel;
-  final TextEditingController _searchCtrl = TextEditingController();
 
   // KPIs
   int _totalEmpresas = 0;
@@ -119,6 +118,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   List<double> _receitaMensal6m = [0, 0, 0, 0, 0, 0];
   List<String> _mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
 
+  // Lista de empresas completa (para dialogs)
+  List<Map<String, dynamic>> _empresasList = [];
+
   // Sparklines semanais (8 pontos)
   List<double> _sparkEmpresas = [];
   List<double> _sparkUsuarios = [];
@@ -150,7 +152,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   void dispose() {
     _channel?.unsubscribe();
     _timer?.cancel();
-    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -191,16 +192,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             .select('id, empresa_id, total_value, fuel_date, vehicle_id, created_at')
             .gte('fuel_date', sixMonthsAgo.toIso8601String().split('T')[0])
             .order('created_at', ascending: false)),
-        // 5: checklists
+        // 5: checklists (sem limit — Supabase default 1000)
         _safeQ(_supabase.from('checklists')
             .select('id, empresa_id, tipo, vehicle_id, driver_id, created_at')
-            .order('created_at', ascending: false)
-            .limit(200)),
-        // 6: ocorrências
+            .order('created_at', ascending: false)),
+        // 6: ocorrências (sem limit — Supabase default 1000)
         _safeQ(_supabase.from('occurrences')
             .select('id, empresa_id, status, created_at')
-            .order('created_at', ascending: false)
-            .limit(200)),
+            .order('created_at', ascending: false)),
         // 7: oil_changes (manutenções)
         _safeQ(_supabase.from('oil_changes').select('id, vehicle_id, created_at')),
         // 8: usuários online (last_access recente)
@@ -211,6 +210,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 now.subtract(const Duration(minutes: 30)).toIso8601String())),
         // 9: manutencoes (tabela opcional — safeQ retorna [] se não existir)
         _safeQ(_supabase.from('manutencoes').select('id').limit(500)),
+        // 10: total abastecimentos sem filtro de data (contagem real)
+        _safeQ(_supabase.from('fuelings').select('id')),
       ]);
 
       final empresas = results[0];
@@ -223,6 +224,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final oilChanges = results[7];
       final online = results[8];
       final manutExtra = results[9];
+      final allFuelings = results[10];
       final manutTotal = manutExtra.length + oilChanges.length;
 
       final onlineIds = online.map((p) => p['empresa_id']).whereType<String>().toSet();
@@ -478,13 +480,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
       if (!mounted) return;
       setState(() {
+        _empresasList = empresas;
         _totalEmpresas = empresas.length;
         _empresasAtivas = stAtivo;
         _empresasOnline = onlineIds.length;
         _totalUsuarios = profiles.length;
         _totalVeiculos = veiculos.length;
         _totalMotoristas = motoristas.length;
-        _totalAbastecimentos = fuelings.length;
+        _totalAbastecimentos = allFuelings.length;
         _totalOcorrencias = ocorrencias.length;
         _totalManutencoes = manutTotal;
         _receitaMes = recMes;
@@ -589,7 +592,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
     final items = <(IconData, String, _Sec, VoidCallback?)>[
       (Icons.dashboard_rounded, 'Painel Geral', _Sec.painel, null),
-      (Icons.business_rounded, 'Empresas', _Sec.empresas, null),
+      (Icons.business_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
       (Icons.people_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
       (Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
       (Icons.badge_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
@@ -654,7 +657,62 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             ),
           ),
 
-          // Footer: user info + sair
+          // Botão Sair fixo
+          Container(height: 1, color: const Color(0xFF0E1E33)),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF0A1628),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFF1E293B)),
+                    ),
+                    title: const Text('Sair do sistema',
+                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                    content: const Text('Deseja encerrar a sessão e voltar ao login?',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancelar', style: TextStyle(color: Color(0xFF64748B))),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Sair'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && mounted) await auth.signOut();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                child: Row(children: [
+                  Container(
+                    width: 30, height: 30,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 16),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Sair', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ),
+          ),
+
+          // Footer: user info
           Container(height: 1, color: const Color(0xFF0E1E33)),
           Padding(
             padding: const EdgeInsets.all(12),
@@ -676,14 +734,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     Text('Master', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                     Text('Administrador', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
                   ]),
-                ),
-                InkWell(
-                  onTap: () => auth.signOut(),
-                  borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.all(6),
-                    child: Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
-                  ),
                 ),
               ],
             ),
@@ -771,26 +821,24 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           ]),
           const SizedBox(width: 20),
 
-          // Search
+          // Search — abre dialog de pesquisa global
           Expanded(
-            child: Container(
-              height: 38,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0A1628),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) {},
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: const InputDecoration(
-                  hintText: 'Buscar empresa, veículo, motorista, usuário...',
-                  hintStyle: TextStyle(color: Color(0xFF334155), fontSize: 12),
-                  prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF334155), size: 17),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+            child: GestureDetector(
+              onTap: _showSearchDialog,
+              child: Container(
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A1628),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF1E293B)),
                 ),
+                child: const Row(children: [
+                  SizedBox(width: 12),
+                  Icon(Icons.search_rounded, color: Color(0xFF334155), size: 17),
+                  SizedBox(width: 8),
+                  Text('Buscar empresa, veículo, motorista...',
+                      style: TextStyle(color: Color(0xFF334155), fontSize: 12)),
+                ]),
               ),
             ),
           ),
@@ -1036,12 +1084,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   }
 
   Widget _buildResumoAlertas() {
-    final alertas = [
-      _AlertItem(Icons.directions_car_rounded, const Color(0xFF3B82F6), 'Veículos offline', _veiculosOffline),
-      _AlertItem(Icons.build_circle_rounded, const Color(0xFFF97316), 'Manutenções vencidas', _manutencoesVencidas),
-      _AlertItem(Icons.credit_card_rounded, const Color(0xFFF59E0B), 'CNHs vencendo', _cnhsVencendo),
-      _AlertItem(Icons.receipt_long_rounded, const Color(0xFFEF4444), 'Mensalidades atrasadas', _mensalidadesAtrasadas),
-      _AlertItem(Icons.report_problem_rounded, const Color(0xFFEF4444), 'Ocorrências abertas', _ocorrenciasAbertas),
+    void go(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    final alertas = <(_AlertItem, VoidCallback)>[
+      (_AlertItem(Icons.directions_car_rounded, const Color(0xFF3B82F6), 'Veículos offline', _veiculosOffline),
+          () => go(const VeiculosPage())),
+      (_AlertItem(Icons.build_rounded, const Color(0xFFF97316), 'Manutenções vencidas', _manutencoesVencidas),
+          () => go(const ManutencoesPage())),
+      (_AlertItem(Icons.badge_rounded, const Color(0xFFF59E0B), 'CNHs vencendo', _cnhsVencendo),
+          () => go(const MotoristasPage())),
+      (_AlertItem(Icons.receipt_long_rounded, const Color(0xFFEF4444), 'Mensalidades atrasadas', _mensalidadesAtrasadas),
+          () => _showEmpresasDialog()),
+      (_AlertItem(Icons.report_problem_rounded, const Color(0xFFEF4444), 'Ocorrências abertas', _ocorrenciasAbertas),
+          () => go(const ListaOcorrenciasPage())),
     ];
 
     return Container(
@@ -1065,17 +1119,17 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             ]),
           ),
           Container(height: 1, color: const Color(0xFF0E1E33)),
-          ...alertas.map((a) => _alertRow(a)),
+          ...alertas.map((e) => _alertRow(e.$1, onTap: e.$2)),
         ],
       ),
     );
   }
 
-  Widget _alertRow(_AlertItem a) {
+  Widget _alertRow(_AlertItem a, {VoidCallback? onTap}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap ?? () {},
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           child: Row(children: [
@@ -1645,6 +1699,110 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     );
   }
 
+  // ── Dialog: Gestão de Empresas ─────────────────────────────────────────────
+  void _showEmpresasDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final lista = _empresasList;
+          return AlertDialog(
+            backgroundColor: const Color(0xFF0A1628),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: Color(0xFF1E293B)),
+            ),
+            title: Row(children: [
+              const Expanded(
+                child: Text('Empresas cadastradas',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+              TextButton.icon(
+                onPressed: () { Navigator.pop(ctx); _showNovaEmpresaDialog(); },
+                icon: const Icon(Icons.add_rounded, size: 15, color: Color(0xFF3B82F6)),
+                label: const Text('Nova', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12)),
+              ),
+            ]),
+            content: SizedBox(
+              width: 520,
+              height: 380,
+              child: lista.isEmpty
+                  ? const Center(
+                      child: Text('Nenhuma empresa cadastrada.',
+                          style: TextStyle(color: Color(0xFF475569))))
+                  : SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: lista.map((e) {
+                          final nome = (e['nome'] ?? '').toString();
+                          final status = (e['status'] ?? 'ativo').toString();
+                          final cnpj = (e['cnpj'] ?? '').toString();
+                          final statusColor = status == 'ativo'
+                              ? const Color(0xFF22C55E)
+                              : status == 'suspenso'
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFFEF4444);
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF060C18),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF1E293B)),
+                            ),
+                            child: Row(children: [
+                              Container(
+                                width: 34, height: 34,
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  nome.isNotEmpty ? nome[0].toUpperCase() : '?',
+                                  style: TextStyle(color: statusColor, fontWeight: FontWeight.w800, fontSize: 15),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(nome, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                                if (cnpj.isNotEmpty)
+                                  Text(cnpj, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                              ])),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
+                              ),
+                            ]),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Fechar', style: TextStyle(color: Color(0xFF3B82F6))),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Dialog: Pesquisa Global ────────────────────────────────────────────────
+  void _showSearchDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => _SearchDialog(supabase: _supabase),
+    );
+  }
+
   void _showLogsDialog() {
     showDialog(
       context: context,
@@ -1770,4 +1928,149 @@ class _PieSlice {
   final double value;
   final Color color;
   const _PieSlice(this.label, this.value, this.color);
+}
+
+// ─── Search Dialog ────────────────────────────────────────────────────────────
+class _SearchDialog extends StatefulWidget {
+  final SupabaseClient supabase;
+  const _SearchDialog({required this.supabase});
+  @override
+  State<_SearchDialog> createState() => _SearchDialogState();
+}
+
+class _SearchDialogState extends State<_SearchDialog> {
+  final _ctrl = TextEditingController();
+  Timer? _debounce;
+  bool _loading = false;
+  List<_SearchResult> _results = [];
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onChanged(String q) {
+    _debounce?.cancel();
+    if (q.trim().length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () => _search(q.trim()));
+  }
+
+  Future<void> _search(String q) async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    final like = '%${q.toLowerCase()}%';
+    final results = <_SearchResult>[];
+    try {
+      final [emp, veic, mot] = await Future.wait([
+        widget.supabase.from('empresas').select('id, nome, status').ilike('nome', like).limit(5),
+        widget.supabase.from('vehicles').select('id, plate, model, empresa_id').ilike('plate', like).limit(5),
+        widget.supabase.from('drivers').select('id, nome, cpf, empresa_id').ilike('nome', like).limit(5),
+      ]);
+      for (final e in (emp as List)) {
+        results.add(_SearchResult('empresa', (e['nome'] ?? '').toString(),
+            (e['status'] ?? '').toString(), Icons.business_rounded, const Color(0xFF3B82F6)));
+      }
+      for (final v in (veic as List)) {
+        final desc = '${v['plate'] ?? ''} · ${v['model'] ?? ''}'.trim();
+        results.add(_SearchResult('veiculo', desc, 'Veículo',
+            Icons.directions_car_rounded, const Color(0xFF22C55E)));
+      }
+      for (final m in (mot as List)) {
+        results.add(_SearchResult('motorista', (m['nome'] ?? '').toString(),
+            'Motorista', Icons.badge_rounded, const Color(0xFFEC4899)));
+      }
+    } catch (_) {}
+    if (mounted) setState(() { _results = results; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF0A1628),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFF1E293B))),
+      title: const Text('Pesquisa global',
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+      content: SizedBox(
+        width: 480, height: 360,
+        child: Column(children: [
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            onChanged: _onChanged,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Buscar empresa, veículo, motorista...',
+              hintStyle: const TextStyle(color: Color(0xFF334155), fontSize: 13),
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF475569), size: 18),
+              filled: true, fillColor: const Color(0xFF060C18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF1E293B))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF1E293B))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF3B82F6))),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(color: Color(0xFF3B82F6), strokeWidth: 2))
+          else if (_results.isEmpty && _ctrl.text.length >= 2)
+            const Padding(padding: EdgeInsets.all(20),
+                child: Text('Nenhum resultado encontrado.',
+                    style: TextStyle(color: Color(0xFF475569), fontSize: 13)))
+          else
+            Expanded(child: ListView.separated(
+              itemCount: _results.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (_, i) {
+                final r = _results[i];
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF060C18),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(
+                          color: r.color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Icon(r.icon, color: r.color, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(r.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text(r.subtitle, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                    ])),
+                  ]),
+                );
+              },
+            )),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar', style: TextStyle(color: Color(0xFF3B82F6)))),
+      ],
+    );
+  }
+}
+
+class _SearchResult {
+  final String type;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  const _SearchResult(this.type, this.title, this.subtitle, this.icon, this.color);
 }
