@@ -55,6 +55,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
 
   String? _empresaId;
   String? _settingsId;
+  bool    _isMaster      = false;
   bool    _loadingPage   = true;
   bool    _savingEmpresa = false;
   bool    _savingPerfil  = false;
@@ -91,12 +92,19 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   Future<void> _init() async {
     final auth = context.read<AppAuthProvider>();
     _empresaId = auth.effectiveEmpresaId ?? auth.empresaId;
+    _isMaster  = auth.isMaster;
 
-    // Preenche perfil pessoal do usuário logado
+    // Perfil pessoal — disponível para qualquer role
     _perfilNomeCtrl.text = auth.profile?.nome ?? '';
 
+    // Master não tem empresa — carrega só o perfil e libera a tela
+    if (_isMaster && _empresaId == null) {
+      if (mounted) setState(() => _loadingPage = false);
+      return;
+    }
+
     if (_empresaId == null) {
-      setState(() { _loadingPage = false; _error = 'Nenhuma empresa vinculada a esta conta.'; });
+      if (mounted) setState(() { _loadingPage = false; _error = 'Nenhuma empresa vinculada a esta conta.'; });
       return;
     }
 
@@ -133,7 +141,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
           _alertaGasto    = settings['alerta_gasto']    as bool? ?? true;
           _alertasPush    = settings['alertas_push']    as bool? ?? true;
           _apiIntegration = settings['api_integration'] as bool? ?? false;
-          // Complementa campos que podem estar em company_settings
           if (_telefoneCtrl.text.isEmpty) {
             _telefoneCtrl.text = settings['phone']?.toString() ?? '';
           }
@@ -151,15 +158,25 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   }
 
   Future<void> _carregarUsuarios() async {
-    if (_empresaId == null) return;
     setState(() => _loadingUsuarios = true);
     try {
-      final res = await _supabase
+      // Master vê todos; admin/gestor vê apenas sua empresa
+      dynamic query = _supabase
           .from('user_profiles')
-          .select()
-          .eq('empresa_id', _empresaId!)
+          .select('*, empresas(nome)')
           .order('created_at', ascending: false)
-          .limit(100);
+          .limit(200);
+
+      if (!_isMaster && _empresaId != null) {
+        query = _supabase
+            .from('user_profiles')
+            .select('*, empresas(nome)')
+            .eq('empresa_id', _empresaId!)
+            .order('created_at', ascending: false)
+            .limit(100);
+      }
+
+      final res = await query;
       if (mounted) {
         setState(() {
           _usuarios = (res as List)
@@ -326,7 +343,8 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         body: Center(child: CircularProgressIndicator(color: _blue)),
       );
     }
-    if (_error != null) {
+    // Apenas bloqueia com erro se não for master (master não tem empresa — é normal)
+    if (_error != null && !_isMaster) {
       return Scaffold(
         backgroundColor: _bg,
         appBar: _appBar(),
@@ -384,14 +402,59 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
 
   // ── Tab: Empresa ──────────────────────────────────────────────────────────
   Widget _buildEmpresa() {
+    // Master não pertence a uma empresa — mostra painel informativo
+    if (_isMaster) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _card(Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAB308).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.settings_rounded, color: Color(0xFFEAB308), size: 22),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Conta Master — FrotaCheck', style: TextStyle(color: _white, fontSize: 15, fontWeight: FontWeight.w700)),
+                  SizedBox(height: 6),
+                  Text(
+                    'Você é o administrador geral da plataforma. '
+                    'Esta conta não pertence a nenhuma empresa específica. '
+                    'Gerencie as empresas pelo Painel Master.',
+                    style: TextStyle(color: _sub, fontSize: 13, height: 1.5),
+                  ),
+                ]),
+              ),
+            ]),
+          )),
+          const SizedBox(height: 20),
+          _sectionTitle('Informações da Plataforma'),
+          const SizedBox(height: 12),
+          _card(Column(children: [
+            _infoRow('Tipo de conta', 'Master / Superadmin'),
+            _divider(),
+            _infoRow('Acesso', 'Todas as empresas'),
+            _divider(),
+            _infoRow('Painel', 'Dashboard Master'),
+          ])),
+        ]),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Dados da Empresa'),
         const SizedBox(height: 4),
-        Text(
+        const Text(
           'Estas informações ficam vinculadas exclusivamente à sua empresa.',
-          style: const TextStyle(color: _sub, fontSize: 12),
+          style: TextStyle(color: _sub, fontSize: 12),
         ),
         const SizedBox(height: 20),
         _card(Column(children: [
@@ -418,6 +481,15 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
     );
   }
 
+  Widget _infoRow(String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    child: Row(children: [
+      Text(label, style: const TextStyle(color: _sub, fontSize: 13)),
+      const Spacer(),
+      Text(value, style: const TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w600)),
+    ]),
+  );
+
   // ── Tab: Usuários ─────────────────────────────────────────────────────────
   Widget _buildUsuarios() {
     return Column(children: [
@@ -426,12 +498,18 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
         color: _surface,
         child: Row(children: [
-          const Expanded(
+          Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Usuários da Empresa',
-                  style: TextStyle(color: _white, fontSize: 14, fontWeight: FontWeight.w700)),
-              Text('Gerencie acessos, papéis e status dos membros.',
-                  style: TextStyle(color: _sub, fontSize: 11)),
+              Text(
+                _isMaster ? 'Todos os Usuários' : 'Usuários da Empresa',
+                style: const TextStyle(color: _white, fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                _isMaster
+                    ? 'Visão geral de todos os usuários da plataforma.'
+                    : 'Gerencie acessos, papéis e status dos membros.',
+                style: const TextStyle(color: _sub, fontSize: 11),
+              ),
             ]),
           ),
           TextButton(
@@ -460,11 +538,14 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   }
 
   Widget _usuarioCard(Map<String, dynamic> u) {
-    final nome   = u['nome']?.toString() ?? u['email']?.toString() ?? '—';
-    final email  = u['email']?.toString() ?? '';
-    final role   = u['role']?.toString() ?? 'MOTORISTA';
-    final status = u['status']?.toString() ?? 'ativo';
-    final isAtivo = status == 'ativo';
+    final nome      = u['nome']?.toString() ?? u['email']?.toString() ?? '—';
+    final email     = u['email']?.toString() ?? '';
+    final role      = u['role']?.toString() ?? 'MOTORISTA';
+    final status    = u['status']?.toString() ?? 'ativo';
+    final isAtivo   = status == 'ativo';
+    final empNome   = (u['empresas'] is Map)
+        ? (u['empresas'] as Map)['nome']?.toString() ?? ''
+        : '';
 
     Color roleColor;
     String roleLabel;
@@ -497,6 +578,8 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
             Text(nome, style: const TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w600)),
             if (email.isNotEmpty)
               Text(email, style: const TextStyle(color: _sub, fontSize: 11)),
+            if (_isMaster && empNome.isNotEmpty)
+              Text(empNome, style: const TextStyle(color: _blue, fontSize: 10)),
           ]),
         ),
         // Role badge
