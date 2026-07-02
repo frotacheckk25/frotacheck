@@ -34,7 +34,8 @@ class _MultasPageState extends State<MultasPage> {
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
-      var multaQ = supabase.from('multas').select('*');
+      var multaQ = supabase.from('multas').select(
+          'id, vehicle_id, veiculo_id, driver_id, motorista_id, status, valor, tipo, descricao, data, created_at, foto_url, empresa_id');
       var veicQ  = supabase.from('vehicles').select('id, plate, brand, model');
       var drivQ  = supabase.from('drivers').select('id, name');
       if (eid != null) {

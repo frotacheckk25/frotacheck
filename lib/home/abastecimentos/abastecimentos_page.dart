@@ -34,7 +34,8 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
-      var fuelingsQ = supabase.from('fuelings').select('*');
+      var fuelingsQ = supabase.from('fuelings').select(
+          'id, vehicle_id, driver_id, fuel_date, created_at, liters, total_value, odometer, empresa_id');
       if (auth.isMotorista && auth.driverId != null) {
         fuelingsQ = fuelingsQ.eq('driver_id', auth.driverId!);
       } else if (eid != null) {

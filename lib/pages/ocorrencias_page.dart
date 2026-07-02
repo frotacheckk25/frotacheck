@@ -69,7 +69,8 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
-      var ocorrQ = supabase.from('occurrences').select('*');
+      var ocorrQ = supabase.from('occurrences').select(
+          'id, status, priority, problem_type, problem, location, created_at, vehicle_id, driver_id, empresa_id');
       if (auth.isMotorista && auth.driverId != null) {
         ocorrQ = ocorrQ.eq('driver_id', auth.driverId!);
       } else if (eid != null) {
