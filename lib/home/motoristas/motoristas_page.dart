@@ -77,7 +77,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
     }
     final hoje = DateTime.now();
     final validadeLimite = DateTime(hoje.year, hoje.month, hoje.day);
-    if (cnhValidade!.isBefore(validadeLimite)) {
+    if (editingId == null && cnhValidade!.isBefore(validadeLimite)) {
       _snackErro('A data de validade da CNH não pode ser no passado');
       return;
     }
@@ -279,15 +279,28 @@ class _MotoristasPageState extends State<MotoristasPage> {
     final q = searchController.text.toLowerCase().trim();
     if (q.isEmpty) return motoristas;
     return motoristas.where((m) {
-      return '${m['name']} ${m['cnh_number']}'.toLowerCase().contains(q);
+      return [m['name'], m['cnh_number'], m['phone'], m['email']]
+          .whereType<String>()
+          .join(' ')
+          .toLowerCase()
+          .contains(q);
     }).toList();
   }
 
   int get _vencendoCount {
-    final limite = DateTime.now().add(const Duration(days: 30));
+    final now = DateTime.now();
+    final limite = now.add(const Duration(days: 30));
     return motoristas.where((m) {
       final dt = DateTime.tryParse(m['cnh_expiration']?.toString() ?? '');
-      return dt != null && dt.isBefore(limite);
+      return dt != null && !dt.isBefore(now) && dt.isBefore(limite);
+    }).length;
+  }
+
+  int get _vencidasCount {
+    final now = DateTime.now();
+    return motoristas.where((m) {
+      final dt = DateTime.tryParse(m['cnh_expiration']?.toString() ?? '');
+      return dt != null && dt.isBefore(now);
     }).length;
   }
 
@@ -430,7 +443,7 @@ class _MotoristasPageState extends State<MotoristasPage> {
         const SizedBox(width: 12),
         _statCard('CNH Vencendo', '$_vencendoCount', Icons.warning_amber, AppColors.warning),
         const SizedBox(width: 12),
-        _statCard('CNH Válidas', '${motoristas.length - _vencendoCount}', Icons.verified, AppColors.success),
+        _statCard('CNH Válidas', '${motoristas.length - _vencidasCount - _vencendoCount}', Icons.verified, AppColors.success),
       ],
     );
   }

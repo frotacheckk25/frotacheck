@@ -511,7 +511,11 @@ class _VeiculosPageState extends State<VeiculosPage> {
                       icon: Icons.speed,
                       hint: '0',
                       keyboardType: TextInputType.number,
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Informe o Km' : null,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Informe o Km';
+                        if (int.tryParse(v.trim()) == null) return 'Km inválido — use apenas números';
+                        return null;
+                      },
                     ),
                   ),
                 ],

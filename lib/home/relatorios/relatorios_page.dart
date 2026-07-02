@@ -163,7 +163,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
       double multasAbertas = 0;
       int qtdAbertas = 0;
       for (final m in multas) {
-        if ((m['status']?.toString() ?? 'aberta') == 'aberta') {
+        if ((m['status']?.toString() ?? 'aberta').toLowerCase() == 'aberta') {
           multasAbertas += _toDouble(m['valor']);
           qtdAbertas++;
         }

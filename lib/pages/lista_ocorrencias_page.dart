@@ -130,7 +130,13 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
   }
 
   Future<void> _avancarStatus(Map<String, dynamic> item) async {
-    final atual = item['status']?.toString() ?? 'Aberto';
+    final atualRaw = (item['status']?.toString() ?? 'Aberto').trim();
+    final atual = switch (atualRaw.toLowerCase()) {
+      'aberto' => 'Aberto',
+      'em andamento' || 'em_andamento' => 'Em andamento',
+      'resolvido' => 'Resolvido',
+      _ => 'Aberto',
+    };
     final proximo = switch (atual) {
       'Aberto' => 'Em andamento',
       'Em andamento' => 'Resolvido',

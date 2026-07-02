@@ -84,7 +84,8 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
         0.0, (sum, item) => sum + (item['total_value'] as num? ?? 0).toDouble());
 
   int get veiculosUnicos => filteredAbastecimentos
-      .map((item) => item['vehicles']?['plate'] ?? '')
+      .map((item) => item['vehicles']?['plate']?.toString() ?? '')
+      .where((p) => p.isNotEmpty)
       .toSet()
       .length;
 
@@ -214,7 +215,7 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
                                     MaterialPageRoute(
                                       builder: (_) => DetalheAbastecimentoPage(abastecimento: item),
                                     ),
-                                  ),
+                                  ).then((_) => carregarAbastecimentos()),
                                   child: Container(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     padding: const EdgeInsets.all(16),

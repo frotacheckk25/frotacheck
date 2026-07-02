@@ -65,7 +65,11 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
           oilQ  = oilQ.eq('vehicle_id', '');
           veicQ = veicQ.eq('id', '');
         }
-        if (driverId != null) ocorrQ = ocorrQ.eq('driver_id', driverId);
+        if (driverId != null) {
+          ocorrQ = ocorrQ.eq('driver_id', driverId);
+        } else {
+          ocorrQ = ocorrQ.eq('driver_id', ''); // força resultado vazio
+        }
       } else if (eid != null) {
         oilQ  = oilQ.eq('empresa_id', eid);
         ocorrQ = ocorrQ.eq('empresa_id', eid);
@@ -112,10 +116,10 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
         if (nextKm > 0 && atualKm >= nextKm - 2000) precisamTroca++;
       }
 
-      // Ocorrências não resolvidas
+      // Ocorrências abertas (apenas status 'Aberto', excluindo 'Em andamento' e 'Resolvido')
       final abertas = ocorr.where((o) {
         final s = (o['status'] ?? '').toString().toLowerCase().trim();
-        return s != 'resolvido';
+        return s == 'aberto';
       }).length;
 
       if (!mounted) return;
@@ -356,7 +360,7 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
                   MaterialPageRoute(
                     builder: (_) => const PlanoManutencaoPage(),
                   ),
-                );
+                ).then((_) => _carregarStats());
               },
               const Color(0xFF7C3AED),
             ),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -111,7 +112,9 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
   int _itensOk(Map<String, dynamic> r) {
     final itens = r['itens'];
     if (itens == null) return 0;
-    final map = Map<String, dynamic>.from(itens as Map);
+    final map = itens is Map
+        ? Map<String, dynamic>.from(itens)
+        : Map<String, dynamic>.from(json.decode(itens.toString()) as Map);
     return map.values.where((v) => v == true).length;
   }
 
