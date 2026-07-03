@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
@@ -61,7 +62,10 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   bool    _savingEmpresa = false;
   bool    _savingPerfil  = false;
   bool    _savingSenha   = false;
+  bool    _uploadingLogo = false;
   String? _error;
+  String? _logoUrl;
+  String? _myRole;
 
   // ── Usuários ───────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _usuarios  = [];
@@ -94,6 +98,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
     final auth = context.read<AppAuthProvider>();
     _empresaId = auth.effectiveEmpresaId ?? auth.empresaId;
     _isMaster  = auth.isMaster;
+    _myRole    = auth.role?.label;
 
     // Perfil pessoal — disponível para qualquer role
     _perfilNomeCtrl.text = auth.profile?.nome ?? '';
@@ -127,6 +132,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         _emailRelCtrl.text = empresa['report_email']?.toString() ?? '';
         _enderecoCtrl.text = empresa['endereco']?.toString()
             ?? empresa['address']?.toString()                     ?? '';
+        _logoUrl = empresa['logo_url']?.toString();
       }
 
       // 2. Configurações extras (tabela company_settings, filtrada por empresa_id)
@@ -196,64 +202,96 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
     if (_empresaId == null) return;
     setState(() => _savingEmpresa = true);
     try {
-      // Campos garantidos na tabela empresas
-      final empresaPayload = <String, dynamic>{
-        'nome'  : _nomeCtrl.text.trim(),
-        'cnpj'  : _cnpjCtrl.text.trim(),
-        'email' : _emailCtrl.text.trim(),
-      };
-      // Tenta incluir colunas opcionais (ignora se não existir)
-      final extraEmpresa = <String, dynamic>{
+      await _supabase.from('empresas').update({
+        'nome'        : _nomeCtrl.text.trim(),
+        'cnpj'        : _cnpjCtrl.text.trim(),
+        'email'       : _emailCtrl.text.trim(),
         'telefone'    : _telefoneCtrl.text.trim(),
         'report_email': _emailRelCtrl.text.trim(),
         'endereco'    : _enderecoCtrl.text.trim(),
-      };
-      try {
-        await _supabase
-            .from('empresas')
-            .update({...empresaPayload, ...extraEmpresa})
-            .eq('id', _empresaId!);
-      } catch (_) {
-        // Fallback: apenas campos básicos
-        await _supabase
-            .from('empresas')
-            .update(empresaPayload)
-            .eq('id', _empresaId!);
-      }
+      }).eq('id', _empresaId!);
 
       // Upsert configurações extras com empresa_id
-      try {
-        final sp = <String, dynamic>{
-          'empresa_id'    : _empresaId,
-          'phone'         : _telefoneCtrl.text.trim(),
-          'report_email'  : _emailRelCtrl.text.trim(),
-          'auditoria_ativa': _auditoriaAtiva,
-          'alerta_gasto'  : _alertaGasto,
-          'alertas_push'  : _alertasPush,
-          'api_integration': _apiIntegration,
-        };
-        if (_settingsId != null) {
-          await _supabase
-              .from('company_settings')
-              .update(sp)
-              .eq('id', _settingsId!);
-        } else {
-          final ins = await _supabase
-              .from('company_settings')
-              .insert(sp)
-              .select('id')
-              .maybeSingle();
-          if (ins != null && mounted) {
-            setState(() => _settingsId = ins['id']?.toString());
-          }
+      final sp = <String, dynamic>{
+        'empresa_id'    : _empresaId,
+        'phone'         : _telefoneCtrl.text.trim(),
+        'report_email'  : _emailRelCtrl.text.trim(),
+        'auditoria_ativa': _auditoriaAtiva,
+        'alerta_gasto'  : _alertaGasto,
+        'alertas_push'  : _alertasPush,
+        'api_integration': _apiIntegration,
+      };
+      if (_settingsId != null) {
+        await _supabase
+            .from('company_settings')
+            .update(sp)
+            .eq('id', _settingsId!);
+      } else {
+        final ins = await _supabase
+            .from('company_settings')
+            .insert(sp)
+            .select('id')
+            .maybeSingle();
+        if (ins != null && mounted) {
+          setState(() => _settingsId = ins['id']?.toString());
         }
-      } catch (_) {/* Tabela pode não ter empresa_id — ignora */}
+      }
 
       _snack('Dados da empresa salvos com sucesso!', ok: true);
     } catch (e) {
       _snack('Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => _savingEmpresa = false);
+    }
+  }
+
+  // ── Upload de logo da empresa ─────────────────────────────────────────────
+  Future<void> _uploadLogo() async {
+    if (_empresaId == null || _myRole != 'ADMIN_EMPRESA') return;
+    try {
+      final picker = ImagePicker();
+      final XFile? picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 90,
+      );
+      if (picked == null || !mounted) return;
+
+      setState(() => _uploadingLogo = true);
+
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.split('.').last.toLowerCase();
+      final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
+      final path = '$_empresaId.$ext';
+
+      await _supabase.storage.from('logos').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: mime, upsert: true),
+          );
+
+      final rawUrl = _supabase.storage.from('logos').getPublicUrl(path);
+      final url = '$rawUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      await _supabase
+          .from('empresas')
+          .update({'logo_url': rawUrl})
+          .eq('id', _empresaId!);
+
+      if (mounted) {
+        setState(() {
+          _logoUrl = url;
+          _uploadingLogo = false;
+        });
+        showSuccess(context, 'Logo da empresa atualizado!');
+      }
+    } catch (e) {
+      debugPrint('Logo upload: $e');
+      if (mounted) {
+        setState(() => _uploadingLogo = false);
+        showError(context, 'Erro ao enviar logo: $e');
+      }
     }
   }
 
@@ -750,13 +788,38 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         _card(Padding(
           padding: const EdgeInsets.all(16),
           child: Row(children: [
-            CircleAvatar(
-              radius: 32,
-              backgroundColor: roleColor.withOpacity(0.15),
-              child: Text(
-                nome.isNotEmpty ? nome[0].toUpperCase() : email.isNotEmpty ? email[0].toUpperCase() : '?',
-                style: TextStyle(color: roleColor, fontSize: 24, fontWeight: FontWeight.w700),
-              ),
+            GestureDetector(
+              onTap: _myRole == 'ADMIN_EMPRESA' ? _uploadLogo : null,
+              child: Stack(children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: roleColor.withOpacity(0.15),
+                  backgroundImage: (_logoUrl != null && _logoUrl!.isNotEmpty)
+                      ? NetworkImage(_logoUrl!)
+                      : null,
+                  child: (_logoUrl != null && _logoUrl!.isNotEmpty)
+                      ? null
+                      : (_uploadingLogo
+                          ? const SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: _blue),
+                            )
+                          : Text(
+                              nome.isNotEmpty ? nome[0].toUpperCase() : email.isNotEmpty ? email[0].toUpperCase() : '?',
+                              style: TextStyle(color: roleColor, fontSize: 24, fontWeight: FontWeight.w700),
+                            )),
+                ),
+                if (_myRole == 'ADMIN_EMPRESA')
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 20, height: 20,
+                      decoration: const BoxDecoration(color: _blue, shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt_rounded, color: _white, size: 12),
+                    ),
+                  ),
+              ]),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -774,6 +837,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
                   ),
                   child: Text(roleLabel, style: TextStyle(color: roleColor, fontSize: 11, fontWeight: FontWeight.w600)),
                 ),
+                if (_myRole == 'ADMIN_EMPRESA') ...[
+                  const SizedBox(height: 6),
+                  const Text('Toque na foto para trocar o logo da empresa',
+                      style: TextStyle(color: _muted, fontSize: 11)),
+                ],
               ]),
             ),
           ]),

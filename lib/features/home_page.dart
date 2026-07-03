@@ -608,7 +608,9 @@ class _HomePageState extends State<HomePage> {
         _safeSelectFiltered('multas', dateStart, dateEnd), // 4
         _safeSelect('pneus'), // 5
         _safeSelectFiltered('occurrences', dateStart, dateEnd), // 6
-        _safeSelectFiltered('ocorrencias', dateStart, dateEnd), // 7
+        // 'ocorrencias' (PT) nunca existiu como tabela — sempre 404.
+        // Mantido como Future vazio pra não precisar renumerar os índices abaixo.
+        Future.value(<Map<String, dynamic>>[]), // 7
         _safeSelect('documentos'), // 8
         _safeQueryDirect(
           _empresaId != null
@@ -641,12 +643,8 @@ class _HomePageState extends State<HomePage> {
               : supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
           'occurrences-alltime',
         ), // 11
-        _safeQueryDirect(
-          _empresaId != null
-              ? supabase.from('ocorrencias').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
-              : supabase.from('ocorrencias').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-          'ocorrencias-alltime',
-        ), // 12
+        // 'ocorrencias' (PT) nunca existiu como tabela — sempre 404.
+        Future.value(<Map<String, dynamic>>[]), // 12
         _safeQueryDirect(
           _empresaId != null
               ? supabase.from('manutencoes').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)

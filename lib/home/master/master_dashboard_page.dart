@@ -238,7 +238,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final onlineIds = online.map((p) => p['empresa_id']).whereType<String>().toSet();
 
       // ── Trends (this month vs last month) ──────────────────────────────────
-      int _cnt(List<Map<String,dynamic>> list, DateTime from, DateTime? to) {
+      int cnt(List<Map<String,dynamic>> list, DateTime from, DateTime? to) {
         final toTs = to ?? DateTime.now();
         return list.where((r) {
           final raw = r['created_at']?.toString() ?? r['fuel_date']?.toString() ?? '';
@@ -248,22 +248,22 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         }).length;
       }
 
-      final empThisM = _cnt(empresas, thisMonth, null);
-      final empLastM = _cnt(empresas, lastMonth, thisMonth);
-      final userThisM = _cnt(profiles, thisMonth, null);
-      final userLastM = _cnt(profiles, lastMonth, thisMonth);
-      final veicThisM = _cnt(veiculos, thisMonth, null);
-      final veicLastM = _cnt(veiculos, lastMonth, thisMonth);
-      final motThisM = _cnt(motoristas, thisMonth, null);
-      final motLastM = _cnt(motoristas, lastMonth, thisMonth);
-      final abastThisM = _cnt(fuelings, thisMonth, null);
-      final abastLastM = _cnt(fuelings, lastMonth, thisMonth);
-      final checkThisM = _cnt(checklists, thisMonth, null);
-      final checkLastM = _cnt(checklists, lastMonth, thisMonth);
-      final ocorrThisM = _cnt(ocorrencias, thisMonth, null);
-      final ocorrLastM = _cnt(ocorrencias, lastMonth, thisMonth);
+      final empThisM = cnt(empresas, thisMonth, null);
+      final empLastM = cnt(empresas, lastMonth, thisMonth);
+      final userThisM = cnt(profiles, thisMonth, null);
+      final userLastM = cnt(profiles, lastMonth, thisMonth);
+      final veicThisM = cnt(veiculos, thisMonth, null);
+      final veicLastM = cnt(veiculos, lastMonth, thisMonth);
+      final motThisM = cnt(motoristas, thisMonth, null);
+      final motLastM = cnt(motoristas, lastMonth, thisMonth);
+      final abastThisM = cnt(fuelings, thisMonth, null);
+      final abastLastM = cnt(fuelings, lastMonth, thisMonth);
+      final checkThisM = cnt(checklists, thisMonth, null);
+      final checkLastM = cnt(checklists, lastMonth, thisMonth);
+      final ocorrThisM = cnt(ocorrencias, thisMonth, null);
+      final ocorrLastM = cnt(ocorrencias, lastMonth, thisMonth);
 
-      double _trend(int cur, int prv) =>
+      double trend(int cur, int prv) =>
           prv > 0 ? (cur - prv) / prv * 100 : (cur > 0 ? 100 : 0);
 
       // ── Receita ────────────────────────────────────────────────────────────
@@ -338,8 +338,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       int stAtivo = 0, stSusp = 0, stCanc = 0, stBloq = 0;
       for (final e in empresas) {
         final s = (e['status'] ?? '').toString();
-        if (s == 'ativo') stAtivo++;
-        else if (s == 'suspenso') stSusp++;
+        if (s == 'ativo') {
+          stAtivo++;
+        } else if (s == 'suspenso') stSusp++;
         else if (s == 'cancelado') stCanc++;
         else if (s == 'bloqueado') stBloq++;
       }
@@ -385,7 +386,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
       // ── Atividade recente ─────────────────────────────────────────────────
       final activities = <_ActivityItem>[];
-      String _fmtHora(String? raw) {
+      String fmtHora(String? raw) {
         if (raw == null) return '--:--';
         final dt = DateTime.tryParse(raw);
         if (dt == null) return '--:--';
@@ -394,7 +395,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       }
       // Fuelings recentes
       for (final f in fuelings.take(4)) {
-        final hora = _fmtHora(f['created_at']?.toString());
+        final hora = fmtHora(f['created_at']?.toString());
         final empNome = empresas
             .firstWhere((e) => e['id']?.toString() == f['empresa_id']?.toString(),
                 orElse: () => {'nome': 'Empresa'})['nome'] ?? 'Empresa';
@@ -405,7 +406,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       }
       // Checklists recentes
       for (final c in checklists.take(3)) {
-        final hora = _fmtHora(c['created_at']?.toString());
+        final hora = fmtHora(c['created_at']?.toString());
         final tipo = (c['tipo'] ?? 'saida').toString();
         activities.add(_ActivityItem(
           hora, Icons.build_rounded, const Color(0xFF22C55E),
@@ -414,7 +415,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       }
       // Ocorrências recentes
       for (final o in ocorrencias.take(3)) {
-        final hora = _fmtHora(o['created_at']?.toString());
+        final hora = fmtHora(o['created_at']?.toString());
         activities.add(_ActivityItem(
           hora, Icons.report_problem_rounded, const Color(0xFFEF4444),
           'Ocorrência ${(o['status'] ?? 'aberta').toString().toLowerCase()} registrada',
@@ -424,7 +425,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final veicRecentes = [...veiculos]..sort((a, b) =>
           (b['created_at'] ?? '').toString().compareTo((a['created_at'] ?? '').toString()));
       for (final v in veicRecentes.take(2)) {
-        final hora = _fmtHora(v['created_at']?.toString());
+        final hora = fmtHora(v['created_at']?.toString());
         final empNome = empresas
             .firstWhere((e) => e['id']?.toString() == v['empresa_id']?.toString(),
                 orElse: () => {'nome': 'Empresa'})['nome'] ?? 'Empresa';
@@ -437,7 +438,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       activities.sort((a, b) => b.hora.compareTo(a.hora));
 
       // ── Sparklines (baseadas em dados reais agrupados) ────────────────────
-      List<double> _weeklyCount(List<Map<String,dynamic>> list, String dateField) {
+      List<double> weeklyCount(List<Map<String,dynamic>> list, String dateField) {
         final now2 = DateTime.now();
         return List.generate(8, (i) {
           final from = now2.subtract(Duration(days: (7 - i) * 7 + 7));
@@ -449,7 +450,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           }).length.toDouble();
         });
       }
-      List<double> _weeklySum(List<Map<String,dynamic>> list, String valField, String dateField) {
+      List<double> weeklySum(List<Map<String,dynamic>> list, String valField, String dateField) {
         final now2 = DateTime.now();
         return List.generate(8, (i) {
           final from = now2.subtract(Duration(days: (7 - i) * 7 + 7));
@@ -466,18 +467,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         });
       }
 
-      final sparkEmp = _weeklyCount(empresas, 'created_at');
-      final sparkUser = _weeklyCount(profiles, 'created_at');
-      final sparkVeic = _weeklyCount(veiculos, 'created_at');
-      final sparkMot = _weeklyCount(motoristas, 'created_at');
-      final sparkAb = _weeklyCount(fuelings, 'fuel_date');
-      final sparkManutWeekly = _weeklyCount(oilChanges, 'created_at');
-      final sparkOc = _weeklyCount(ocorrencias, 'created_at');
-      final sparkRec = _weeklySum(fuelings, 'total_value', 'fuel_date');
+      final sparkEmp = weeklyCount(empresas, 'created_at');
+      final sparkUser = weeklyCount(profiles, 'created_at');
+      final sparkVeic = weeklyCount(veiculos, 'created_at');
+      final sparkMot = weeklyCount(motoristas, 'created_at');
+      final sparkAb = weeklyCount(fuelings, 'fuel_date');
+      final sparkManutWeekly = weeklyCount(oilChanges, 'created_at');
+      final sparkOc = weeklyCount(ocorrencias, 'created_at');
+      final sparkRec = weeklySum(fuelings, 'total_value', 'fuel_date');
       // Online e novas: use total count as flat sparkline with slight variation
       double total = _totalEmpresas.toDouble();
       final sparkOnl = List.generate(8, (i) => math.max(0.0, total * 0.8 + i * total * 0.03));
-      final sparkNov = _weeklyCount(empresas, 'created_at');
+      final sparkNov = weeklyCount(empresas, 'created_at');
 
       // ── Novas empresas este mês ────────────────────────────────────────────
       final novasEmp = empresas.where((e) {
@@ -501,14 +502,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _receitaMes = recMes;
         _novasEmpresas = novasEmp;
 
-        _tendEmpresas = _trend(empThisM, empLastM);
-        _tendUsuarios = _trend(userThisM, userLastM);
-        _tendVeiculos = _trend(veicThisM, veicLastM);
-        _tendMotoristas = _trend(motThisM, motLastM);
-        _tendAbast = _trend(abastThisM, abastLastM);
-        _tendReceita = _trend(recThisM.toInt(), recLastM.toInt());
-        _tendChecks = _trend(checkThisM, checkLastM);
-        _tendOcorr = _trend(ocorrThisM, ocorrLastM);
+        _tendEmpresas = trend(empThisM, empLastM);
+        _tendUsuarios = trend(userThisM, userLastM);
+        _tendVeiculos = trend(veicThisM, veicLastM);
+        _tendMotoristas = trend(motThisM, motLastM);
+        _tendAbast = trend(abastThisM, abastLastM);
+        _tendReceita = trend(recThisM.toInt(), recLastM.toInt());
+        _tendChecks = trend(checkThisM, checkLastM);
+        _tendOcorr = trend(ocorrThisM, ocorrLastM);
 
         _veiculosOffline = math.max(0, veicOffline);
         _manutencoesVencidas = manutVencidas;
@@ -927,7 +928,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: kpis.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (_, i) => _kpiCard(kpis[i]),
       ),
     );
@@ -2292,7 +2293,7 @@ class _SparklinePainter extends CustomPainter {
     final minV = points.reduce(math.min);
     final range = maxV - minV;
 
-    double _y(double v) => range > 0
+    double y0(double v) => range > 0
         ? size.height - (v - minV) / range * (size.height - 4) - 2
         : size.height / 2;
 
@@ -2306,8 +2307,12 @@ class _SparklinePainter extends CustomPainter {
     final path = Path();
     for (int i = 0; i < points.length; i++) {
       final x = i * size.width / (points.length - 1);
-      final y = _y(points[i]);
-      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      final y = y0(points[i]);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
     }
     canvas.drawPath(path, linePaint);
 
@@ -2444,7 +2449,7 @@ class _SearchDialogState extends State<_SearchDialog> {
           else
             Expanded(child: ListView.separated(
               itemCount: _results.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (_, i) {
                 final r = _results[i];
                 return Container(
