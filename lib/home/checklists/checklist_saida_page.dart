@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class ChecklistSaidaPage extends StatefulWidget {
   final String veiculoId;
@@ -73,10 +74,7 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
         setState(() => fotosCapturadas.add({'bytes': bytes, 'label': label}));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao capturar foto: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao capturar foto: $e');
     }
   }
 
@@ -101,12 +99,8 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
 
   Future<void> _salvarChecklist() async {
     if (fotosCapturadas.length < _totalFotos) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Faltam ${_totalFotos - fotosCapturadas.length} foto(s) obrigatória(s)'),
-        ),
-      );
+      showError(context,
+          'Faltam ${_totalFotos - fotosCapturadas.length} foto(s) obrigatória(s)');
       return;
     }
 
@@ -125,14 +119,8 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
         final url = await _uploadComRetry(bytes, fileName);
         if (url == null) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    'Falha ao enviar foto "${fotosCapturadas[i]['label']}". Tente novamente.'),
-                backgroundColor: AppColors.danger,
-                duration: const Duration(seconds: 5),
-              ),
-            );
+            showError(context,
+                'Falha ao enviar foto "${fotosCapturadas[i]['label']}". Tente novamente.');
             setState(() => isLoading = false);
           }
           return;
@@ -151,18 +139,10 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
       }));
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Checklist de saída registrado!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      showSuccess(context, 'Checklist de saída registrado!');
       Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }

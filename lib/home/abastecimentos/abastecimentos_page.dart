@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class AbastecimentosPage extends StatefulWidget {
   const AbastecimentosPage({super.key});
@@ -132,13 +133,9 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
     try {
       await supabase.from('fuelings').delete().eq('id', id);
       if (mounted) setState(() => fuelings.removeWhere((x) => x['id']?.toString() == id));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Abastecimento excluído'), backgroundColor: AppColors.success),
-        );
-      }
+      if (mounted) showSuccess(context, 'Abastecimento excluído');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -523,11 +520,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
       await supabase.from('fuelings').insert(injetar(payload));
       widget.onSaved();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: $e')),
-        );
-      }
+      if (mounted) showError(context, 'Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
