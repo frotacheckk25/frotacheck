@@ -145,7 +145,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       context: context,
       initialDate: dataTroca ?? DateTime.now(),
       firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
+      lastDate: DateTime.now(),
       helpText: 'Data da troca',
     );
     if (d != null) setState(() => dataTroca = d);
@@ -527,7 +527,15 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
                 onChanged: (_) => setState(() {}),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Informe o KM atual';
-                  if (int.tryParse(v.trim()) == null) return 'Somente números';
+                  final parsed = int.tryParse(v.trim());
+                  if (parsed == null) return 'Somente números';
+                  final atual = veiculos.firstWhere(
+                    (veic) => veic['id']?.toString() == selectedVehicleId,
+                    orElse: () => {},
+                  )['odometer'] as num?;
+                  if (atual != null && parsed < atual) {
+                    return 'Menor que o último odômetro registrado ($atual km)';
+                  }
                   return null;
                 },
               ),

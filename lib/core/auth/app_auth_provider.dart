@@ -24,6 +24,7 @@ class AppAuthProvider extends ChangeNotifier {
   bool get isAuthenticated   => _profile != null && _profile!.isActive;
   bool get isPending         => _profile?.isPending ?? false;
   bool get isBlocked         => _profile?.isBlocked ?? false;
+  bool get isInactive        => _profile?.isInactive ?? false;
 
   String? get empresaId      => _profile?.empresaId;
   String? get empresaNome    => _profile?.empresaNome;
@@ -161,6 +162,10 @@ class AppAuthProvider extends ChangeNotifier {
   Future<void> reload() => _loadProfile();
 
   Future<void> signOut() async {
+    // Invalida qualquer _loadProfile() em voo — sem isso, um carregamento
+    // de perfil disparado antes do logout (ex: tokenRefreshed concorrente)
+    // pode concluir depois e restaurar o estado autenticado após signOut().
+    _loadGen++;
     // Limpa impersonation antes de sair para não vazar estado entre sessões
     _impersonatedEmpresaId = null;
     _impersonatedEmpresaNome = null;

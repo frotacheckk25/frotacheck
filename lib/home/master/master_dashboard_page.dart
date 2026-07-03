@@ -2045,13 +2045,45 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   // 1. Verifica se o usuário com esse e-mail existe
                   final userRes = await _supabase
                       .from('user_profiles')
-                      .select('user_id, nome, role')
+                      .select('user_id, nome, role, empresa_id, empresas(nome)')
                       .eq('email', email)
                       .maybeSingle();
 
                   if (userRes == null) {
                     setS(() { saving = false; error = 'Nenhuma conta encontrada com o e-mail "$email". Peça ao administrador para criar a conta no app primeiro.'; });
                     return;
+                  }
+
+                  // Se o usuário já pertence a outra empresa, confirma antes de mover
+                  final empresaAtualId = userRes['empresa_id']?.toString();
+                  if (empresaAtualId != null) {
+                    final empresaAtualNome = (userRes['empresas'] is Map)
+                        ? (userRes['empresas'] as Map)['nome']?.toString() ?? 'outra empresa'
+                        : 'outra empresa';
+                    setS(() => saving = false);
+                    if (!ctx.mounted) return;
+                    final confirmarMover = await showDialog<bool>(
+                      context: ctx,
+                      builder: (ctx2) => AlertDialog(
+                        backgroundColor: const Color(0xFF0A1628),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFF1E293B))),
+                        title: const Text('Usuário já vinculado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                        content: Text(
+                          'O e-mail "$email" já está vinculado à empresa "$empresaAtualNome" (papel: ${userRes['role']}). Mover para a nova empresa "$nome" como ADMIN_EMPRESA?',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx2, false), child: const Text('Cancelar', style: TextStyle(color: Color(0xFF64748B)))),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                            onPressed: () => Navigator.pop(ctx2, true),
+                            child: const Text('Mover mesmo assim', style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmarMover != true) return;
+                    setS(() => saving = true);
                   }
 
                   // 2. Cria a empresa

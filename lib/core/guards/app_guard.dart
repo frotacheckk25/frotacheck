@@ -22,6 +22,7 @@ class AppGuard extends StatelessWidget {
     if (auth.loading)     return const _SplashScreen();
     if (auth.isBlocked)   return const _BlockedScreen();
     if (auth.isPending)   return const _PendingScreen();
+    if (auth.isInactive)  return const _InactiveScreen();
     if (!auth.isAuthenticated) return unauthenticated;
 
     // Key garante que toda a subárvore é recriada do zero quando
@@ -101,6 +102,53 @@ class _PendingScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              TextButton(
+                onPressed: auth.signOut,
+                child: const Text(
+                  'Sair',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InactiveScreen extends StatelessWidget {
+  const _InactiveScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.read<AppAuthProvider>();
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.pause_circle_outline,
+                  color: AppColors.warning, size: 64),
+              const SizedBox(height: 24),
+              const Text(
+                'Conta inativa',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Sua conta está marcada como inativa.\nEntre em contato com o administrador da sua empresa.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
               TextButton(
                 onPressed: auth.signOut,
                 child: const Text(

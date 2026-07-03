@@ -325,7 +325,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   Future<void> _alterarSenha() async {
     final nova = _novaSenhaCtrl.text;
     final confirmar = _confirmarCtrl.text;
-    if (nova.length < 6) { _snack('Senha deve ter pelo menos 6 caracteres'); return; }
+    if (nova.length < 8) { _snack('Senha deve ter pelo menos 8 caracteres'); return; }
+    if (!RegExp(r'[A-Za-z]').hasMatch(nova) || !RegExp(r'[0-9]').hasMatch(nova)) {
+      _snack('Senha deve ter letras e números');
+      return;
+    }
     if (nova != confirmar) { _snack('As senhas não coincidem'); return; }
     setState(() => _savingSenha = true);
     try {

@@ -142,8 +142,12 @@ class _RegisterPageState extends State<RegisterPage> {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Informe a senha';
                               }
-                              if (value.length < 6) {
-                                return 'A senha deve ter pelo menos 6 caracteres';
+                              if (value.length < 8) {
+                                return 'A senha deve ter pelo menos 8 caracteres';
+                              }
+                              if (!RegExp(r'[A-Za-z]').hasMatch(value) ||
+                                  !RegExp(r'[0-9]').hasMatch(value)) {
+                                return 'A senha deve ter letras e números';
                               }
                               return null;
                             },

@@ -43,6 +43,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
   List<Map<String, dynamic>> topMotoristas = [];
 
   bool carregando = true;
+  bool visaoAgregada = false;
 
   @override
   void initState() {
@@ -84,6 +85,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
+      visaoAgregada = eid == null && auth.isMaster;
       var fuelQ = supabase
           .from('fuelings')
           .select('liters, total_value, fuel_date, vehicles(plate), drivers(name)');
@@ -249,6 +251,21 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         ),
         build: (ctx) => [
           pw.SizedBox(height: 18),
+
+          if (visaoAgregada)
+            pw.Container(
+              margin: const pw.EdgeInsets.only(bottom: 12),
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.amber50,
+                border: pw.Border.all(color: PdfColors.amber700),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Text(
+                'VISÃO AGREGADA MASTER — dados de TODAS as empresas cadastradas na plataforma, não de uma empresa específica.',
+                style: pw.TextStyle(color: PdfColors.amber900, fontSize: 10, fontWeight: pw.FontWeight.bold),
+              ),
+            ),
 
           // ── KPIs Combustível ────────────────────────────────────────────────
           pw.Container(
@@ -416,6 +433,26 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  if (visaoAgregada)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.warning.withOpacity(0.4)),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.info_outline, color: AppColors.warning, size: 18),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Visão agregada Master: estes dados somam TODAS as empresas da plataforma, não uma empresa específica.',
+                            style: TextStyle(color: AppColors.warning, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ]),
+                    ),
                   // ── Header ──────────────────────────────────────────────────
                   Container(
                     padding: const EdgeInsets.all(22),

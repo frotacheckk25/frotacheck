@@ -587,7 +587,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
   Future<void> _carregarVeiculos() async {
     try {
       final auth = context.read<AppAuthProvider>();
-      var q = supabase.from('vehicles').select('id, plate, brand, model');
+      var q = supabase.from('vehicles').select('id, plate, brand, model, odometer');
       if (auth.isMotorista && auth.driverId != null) {
         q = q.eq('driver_id', auth.driverId!);
       } else if (auth.effectiveEmpresaId != null) {
@@ -786,6 +786,13 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                   if (v == null || v.trim().isEmpty) return null;
                   final km = int.tryParse(v.trim());
                   if (km == null || km < 0) return 'Informe um KM válido (não negativo)';
+                  final atual = veiculos.firstWhere(
+                    (veic) => veic['id']?.toString() == veiculoSelecionado,
+                    orElse: () => {},
+                  )['odometer'] as num?;
+                  if (atual != null && km > atual) {
+                    return 'Maior que o odômetro atual do veículo ($atual km)';
+                  }
                   return null;
                 },
               ),

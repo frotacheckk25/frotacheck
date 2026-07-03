@@ -43,7 +43,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         fuelingsQ = fuelingsQ.eq('empresa_id', eid);
       }
 
-      var veicQ = supabase.from('vehicles').select('id, plate, model');
+      var veicQ = supabase.from('vehicles').select('id, plate, model, odometer');
       var drivQ = supabase.from('drivers').select('id, name');
       if (auth.isMotorista && auth.driverId != null) {
         // Motorista só vê o veículo atribuído a ele e somente a si mesmo
@@ -649,6 +649,13 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                    final parsed = int.tryParse(v);
                    if (parsed == null) return 'Valor inválido';
                    if (parsed < 0) return 'Odômetro não pode ser negativo';
+                   final atual = widget.vehicles.firstWhere(
+                     (v) => v['id']?.toString() == selectedVehicle,
+                     orElse: () => {},
+                   )['odometer'] as num?;
+                   if (atual != null && parsed < atual) {
+                     return 'Menor que o último odômetro registrado ($atual km)';
+                   }
                    return null;
                  },
                ),

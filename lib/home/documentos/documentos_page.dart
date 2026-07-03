@@ -1472,8 +1472,8 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
       text: doc['descricao']?.toString() ?? '',
     );
     DateTime? vencimento = _parseDate(doc['data_vencimento']);
-    String tipo = doc['tipo']?.toString() ?? 'CNH';
-    final tipos = ['CNH', 'CRLV', 'Seguro', 'Licença', 'Outros'];
+    String tipo = doc['tipo']?.toString() ?? 'CNH - Frente';
+    final tipos = _NovoDocumentoFormState.tipos;
 
     showModalBottomSheet(
       context: context,

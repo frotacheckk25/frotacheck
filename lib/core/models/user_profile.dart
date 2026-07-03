@@ -40,9 +40,10 @@ class UserProfile {
   bool hasRole(AppRole r) => role == r;
   bool hasAnyRole(List<AppRole> roles) => roles.contains(role);
 
-  bool get isActive  => status == 'ativo';
-  bool get isBlocked => status == 'bloqueado';
-  bool get isPending => status == 'pendente';
+  bool get isActive   => status == 'ativo';
+  bool get isBlocked  => status == 'bloqueado';
+  bool get isPending  => status == 'pendente';
+  bool get isInactive => status == 'inativo';
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
     final permMap = <String, bool>{};

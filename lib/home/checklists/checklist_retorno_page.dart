@@ -116,6 +116,22 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
       return;
     }
 
+    try {
+      final veiculo = await supabase
+          .from('vehicles')
+          .select('odometer')
+          .eq('id', widget.veiculoId)
+          .maybeSingle();
+      final atual = veiculo?['odometer'] as num?;
+      if (atual != null && kmFinal < atual) {
+        if (mounted) {
+          showError(context, 'KM final menor que o último registrado ($atual km)');
+        }
+        return;
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
     if (fotosCapturadas.length < _totalFotos) {
       showError(context,
           'Faltam ${_totalFotos - fotosCapturadas.length} foto(s) obrigatória(s)');
