@@ -1,6 +1,44 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
+/// Traduz erros técnicos (PostgrestException, AuthException, SocketException, etc.)
+/// em mensagens curtas e compreensíveis para o usuário final, evitando vazar
+/// detalhes de schema/SQL/stack em snackbars.
+String friendlyError(Object e, {String fallback = 'Não foi possível concluir a operação. Tente novamente.'}) {
+  final raw = e.toString().toLowerCase();
+  if (raw.contains('violates row-level security') || raw.contains('rls') || raw.contains('permission denied')) {
+    return 'Você não tem permissão para realizar esta ação.';
+  }
+  if (raw.contains('duplicate key') || raw.contains('23505') || raw.contains('already exists')) {
+    return 'Este registro já existe.';
+  }
+  if (raw.contains('foreign key') || raw.contains('23503') || raw.contains('violates foreign key constraint')) {
+    return 'Não é possível concluir: este registro está vinculado a outro dado do sistema.';
+  }
+  if (raw.contains('violates not-null constraint') || raw.contains('23502')) {
+    return 'Preencha todos os campos obrigatórios.';
+  }
+  if (raw.contains('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (raw.contains('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (raw.contains('too many requests') || raw.contains('rate limit')) return 'Muitas tentativas. Aguarde alguns minutos.';
+  if (raw.contains('user not found')) return 'Usuário não encontrado.';
+  if (raw.contains('jwt') || raw.contains('session') || raw.contains('not authenticated')) {
+    return 'Sua sessão expirou. Faça login novamente.';
+  }
+  if (raw.contains('network') || raw.contains('socketexception') || raw.contains('failed host lookup') || raw.contains('connection')) {
+    return 'Sem conexão com o servidor. Verifique sua internet.';
+  }
+  if (raw.contains('timeout')) return 'A operação demorou demais. Tente novamente.';
+  if (raw.contains('storage') && raw.contains('not found')) return 'Arquivo não encontrado.';
+  return fallback;
+}
+
+/// Atalho: mostra um snackbar de erro já traduzido a partir de uma exceção crua.
+void showErrorFrom(BuildContext context, Object e, {String? prefix}) {
+  final msg = friendlyError(e);
+  showError(context, prefix != null ? '$prefix $msg' : msg);
+}
+
 void showSuccess(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
     ..clearSnackBars()

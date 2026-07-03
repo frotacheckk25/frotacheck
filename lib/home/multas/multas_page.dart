@@ -82,7 +82,7 @@ class _MultasPageState extends State<MultasPage> {
       debugPrint('Erro ao carregar multas: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      showError(context, 'Erro ao carregar: $e');
+      showError(context, friendlyError(e));
     }
   }
 
@@ -719,7 +719,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => carregandoDados = false);
-      showError(context, 'Erro ao carregar dados: $e');
+      showError(context, friendlyError(e));
     }
   }
 
@@ -766,7 +766,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         if (mounted) setState(() => fotoBytes = bytes);
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao selecionar foto: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -810,7 +810,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
       if (mounted) showSuccess(context, 'Multa registrada com sucesso!');
       widget.onSaved();
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao salvar: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -1335,7 +1335,7 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
         if (novoStatus == 'paga') Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => salvando = false);
     }
@@ -1376,7 +1376,7 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
       widget.onAtualizada();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 

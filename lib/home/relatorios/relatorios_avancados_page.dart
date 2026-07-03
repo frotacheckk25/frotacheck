@@ -167,7 +167,7 @@ class _RelatoriosAvancadosPageState
     } catch (e) {
       debugPrint('Erro relatórios avançados: $e');
       if (mounted) {
-        showError(context, 'Erro ao carregar: $e');
+        showError(context, friendlyError(e));
         setState(() => isLoading = false);
       }
     }

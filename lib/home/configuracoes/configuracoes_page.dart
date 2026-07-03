@@ -244,7 +244,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
 
       _snack('Dados da empresa salvos com sucesso!', ok: true);
     } catch (e) {
-      _snack('Erro ao salvar: $e');
+      _snack(friendlyError(e));
     } finally {
       if (mounted) setState(() => _savingEmpresa = false);
     }
@@ -295,7 +295,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       debugPrint('Logo upload: $e');
       if (mounted) {
         setState(() => _uploadingLogo = false);
-        showError(context, 'Erro ao enviar logo: $e');
+        showError(context, friendlyError(e));
       }
     }
   }
@@ -315,7 +315,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       await auth.reload();
       _snack('Perfil atualizado!', ok: true);
     } catch (e) {
-      _snack('Erro ao salvar perfil: $e');
+      _snack(friendlyError(e));
     } finally {
       if (mounted) setState(() => _savingPerfil = false);
     }
@@ -339,7 +339,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       _confirmarCtrl.clear();
       _snack('Senha alterada com sucesso!', ok: true);
     } catch (e) {
-      _snack('Erro ao alterar senha: $e');
+      _snack(friendlyError(e));
     } finally {
       if (mounted) setState(() => _savingSenha = false);
     }
@@ -381,7 +381,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       await _carregarUsuarios();
       _snack('Papel atualizado!', ok: true);
     } catch (e) {
-      _snack('Erro: $e');
+      _snack(friendlyError(e));
     }
   }
 
@@ -397,7 +397,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
           .eq('user_id', userId);
       await _carregarUsuarios();
     } catch (e) {
-      _snack('Erro: $e');
+      _snack(friendlyError(e));
     }
   }
 

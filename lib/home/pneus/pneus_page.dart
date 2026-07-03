@@ -81,7 +81,7 @@ class _PneusPageState extends State<PneusPage> {
       debugPrint('Erro ao carregar pneus: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      if (mounted) showError(context, 'Erro ao carregar: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -112,7 +112,7 @@ class _PneusPageState extends State<PneusPage> {
       if (mounted) setState(() => pneus.removeWhere((x) => x['id']?.toString() == id));
       if (mounted) showSuccess(context, 'Pneu excluído');
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -156,7 +156,7 @@ class _PneusPageState extends State<PneusPage> {
                           showSuccess(context, 'Status atualizado: ${_statusLabel(s)}');
                         }
                       } catch (e) {
-                        if (mounted) showError(context, 'Erro: $e');
+                        if (mounted) showError(context, friendlyError(e));
                       }
                     },
                     borderRadius: BorderRadius.circular(10),
@@ -605,7 +605,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => carregandoVeiculos = false);
-      showError(context, 'Erro ao carregar veículos: $e');
+      showError(context, friendlyError(e));
     }
   }
 
@@ -657,7 +657,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
       if (mounted) showSuccess(context, 'Pneu cadastrado com sucesso!');
       widget.onSaved();
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao salvar: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }

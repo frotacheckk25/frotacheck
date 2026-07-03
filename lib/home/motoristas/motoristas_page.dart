@@ -6,6 +6,7 @@ import 'package:frotacheck/core/enums/app_permission.dart';
 import 'package:frotacheck/core/guards/permission_guard.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
+import 'package:frotacheck/core/utils/driver_account_link.dart';
 
 class MotoristasPage extends StatelessWidget {
   const MotoristasPage({super.key});
@@ -97,12 +98,15 @@ class _MotoristasPageState extends State<_MotoristasView> {
       return;
     }
 
-    // Validar unicidade de CNH antes de salvar
+    // Validar unicidade de CNH antes de salvar (checagem de UX; a garantia real
+    // é a constraint UNIQUE(empresa_id, cnh_number) no banco — ver catch do insert/update)
     final cnhNum = cnhController.text.trim();
     if (cnhNum.isNotEmpty) {
       try {
-        final existingCnh = await supabase.from('drivers')
-            .select('id').eq('cnh_number', cnhNum);
+        final eidCheck = context.read<AppAuthProvider>().effectiveEmpresaId;
+        var qCnh = supabase.from('drivers').select('id').eq('cnh_number', cnhNum);
+        if (eidCheck != null) qCnh = qCnh.eq('empresa_id', eidCheck);
+        final existingCnh = await qCnh;
         if (!mounted) return;
         final others = (existingCnh as List)
             .where((m) => m['id']?.toString() != editingId)
@@ -178,12 +182,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
                 .maybeSingle();
             if (userProfile != null) {
               final uId = userProfile['user_id'].toString();
-              await Future.wait([
-                supabase.from('user_profiles')
-                    .update({'driver_id': driverId}).eq('user_id', uId),
-                supabase.from('drivers')
-                    .update({'user_id': uId}).eq('id', driverId),
-              ]);
+              await linkUserToDriver(supabase, userId: uId, driverId: driverId);
               _snackSucesso('Motorista cadastrado e vinculado à conta $emailConta!');
             } else {
               _snackSucesso('Motorista cadastrado! Conta "$emailConta" não encontrada ainda — vínculo pendente.');
@@ -214,12 +213,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
                 .maybeSingle();
             if (userProfile != null) {
               final uId = userProfile['user_id'].toString();
-              await Future.wait([
-                supabase.from('user_profiles')
-                    .update({'driver_id': editingId}).eq('user_id', uId),
-                supabase.from('drivers')
-                    .update({'user_id': uId}).eq('id', editingId!),
-              ]);
+              await linkUserToDriver(supabase, userId: uId, driverId: editingId!);
             }
           } catch (_) {}
         }
@@ -228,7 +222,11 @@ class _MotoristasPageState extends State<_MotoristasView> {
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
-      _snackErro('Erro ao salvar: $e');
+      if (e is PostgrestException && e.code == '23505') {
+        _snackErro('Número de CNH já cadastrado para outro motorista');
+      } else {
+        _snackErro(friendlyError(e));
+      }
       debugPrint('ERRO SALVAR MOTORISTA: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
@@ -266,7 +264,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
       _snackSucesso('$nome excluído');
     } catch (e) {
       if (!mounted) return;
-      _snackErro('Erro ao excluir: $e');
+      _snackErro(friendlyError(e));
     }
   }
 

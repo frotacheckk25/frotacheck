@@ -191,7 +191,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
-      showError(context, 'Erro ao salvar: $e');
+      showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -261,7 +261,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
       showSuccess(context, 'Veículo $placa excluído');
     } catch (e) {
       if (!mounted) return;
-      showError(context, 'Erro ao excluir: $e');
+      showError(context, friendlyError(e));
     }
   }
 

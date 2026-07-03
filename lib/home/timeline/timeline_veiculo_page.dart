@@ -148,7 +148,7 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
         isLoading = false;
       });
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao carregar timeline: $e');
+      if (mounted) showError(context, friendlyError(e));
       if (mounted) setState(() => isLoading = false);
     }
   }

@@ -187,7 +187,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
     } catch (e) {
       debugPrint('Erro relatório: $e');
       if (mounted) {
-        showError(context, 'Erro ao carregar: $e');
+        showError(context, friendlyError(e));
         setState(() => carregando = false);
       }
     }
@@ -393,7 +393,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
             'Relatorio_FrotaCheck_${DateTime.now().year}.pdf',
       );
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao exportar PDF: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -406,7 +406,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
             'Relatorio_FrotaCheck_${DateTime.now().year}.pdf',
       );
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao compartilhar: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 

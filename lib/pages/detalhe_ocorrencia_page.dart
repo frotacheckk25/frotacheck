@@ -99,7 +99,7 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
         showSuccess(context, 'Status atualizado para: ${ocorrencia['status']}');
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => salvando = false);
     }

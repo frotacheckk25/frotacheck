@@ -81,7 +81,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         setState(() => fotosCapturadas.add({'bytes': bytes, 'label': label}));
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao capturar foto: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -188,7 +188,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
       showSuccess(context, 'Checklist de retorno registrado!');
       Navigator.pop(context);
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao salvar: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }

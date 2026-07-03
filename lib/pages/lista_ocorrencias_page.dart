@@ -215,7 +215,7 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
         } catch (_) {}
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 

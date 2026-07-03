@@ -9,6 +9,7 @@ import '../../core/enums/app_role.dart';
 import '../../core/guards/permission_guard.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/driver_account_link.dart';
 
 class AdminUsuariosPage extends StatelessWidget {
   const AdminUsuariosPage({super.key});
@@ -39,6 +40,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   String? _erro;
   bool _isEditing = false; // BUG-17: suppresses realtime rebuild during active edits
   RealtimeChannel? _channel;
+  Timer? _realtimeDebounce;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -57,19 +59,29 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           schema: 'public',
           table: 'user_profiles',
           // BUG-17: don't rebuild while a dialog/form is being edited
-          callback: (_) { if (!_isEditing) _carregar(); },
+          callback: (_) { if (!_isEditing) _debouncedCarregar(); },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'empresas',
-          callback: (_) { if (!_isEditing) _carregar(); },
+          callback: (_) { if (!_isEditing) _debouncedCarregar(); },
         )
         .subscribe();
   }
 
+  // Coalesce bursts of changes (ex.: last_access sendo tocado por vários usuários
+  // ao mesmo tempo) em um único recarregamento, em vez de um por evento.
+  void _debouncedCarregar() {
+    _realtimeDebounce?.cancel();
+    _realtimeDebounce = Timer(const Duration(milliseconds: 800), () {
+      if (mounted && !_isEditing) _carregar();
+    });
+  }
+
   @override
   void dispose() {
+    _realtimeDebounce?.cancel();
     _channel?.unsubscribe();
     _searchController.dispose();
     super.dispose();
@@ -194,7 +206,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -269,7 +281,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         showSuccess(context, 'Empresa "$nomeEmpresa" criada e admin vinculado!');
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao criar empresa: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -346,16 +358,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         }
 
         // Sincronizar user_profiles.driver_id e drivers.user_id
-        await _supabase
-            .from('user_profiles')
-            .update({'driver_id': driverId})
-            .eq('user_id', userId);
-        try {
-          await _supabase
-              .from('drivers')
-              .update({'user_id': userId})
-              .eq('id', driverId);
-        } catch (_) {}
+        await linkUserToDriver(_supabase, userId: userId, driverId: driverId);
       }
 
       // Remover este driver de qualquer outro veículo antes de vincular
@@ -373,7 +376,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       await _carregar();
       if (mounted) showSuccess(context, 'Veículo vinculado com sucesso!');
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao vincular veículo: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -385,7 +388,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -397,7 +400,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -442,7 +445,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       await _supabase.from('user_profiles').update({'nome': salvo}).eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao salvar: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 

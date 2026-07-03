@@ -135,7 +135,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
       if (mounted) setState(() => fuelings.removeWhere((x) => x['id']?.toString() == id));
       if (mounted) showSuccess(context, 'Abastecimento excluído');
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -549,7 +549,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
       }
       widget.onSaved();
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao salvar: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }

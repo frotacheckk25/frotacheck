@@ -413,7 +413,7 @@ class _AlertasPageState extends State<AlertasPage> {
           final idx = alertas.indexWhere((a) => a['id']?.toString() == id);
           if (idx != -1) alertas[idx] = {...alertas[idx], 'status': 'ativo'};
         });
-        showError(context, 'Erro: $e');
+        showError(context, friendlyError(e));
       }
     } finally {
       if (mounted) setState(() => _processando.remove(id));
@@ -445,7 +445,7 @@ class _AlertasPageState extends State<AlertasPage> {
         );
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 

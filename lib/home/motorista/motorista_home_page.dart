@@ -1980,7 +1980,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         showSuccess(context, 'Email de redefinição de senha enviado!');
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -2175,7 +2175,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
-        showError(context, 'Erro ao salvar: $e');
+        showError(context, friendlyError(e));
       }
     }
   }

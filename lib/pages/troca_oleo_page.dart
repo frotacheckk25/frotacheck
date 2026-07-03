@@ -244,7 +244,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
-      _snackErro('Erro ao salvar: $e');
+      _snackErro(friendlyError(e));
       debugPrint('ERRO TROCA DE ÓLEO: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
@@ -759,7 +759,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       if (mounted) setState(() => historico.removeWhere((x) => x['id']?.toString() == id));
       if (mounted) _snackSucesso('Registro excluído');
     } catch (e) {
-      if (mounted) _snackErro('Erro ao excluir: $e');
+      if (mounted) _snackErro(friendlyError(e));
     }
   }
 

@@ -163,7 +163,7 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
-      _snackErro('Erro ao registrar: $e');
+      _snackErro(friendlyError(e));
       debugPrint('ERRO OCORRÊNCIA: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
@@ -195,7 +195,7 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
       if (mounted) setState(() => ocorrencias.removeWhere((o) => o['id']?.toString() == id));
       if (mounted) _snackSucesso('Ocorrência excluída');
     } catch (e) {
-      if (mounted) _snackErro('Erro ao excluir: $e');
+      if (mounted) _snackErro(friendlyError(e));
     }
   }
 
@@ -212,7 +212,7 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         await supabase.from('alerts').update({'status': 'resolvido'}).eq('occurrence_id', id);
       } catch (_) {}
     } catch (e) {
-      if (mounted) _snackErro('Erro ao resolver: $e');
+      if (mounted) _snackErro(friendlyError(e));
     }
   }
 

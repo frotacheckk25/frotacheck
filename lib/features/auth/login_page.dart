@@ -422,57 +422,6 @@ class _LoginForm extends StatelessWidget {
                     ),
             ),
           ),
-          const SizedBox(height: 24),
-          // Divider
-          Row(
-            children: [
-              Expanded(
-                child: Divider(color: Colors.white.withOpacity(0.10)),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'ou continue com',
-                  style: TextStyle(color: _muted, fontSize: 12),
-                ),
-              ),
-              Expanded(
-                child: Divider(color: Colors.white.withOpacity(0.10)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          // Social buttons
-          Row(
-            children: [
-              Expanded(
-                child: _SocialButton(
-                  label: 'Google',
-                  icon: const Text(
-                    'G',
-                    style: TextStyle(
-                      color: Color(0xFF4285F4),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  onTap: () => showError(context, 'Login com Google em breve'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _SocialButton(
-                  label: 'Microsoft',
-                  icon: const Icon(
-                    Icons.window,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                  onTap: () => showError(context, 'Login com Microsoft em breve'),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 28),
           // Register link
           Row(
@@ -565,42 +514,6 @@ class _InputField extends StatelessWidget {
         ),
       ),
       validator: validator,
-    );
-  }
-}
-
-// ─── Social Button ────────────────────────────────────────────────────────────
-
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final Widget icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: icon,
-        label: Text(
-          label,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-        ),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: _surface,
-          side: BorderSide.none,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
     );
   }
 }

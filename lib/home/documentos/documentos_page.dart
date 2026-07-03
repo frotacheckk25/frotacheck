@@ -80,7 +80,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
       debugPrint('Erro ao carregar documentos: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      showError(context, 'Erro ao carregar: $e');
+      showError(context, friendlyError(e));
     }
   }
 
@@ -838,7 +838,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       if (mounted) showSuccess(context, 'Documento registrado com sucesso!');
       widget.onSaved();
     } catch (e) {
-      if (mounted) showError(context, 'Erro ao salvar: $e');
+      if (mounted) showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -1462,7 +1462,7 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) showError(context, 'Erro: $e');
+      if (mounted) showError(context, friendlyError(e));
     }
   }
 
@@ -1631,7 +1631,7 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                     }
                     if (mounted) showSuccess(context, 'Documento atualizado');
                   } catch (e) {
-                    if (mounted) showError(context, 'Erro: $e');
+                    if (mounted) showError(context, friendlyError(e));
                   }
                 },
                 style: ElevatedButton.styleFrom(

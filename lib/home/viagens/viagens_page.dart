@@ -173,7 +173,7 @@ class _ViagensPageState extends State<ViagensPage> {
       debugPrint('Erro ao carregar viagens: $e');
       if (!mounted) return;
       setState(() => isLoading = false);
-      showError(context, 'Erro ao carregar viagens: $e');
+      showError(context, friendlyError(e));
     }
   }
 
@@ -496,7 +496,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      showError(context, 'Erro ao salvar viagem: $e');
+      showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -705,7 +705,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      showError(context, 'Erro ao concluir viagem: $e');
+      showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -743,7 +743,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      showError(context, 'Erro ao cancelar viagem: $e');
+      showError(context, friendlyError(e));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }

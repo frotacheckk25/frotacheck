@@ -39,7 +39,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       if (!mounted) return;
       debugPrint('Register error: $e');
-      showError(context, 'Erro ao cadastrar: $e');
+      showError(context, friendlyError(e));
     } finally {
       if (mounted) {
         setState(() {

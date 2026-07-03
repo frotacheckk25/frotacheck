@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/config/supabase_config.dart';
+import '../../core/utils/snackbar_utils.dart';
 import '../admin/admin_usuarios_page.dart';
 import '../veiculos/veiculos_page.dart';
 import '../motoristas/motoristas_page.dart';
@@ -1676,10 +1677,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     final nomeCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final telefoneCtrl = TextEditingController();
-    final senhaCtrl = TextEditingController();
-    final confirmarCtrl = TextEditingController();
-    bool mostrarSenha = false;
-    bool mostrarConfirmar = false;
+    bool criarConta = false;
     bool saving = false;
     String? error;
     String? successMsg;
@@ -1739,7 +1737,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 _fieldLabel('E-mail da conta *'),
                 const SizedBox(height: 4),
                 const Text(
-                  'Use o e-mail com que o motorista criou a conta no app. Se ainda não tem conta, preencha a senha abaixo para criar uma.',
+                  'Use o e-mail com que o motorista criou a conta no app. Se ainda não tem conta, marque a opção abaixo para criar uma e enviar o convite por e-mail.',
                   style: TextStyle(color: Color(0xFF475569), fontSize: 11),
                 ),
                 const SizedBox(height: 6),
@@ -1781,63 +1779,23 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Divider senha
-                Row(children: [
-                  const Expanded(child: Divider(color: Color(0xFF1E293B))),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('Criar senha (opcional)', style: TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+                // Criar conta nova (convite por e-mail — Master nunca define a senha do motorista)
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1C30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E293B)),
                   ),
-                  const Expanded(child: Divider(color: Color(0xFF1E293B))),
-                ]),
-                const SizedBox(height: 4),
-                const Text(
-                  'Preencha apenas se quiser criar uma conta nova para este motorista.',
-                  style: TextStyle(color: Color(0xFF475569), fontSize: 11),
-                ),
-                const SizedBox(height: 10),
-
-                // Senha
-                TextField(
-                  controller: senhaCtrl,
-                  obscureText: !mostrarSenha,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Senha (mín. 6 caracteres)',
-                    hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 13),
-                    filled: true,
-                    fillColor: const Color(0xFF0F1C30),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    suffixIcon: IconButton(
-                      icon: Icon(mostrarSenha ? Icons.settings_rounded : Icons.build_rounded,
-                          color: const Color(0xFF475569), size: 18),
-                      onPressed: () => setS(() => mostrarSenha = !mostrarSenha),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Confirmar senha
-                TextField(
-                  controller: confirmarCtrl,
-                  obscureText: !mostrarConfirmar,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Confirmar senha',
-                    hintStyle: const TextStyle(color: Color(0xFF475569), fontSize: 13),
-                    filled: true,
-                    fillColor: const Color(0xFF0F1C30),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    suffixIcon: IconButton(
-                      icon: Icon(mostrarConfirmar ? Icons.settings_rounded : Icons.build_rounded,
-                          color: const Color(0xFF475569), size: 18),
-                      onPressed: () => setS(() => mostrarConfirmar = !mostrarConfirmar),
+                  child: CheckboxListTile(
+                    value: criarConta,
+                    onChanged: (v) => setS(() => criarConta = v ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: const Color(0xFF3B82F6),
+                    title: const Text('Criar conta de acesso para este motorista',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                    subtitle: const Text(
+                      'Um e-mail com link para o motorista definir a própria senha será enviado.',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
                     ),
                   ),
                 ),
@@ -1854,30 +1812,27 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 final nome = nomeCtrl.text.trim();
                 final email = emailCtrl.text.trim().toLowerCase();
                 final telefone = telefoneCtrl.text.trim();
-                final senha = senhaCtrl.text;
-                final confirmar = confirmarCtrl.text;
 
                 if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
                 if (email.isEmpty) { setS(() => error = 'E-mail é obrigatório'); return; }
-                if (senha.isNotEmpty) {
-                  if (senha.length < 6) { setS(() => error = 'Senha deve ter pelo menos 6 caracteres'); return; }
-                  if (senha != confirmar) { setS(() => error = 'As senhas não coincidem'); return; }
-                }
 
                 setS(() { saving = true; error = null; successMsg = null; });
 
                 try {
                   String? userId;
 
-                  if (senha.isNotEmpty) {
+                  if (criarConta) {
                     // ── Criar conta nova via cliente secundário ──────────────
+                    // A senha é aleatória e descartada: o motorista define a própria
+                    // senha pelo link enviado via resetPasswordForEmail (Master nunca a conhece).
                     final url = await SupabaseConfig.getUrl();
                     final key = await SupabaseConfig.getPublishableKey();
                     final tmpClient = SupabaseClient(url, key);
                     try {
+                      final tempPassword = '${DateTime.now().microsecondsSinceEpoch}${UniqueKey().hashCode}Aa1!';
                       final signUpRes = await tmpClient.auth.signUp(
                         email: email,
-                        password: senha,
+                        password: tempPassword,
                       );
                       userId = signUpRes.user?.id;
                       if (userId == null) {
@@ -1885,6 +1840,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         setS(() { saving = false; error = 'Falha ao criar conta. Verifique se o e-mail já está cadastrado.'; });
                         return;
                       }
+                      try {
+                        await tmpClient.auth.resetPasswordForEmail(email);
+                      } catch (_) {}
                     } finally {
                       await tmpClient.dispose();
                     }
@@ -1942,8 +1900,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         .eq('user_id', userId);
                   }
 
-                  final msg = senha.isNotEmpty
-                      ? 'Conta criada e motorista "$nome" cadastrado com sucesso!'
+                  final msg = criarConta
+                      ? 'Motorista "$nome" cadastrado! Um e-mail para definir a senha foi enviado a $email.'
                       : userId != null
                           ? 'Motorista "$nome" cadastrado e vinculado à conta $email!'
                           : 'Motorista "$nome" cadastrado! Conta "$email" não encontrada — vínculo pendente quando fizer login.';
@@ -1955,7 +1913,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   }
                   _loadAll();
                 } catch (e) {
-                  setS(() { saving = false; error = 'Erro: $e'; });
+                  setS(() { saving = false; error = friendlyError(e); });
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -2124,7 +2082,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   }
                   _loadAll();
                 } catch (e) {
-                  setS(() { saving = false; error = 'Erro: $e'; });
+                  setS(() { saving = false; error = friendlyError(e); });
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
