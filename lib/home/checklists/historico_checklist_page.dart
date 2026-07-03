@@ -52,7 +52,10 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
 
       var veicQ = supabase.from('vehicles').select('id, plate, model, brand');
       var drivQ = supabase.from('drivers').select('id, name');
-      if (eid != null) {
+      if (auth.isMotorista && auth.driverId != null) {
+        veicQ = veicQ.eq('driver_id', auth.driverId!);
+        drivQ = drivQ.eq('id', auth.driverId!);
+      } else if (eid != null) {
         veicQ = veicQ.eq('empresa_id', eid);
         drivQ = drivQ.eq('empresa_id', eid);
       }

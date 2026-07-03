@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/enums/app_permission.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -39,7 +40,12 @@ class _MultasPageState extends State<MultasPage> {
           'id, vehicle_id, veiculo_id, driver_id, motorista_id, status, valor, tipo, descricao, data, created_at, foto_url, empresa_id');
       var veicQ  = supabase.from('vehicles').select('id, plate, brand, model');
       var drivQ  = supabase.from('drivers').select('id, name');
-      if (eid != null) {
+      if (auth.isMotorista && auth.driverId != null) {
+        // Motorista só vê suas próprias multas e o veículo atribuído a ele
+        multaQ = multaQ.or('driver_id.eq.${auth.driverId},motorista_id.eq.${auth.driverId}');
+        veicQ  = veicQ.eq('driver_id', auth.driverId!);
+        drivQ  = drivQ.eq('id', auth.driverId!);
+      } else if (eid != null) {
         multaQ = multaQ.eq('empresa_id', eid);
         veicQ  = veicQ.eq('empresa_id', eid);
         drivQ  = drivQ.eq('empresa_id', eid);
@@ -676,7 +682,10 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
       final eid = auth.effectiveEmpresaId;
       var veicQ2 = supabase.from('vehicles').select('id, plate, brand, model');
       var drivQ2 = supabase.from('drivers').select('id, name');
-      if (eid != null) {
+      if (auth.isMotorista && auth.driverId != null) {
+        veicQ2 = veicQ2.eq('driver_id', auth.driverId!);
+        drivQ2 = drivQ2.eq('id', auth.driverId!);
+      } else if (eid != null) {
         veicQ2 = veicQ2.eq('empresa_id', eid);
         drivQ2 = drivQ2.eq('empresa_id', eid);
       }
@@ -693,6 +702,10 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
           (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
         carregandoDados = false;
+        if (auth.isMotorista) {
+          if (veiculos.length == 1) selectedVehicle = veiculos.first['id']?.toString();
+          if (motoristas.length == 1) selectedDriver = motoristas.first['id']?.toString();
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -1360,6 +1373,7 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = context.watch<AppAuthProvider>().can(AppPermission.manageMultas);
     final cor = _statusColor(_status);
     final valor = multa['valor'];
     final tipo = multa['tipo']?.toString() ?? '-';
@@ -1375,11 +1389,12 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
         title: const Text('Detalhe da Multa'),
         backgroundColor: AppColors.surface,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppColors.danger),
-            tooltip: 'Excluir multa',
-            onPressed: _deletar,
-          ),
+          if (canManage)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.danger),
+              tooltip: 'Excluir multa',
+              onPressed: _deletar,
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -1530,7 +1545,7 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
             const SizedBox(height: 24),
 
             // Ações
-            if (!_paga) ...[
+            if (!_paga && canManage) ...[
               ElevatedButton.icon(
                 onPressed: salvando ? null : () => _atualizarStatus('paga'),
                 icon: salvando
@@ -1582,7 +1597,37 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
                   ),
                 ),
               ],
-            ] else
+            ] else if (!_paga && !canManage)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: AppColors.warning,
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Aguardando análise da empresa',
+                        style: TextStyle(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(

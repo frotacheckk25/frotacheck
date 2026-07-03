@@ -44,7 +44,7 @@ class _PneusPageState extends State<PneusPage> {
       }
 
       var pneusQ = supabase.from('pneus').select(
-          'id, vehicle_id, veiculo_id, status, marca, brand, modelo, model_tire, posicao, position, km_instalacao, km_installation, data_instalacao, installation_date, observacoes, notes, empresa_id, created_at');
+          'id, vehicle_id, status, marca, modelo, posicao, km_instalacao, data_instalacao, observacoes, empresa_id, created_at');
       if (auth.isMotorista) {
         if (vehicleId != null) pneusQ = pneusQ.eq('vehicle_id', vehicleId);
       } else if (eid != null) {
@@ -52,7 +52,11 @@ class _PneusPageState extends State<PneusPage> {
       }
 
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
-      if (eid != null) veicQ = veicQ.eq('empresa_id', eid);
+      if (auth.isMotorista && auth.driverId != null) {
+        veicQ = veicQ.eq('driver_id', auth.driverId!);
+      } else if (eid != null) {
+        veicQ = veicQ.eq('empresa_id', eid);
+      }
       final results = await Future.wait([
         pneusQ.order('created_at', ascending: false),
         veicQ.order('plate'),
@@ -219,7 +223,7 @@ class _PneusPageState extends State<PneusPage> {
   }
 
   String _veiculoLabel(Map<String, dynamic> p) {
-    final vid = p['vehicle_id']?.toString() ?? p['veiculo_id']?.toString();
+    final vid = p['vehicle_id']?.toString();
     if (vid != null && veiculosMap.containsKey(vid)) {
       final v = veiculosMap[vid]!;
       final plate = v['plate']?.toString() ?? '';
@@ -365,13 +369,12 @@ class _PneusPageState extends State<PneusPage> {
                       final status = p['status']?.toString();
                       final cor = _statusColor(status);
                       final veiculo = _veiculoLabel(p);
-                      final marca = p['marca']?.toString() ?? p['brand']?.toString() ?? '-';
-                      final modelo = p['modelo']?.toString() ?? p['model_tire']?.toString() ?? '';
-                      final posicao = p['posicao']?.toString() ?? p['position']?.toString() ?? '-';
-                      final kmInst = p['km_instalacao'] ?? p['km_installation'];
-                      final dataInst = _fmtDate(
-                          p['data_instalacao']?.toString() ?? p['installation_date']?.toString());
-                      final obs = p['observacoes']?.toString() ?? p['notes']?.toString() ?? '';
+                      final marca = p['marca']?.toString() ?? '-';
+                      final modelo = p['modelo']?.toString() ?? '';
+                      final posicao = p['posicao']?.toString() ?? '-';
+                      final kmInst = p['km_instalacao'];
+                      final dataInst = _fmtDate(p['data_instalacao']?.toString());
+                      final obs = p['observacoes']?.toString() ?? '';
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -583,16 +586,21 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
 
   Future<void> _carregarVeiculos() async {
     try {
-      final res = await supabase
-          .from('vehicles')
-          .select('id, plate, brand, model')
-          .order('plate');
+      final auth = context.read<AppAuthProvider>();
+      var q = supabase.from('vehicles').select('id, plate, brand, model');
+      if (auth.isMotorista && auth.driverId != null) {
+        q = q.eq('driver_id', auth.driverId!);
+      } else if (auth.effectiveEmpresaId != null) {
+        q = q.eq('empresa_id', auth.effectiveEmpresaId!);
+      }
+      final res = await q.order('plate');
       if (!mounted) return;
       setState(() {
         veiculos = List<Map<String, dynamic>>.from(
           (res as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
         carregandoVeiculos = false;
+        if (veiculos.length == 1) veiculoSelecionado = veiculos.first['id']?.toString();
       });
     } catch (e) {
       if (!mounted) return;

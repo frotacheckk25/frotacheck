@@ -94,15 +94,12 @@ class _ViagensPageState extends State<ViagensPage> {
             vMap[v['id'].toString()] = v;
           }
         } catch (_) {}
-        // Fallback: query direta por empresa
-        if (vMap.isEmpty && eid != null) {
+        // Fallback: query direta pelo próprio veículo (nunca pela empresa toda)
+        if (vMap.isEmpty && driverId != null) {
           try {
-            final vs = await supabase.from('vehicles')
-                .select('id, plate, brand, model').eq('empresa_id', eid);
-            for (final v in vs as List) {
-              final row = Map<String, dynamic>.from(v as Map);
-              vMap[row['id'].toString()] = row;
-            }
+            final v = await supabase.from('vehicles')
+                .select('id, plate, brand, model').eq('driver_id', driverId).maybeSingle();
+            if (v != null) vMap[v['id'].toString()] = Map<String, dynamic>.from(v);
           } catch (_) {}
         }
         // Próprio motorista: query por ID específico (RLS permite)

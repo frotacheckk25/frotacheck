@@ -37,7 +37,12 @@ class _DocumentosPageState extends State<DocumentosPage> {
       var docQ  = supabase.from('documentos').select('*');
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model, driver_id');
       var drivQ = supabase.from('drivers').select('id, name');
-      if (eid != null) {
+      if (auth.isMotorista && auth.driverId != null) {
+        // Motorista só vê seus próprios documentos e o veículo atribuído a ele
+        docQ  = docQ.or('driver_id.eq.${auth.driverId},motorista_id.eq.${auth.driverId}');
+        veicQ = veicQ.eq('driver_id', auth.driverId!);
+        drivQ = drivQ.eq('id', auth.driverId!);
+      } else if (eid != null) {
         docQ  = docQ.eq('empresa_id', eid);
         veicQ = veicQ.eq('empresa_id', eid);
         drivQ = drivQ.eq('empresa_id', eid);
