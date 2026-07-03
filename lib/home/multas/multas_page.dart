@@ -52,7 +52,7 @@ class _MultasPageState extends State<MultasPage> {
       }
       // Queries separadas — sem FK join
       final results = await Future.wait([
-        multaQ.order('created_at', ascending: false),
+        multaQ.order('created_at', ascending: false).limit(300),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);
@@ -289,6 +289,15 @@ class _MultasPageState extends State<MultasPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    if (multas.length >= 300)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(
+                          'Mostrando as 300 multas mais recentes. Use os filtros para refinar a busca.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                        ),
+                      ),
 
                     // KPIs
                     Row(

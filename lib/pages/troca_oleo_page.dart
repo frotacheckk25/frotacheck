@@ -221,13 +221,22 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         }
       } catch (_) {}
 
+      // Atualiza o odômetro do veículo se este for maior que o registrado
+      if (selectedVehicleId != null && kmAtual > 0) {
+        try {
+          await supabase
+              .from('vehicles')
+              .update({'odometer': kmAtual})
+              .eq('id', selectedVehicleId!)
+              .lt('odometer', kmAtual);
+        } catch (_) {}
+      }
+
       // ── Alerta de próxima troca (silencioso se falhar) ──────────────────────
       try {
         await supabase.from('alerts').insert(injetar({
-          'title'   : 'Próxima Troca de Óleo: $placa',
-          'subtitle': '$selectedServiceType — próxima em $proximoKm km',
-          'tipo'    : 'warning',
-          'status'  : 'ativo',
+          'title'      : 'Próxima Troca de Óleo: $placa',
+          'description': '$selectedServiceType — próxima em $proximoKm km',
         }));
       } catch (_) {}
 

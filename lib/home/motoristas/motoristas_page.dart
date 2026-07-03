@@ -2,17 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
+import 'package:frotacheck/core/enums/app_permission.dart';
+import 'package:frotacheck/core/guards/permission_guard.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
 
-class MotoristasPage extends StatefulWidget {
+class MotoristasPage extends StatelessWidget {
   const MotoristasPage({super.key});
 
   @override
-  State<MotoristasPage> createState() => _MotoristasPageState();
+  Widget build(BuildContext context) {
+    return const PermissionGuard(
+      permission: AppPermission.viewDrivers,
+      child: _MotoristasView(),
+    );
+  }
 }
 
-class _MotoristasPageState extends State<MotoristasPage> {
+class _MotoristasView extends StatefulWidget {
+  const _MotoristasView();
+
+  @override
+  State<_MotoristasView> createState() => _MotoristasPageState();
+}
+
+class _MotoristasPageState extends State<_MotoristasView> {
   final supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();

@@ -480,17 +480,20 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
 
   Future<String?> _upload(XFile? img, String bucket) async {
     if (img == null) return null;
-    try {
-      final nome = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(img.path)}';
-      final bytes = await img.readAsBytes();
-      await supabase.storage
-          .from(bucket)
-          .uploadBinary(nome, bytes, fileOptions: const FileOptions(upsert: true));
-      return supabase.storage.from(bucket).getPublicUrl(nome);
-    } catch (e) {
-      debugPrint('Erro no upload: $e');
-      return null;
+    final nome = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(img.path)}';
+    final bytes = await img.readAsBytes();
+    for (int attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await supabase.storage
+            .from(bucket)
+            .uploadBinary(nome, bytes, fileOptions: const FileOptions(upsert: true));
+        return supabase.storage.from(bucket).getPublicUrl(nome);
+      } catch (e) {
+        debugPrint('Erro no upload (tentativa $attempt): $e');
+        if (attempt < 3) await Future.delayed(Duration(seconds: attempt));
+      }
     }
+    return null;
   }
 
   Future<void> _salvar() async {
@@ -518,6 +521,32 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
       if (cupomUrl != null) payload['receipt_photo'] = cupomUrl;
 
       await supabase.from('fuelings').insert(injetar(payload));
+
+      // Atualiza o odômetro do veículo se este for maior que o registrado
+      final novoKm = payload['odometer'] as int;
+      if (selectedVehicle != null && novoKm > 0) {
+        try {
+          await supabase
+              .from('vehicles')
+              .update({'odometer': novoKm})
+              .eq('id', selectedVehicle!)
+              .lt('odometer', novoKm);
+        } catch (_) {}
+      }
+
+      final falhas = <String>[
+        if (odometroPhoto != null && odometroUrl == null) 'Hodômetro',
+        if (pumpPhoto != null && bombaUrl == null) 'Bomba',
+        if (receiptPhoto != null && cupomUrl == null) 'Cupom',
+      ];
+      if (mounted) {
+        if (falhas.isNotEmpty) {
+          showError(context,
+              'Abastecimento salvo, mas a(s) foto(s) ${falhas.join(", ")} não foram enviadas. Tente anexar novamente.');
+        } else {
+          showSuccess(context, 'Abastecimento registrado com sucesso!');
+        }
+      }
       widget.onSaved();
     } catch (e) {
       if (mounted) showError(context, 'Erro ao salvar: $e');

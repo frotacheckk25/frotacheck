@@ -105,8 +105,14 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
   }
 
   Future<void> _salvarChecklist() async {
-    if (kmFinalController.text.trim().isEmpty) {
+    final kmFinalTexto = kmFinalController.text.trim();
+    if (kmFinalTexto.isEmpty) {
       showError(context, 'Informe o KM final do veículo');
+      return;
+    }
+    final kmFinal = int.tryParse(kmFinalTexto);
+    if (kmFinal == null || kmFinal < 0) {
+      showError(context, 'Informe um KM final válido (somente números)');
       return;
     }
 
@@ -148,10 +154,19 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         'itens': itensVerificados,
         'foto_urls': fotoUrls,
         'aprovado': _totalMarcados == Checklist.itensChecklist.length,
-        'km_final': int.tryParse(kmFinalController.text.trim()) ?? 0,
+        'km_final': kmFinal,
         if (observacoesController.text.trim().isNotEmpty)
           'observacoes': observacoesController.text.trim(),
       }));
+
+      // Atualiza o odômetro do veículo se este for maior que o registrado
+      try {
+        await supabase
+            .from('vehicles')
+            .update({'odometer': kmFinal})
+            .eq('id', widget.veiculoId)
+            .lt('odometer', kmFinal);
+      } catch (_) {}
 
       if (!mounted) return;
       showSuccess(context, 'Checklist de retorno registrado!');

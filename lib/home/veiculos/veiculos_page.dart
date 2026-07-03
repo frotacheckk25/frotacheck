@@ -2,17 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
+import 'package:frotacheck/core/enums/app_permission.dart';
+import 'package:frotacheck/core/guards/permission_guard.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
 
-class VeiculosPage extends StatefulWidget {
+class VeiculosPage extends StatelessWidget {
   const VeiculosPage({super.key});
 
   @override
-  State<VeiculosPage> createState() => _VeiculosPageState();
+  Widget build(BuildContext context) {
+    return const PermissionGuard(
+      permission: AppPermission.viewVehicles,
+      child: _VeiculosView(),
+    );
+  }
 }
 
-class _VeiculosPageState extends State<VeiculosPage> {
+class _VeiculosView extends StatefulWidget {
+  const _VeiculosView();
+
+  @override
+  State<_VeiculosView> createState() => _VeiculosPageState();
+}
+
+class _VeiculosPageState extends State<_VeiculosView> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
   final searchController = TextEditingController();
