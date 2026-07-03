@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/snackbar_utils.dart';
 
 class DetalheOcorrenciaPage extends StatefulWidget {
   final Map<String, dynamic> ocorrencia;
@@ -95,18 +96,10 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
       widget.onStatusChanged?.call();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Status atualizado para: ${ocorrencia['status']}'),
-            backgroundColor: _statusColor(proximo),
-          ),
-        );
+        showSuccess(context, 'Status atualizado para: ${ocorrencia['status']}');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     } finally {
       if (mounted) setState(() => salvando = false);
     }

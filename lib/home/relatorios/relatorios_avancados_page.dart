@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class RelatoriosAvancadosPage extends StatefulWidget {
   const RelatoriosAvancadosPage({super.key});
@@ -166,8 +167,7 @@ class _RelatoriosAvancadosPageState
     } catch (e) {
       debugPrint('Erro relatórios avançados: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
+        showError(context, 'Erro ao carregar: $e');
         setState(() => isLoading = false);
       }
     }

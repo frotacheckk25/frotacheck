@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 import '../../pages/detalhe_ocorrencia_page.dart';
 
 // Fontes de alerta sintético
@@ -404,21 +405,7 @@ class _AlertasPageState extends State<AlertasPage> {
         } catch (_) {}
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('Alerta marcado como resolvido'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      if (mounted) showSuccess(context, 'Alerta marcado como resolvido');
       _carregar();
     } catch (e) {
       if (mounted) {
@@ -426,9 +413,7 @@ class _AlertasPageState extends State<AlertasPage> {
           final idx = alertas.indexWhere((a) => a['id']?.toString() == id);
           if (idx != -1) alertas[idx] = {...alertas[idx], 'status': 'ativo'};
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        showError(context, 'Erro: $e');
       }
     } finally {
       if (mounted) setState(() => _processando.remove(id));
@@ -445,11 +430,7 @@ class _AlertasPageState extends State<AlertasPage> {
           .eq('id', occId)
           .maybeSingle();
       if (result == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ocorrência não encontrada')),
-          );
-        }
+        if (mounted) showError(context, 'Ocorrência não encontrada');
         return;
       }
       if (mounted) {
@@ -464,11 +445,7 @@ class _AlertasPageState extends State<AlertasPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 import '../abastecimentos/abastecimentos_page.dart';
 import '../checklists/selecionar_veiculo_checklist.dart';
 import '../checklists/historico_checklist_page.dart';
@@ -1976,15 +1977,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     try {
       await _supabase.auth.resetPasswordForEmail(email);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Email de redefinição de senha enviado!'),
-            backgroundColor: Color(0xFF1AA251)));
+        showSuccess(context, 'Email de redefinição de senha enviado!');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Erro: $e'), backgroundColor: Colors.red));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -2114,22 +2110,14 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _avatarUrl = urlComBust;
           _uploadingAvatar = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Foto atualizada com sucesso!'),
-          backgroundColor: Color(0xFF1AA251),
-        ));
+        showSuccess(context, 'Foto atualizada com sucesso!');
       }
     } catch (e) {
       debugPrint('Avatar upload: $e');
       if (mounted) {
         setState(() => _uploadingAvatar = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            'Erro ao enviar foto. Verifique se o bucket "avatars" existe no Supabase Storage.',
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ));
+        showError(context,
+            'Erro ao enviar foto. Verifique se o bucket "avatars" existe no Supabase Storage.');
       }
     }
   }
@@ -2184,9 +2172,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Erro ao salvar: $e'),
-            backgroundColor: Colors.red));
+        showError(context, 'Erro ao salvar: $e');
       }
     }
   }

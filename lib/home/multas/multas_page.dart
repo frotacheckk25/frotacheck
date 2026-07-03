@@ -5,6 +5,7 @@ import '../../core/auth/app_auth_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class MultasPage extends StatefulWidget {
   const MultasPage({super.key});
@@ -75,9 +76,7 @@ class _MultasPageState extends State<MultasPage> {
       debugPrint('Erro ao carregar multas: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
+      showError(context, 'Erro ao carregar: $e');
     }
   }
 
@@ -698,9 +697,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => carregandoDados = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao carregar dados: $e')));
+      showError(context, 'Erro ao carregar dados: $e');
     }
   }
 
@@ -747,11 +744,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         if (mounted) setState(() => fotoBytes = bytes);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao selecionar foto: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao selecionar foto: $e');
     }
   }
 
@@ -792,21 +785,10 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
 
       await supabase.from('multas').insert(injetar(payload));
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Multa registrada com sucesso!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      if (mounted) showSuccess(context, 'Multa registrada com sucesso!');
       widget.onSaved();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -1322,26 +1304,16 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
       setState(() => multa = {...multa, 'status': novoStatus});
       widget.onAtualizada();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              novoStatus == 'paga'
-                  ? 'Multa marcada como paga!'
-                  : 'Multa marcada como contestada.',
-            ),
-            backgroundColor: novoStatus == 'paga'
-                ? AppColors.success
-                : const Color(0xFF8B5CF6),
-          ),
+        showSuccess(
+          context,
+          novoStatus == 'paga'
+              ? 'Multa marcada como paga!'
+              : 'Multa marcada como contestada.',
         );
         if (novoStatus == 'paga') Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     } finally {
       if (mounted) setState(() => salvando = false);
     }
@@ -1382,11 +1354,7 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
       widget.onAtualizada();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 

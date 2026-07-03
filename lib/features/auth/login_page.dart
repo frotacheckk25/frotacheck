@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/utils/snackbar_utils.dart';
 import 'register_page.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -48,9 +49,7 @@ class _LoginPageState extends State<LoginPage> {
       // Do NOT push any route here — the guard rebuilds with the correct role.
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_loginError(e.toString()))),
-      );
+      showError(context, _loginError(e.toString()));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -99,23 +98,16 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted || send != true) return;
     final email = _forgotCtrl.text.trim();
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Informe um email')));
+      showError(context, 'Informe um email');
       return;
     }
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(email);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email de recuperação enviado')),
-      );
+      showSuccess(context, 'Email de recuperação enviado');
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível enviar. Contate o administrador.'),
-        ),
-      );
+      showError(context, 'Não foi possível enviar. Contate o administrador.');
     }
   }
 
@@ -464,9 +456,7 @@ class _LoginForm extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Login com Google em breve')),
-                  ),
+                  onTap: () => showError(context, 'Login com Google em breve'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -478,11 +468,7 @@ class _LoginForm extends StatelessWidget {
                     color: Colors.white70,
                     size: 18,
                   ),
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Login com Microsoft em breve'),
-                    ),
-                  ),
+                  onTap: () => showError(context, 'Login com Microsoft em breve'),
                 ),
               ),
             ],

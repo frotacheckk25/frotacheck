@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
+import 'package:frotacheck/core/utils/snackbar_utils.dart';
 
 class VeiculosPage extends StatefulWidget {
   const VeiculosPage({super.key});
@@ -170,46 +171,14 @@ class _VeiculosPageState extends State<VeiculosPage> {
       }
 
       if (!mounted) return;
-      _mostrarSucesso(isNew ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado!');
+      showSuccess(context, isNew ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado!');
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
-      _mostrarErro('Erro ao salvar: $e');
+      showError(context, 'Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
-  }
-
-  void _mostrarSucesso(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          const Icon(Icons.check_circle, color: Colors.white),
-          const SizedBox(width: 10),
-          Text(msg),
-        ]),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  void _mostrarErro(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          const Icon(Icons.error_outline, color: Colors.white),
-          const SizedBox(width: 10),
-          Expanded(child: Text(msg)),
-        ]),
-        backgroundColor: AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 5),
-      ),
-    );
   }
 
   void _limparFormulario() {
@@ -273,10 +242,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
       await supabase.from('vehicles').delete().eq('id', id);
       if (!mounted) return;
       setState(() => veiculos.removeWhere((v) => v['id']?.toString() == id));
-      _mostrarSucesso('Veículo $placa excluído');
+      showSuccess(context, 'Veículo $placa excluído');
     } catch (e) {
       if (!mounted) return;
-      _mostrarErro('Erro ao excluir: $e');
+      showError(context, 'Erro ao excluir: $e');
     }
   }
 

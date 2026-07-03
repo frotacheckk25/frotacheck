@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -32,17 +33,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (response.user != null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Conta criada. Verifique seu e-mail.')),
-        );
+        showSuccess(context, 'Conta criada. Verifique seu e-mail.');
         Navigator.pop(context);
       }
     } catch (e) {
       if (!mounted) return;
       debugPrint('Register error: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao cadastrar: $e')));
+      showError(context, 'Erro ao cadastrar: $e');
     } finally {
       if (mounted) {
         setState(() {

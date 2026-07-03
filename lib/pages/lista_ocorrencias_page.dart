@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/snackbar_utils.dart';
 import 'detalhe_ocorrencia_page.dart';
 
 class ListaOcorrenciasPage extends StatefulWidget {
@@ -214,10 +215,7 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
         } catch (_) {}
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 

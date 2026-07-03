@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_role.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const _bg      = Color(0xFF080F1E);
@@ -325,11 +326,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
 
   void _snack(String msg, {bool ok = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: ok ? _green : _red,
-      behavior: SnackBarBehavior.floating,
-    ));
+    if (ok) {
+      showSuccess(context, msg);
+    } else {
+      showError(context, msg);
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════════

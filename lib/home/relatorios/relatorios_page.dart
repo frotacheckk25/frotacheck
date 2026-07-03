@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
+import 'package:frotacheck/core/utils/snackbar_utils.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -184,8 +185,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
     } catch (e) {
       debugPrint('Erro relatório: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
+        showError(context, 'Erro ao carregar: $e');
         setState(() => carregando = false);
       }
     }
@@ -376,10 +376,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
             'Relatorio_FrotaCheck_${DateTime.now().year}.pdf',
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao exportar PDF: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao exportar PDF: $e');
     }
   }
 
@@ -392,10 +389,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
             'Relatorio_FrotaCheck_${DateTime.now().year}.pdf',
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao compartilhar: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao compartilhar: $e');
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/snackbar_utils.dart';
 
 class TrocaOleoPage extends StatefulWidget {
   const TrocaOleoPage({super.key});
@@ -247,32 +248,9 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     });
   }
 
-  void _snackSucesso(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.check_circle, color: Colors.white),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg)),
-      ]),
-      backgroundColor: AppColors.success,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
+  void _snackSucesso(String msg) => showSuccess(context, msg);
 
-  void _snackErro(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.error_outline, color: Colors.white),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg)),
-      ]),
-      backgroundColor: AppColors.danger,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
+  void _snackErro(String msg) => showError(context, msg);
 
   String _fmtDate(String? raw) {
     if (raw == null || raw.isEmpty) return '-';

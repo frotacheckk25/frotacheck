@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class PneusPage extends StatefulWidget {
   const PneusPage({super.key});
@@ -76,10 +77,7 @@ class _PneusPageState extends State<PneusPage> {
       debugPrint('Erro ao carregar pneus: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao carregar: $e');
     }
   }
 
@@ -108,13 +106,9 @@ class _PneusPageState extends State<PneusPage> {
     try {
       await supabase.from('pneus').delete().eq('id', id);
       if (mounted) setState(() => pneus.removeWhere((x) => x['id']?.toString() == id));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pneu excluído'), backgroundColor: AppColors.success),
-        );
-      }
+      if (mounted) showSuccess(context, 'Pneu excluído');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -155,12 +149,10 @@ class _PneusPageState extends State<PneusPage> {
                           });
                         }
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Status atualizado: ${_statusLabel(s)}'), backgroundColor: AppColors.success),
-                          );
+                          showSuccess(context, 'Status atualizado: ${_statusLabel(s)}');
                         }
                       } catch (e) {
-                        if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e'))); }
+                        if (mounted) showError(context, 'Erro: $e');
                       }
                     },
                     borderRadius: BorderRadius.circular(10),
@@ -605,8 +597,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => carregandoVeiculos = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Erro ao carregar veículos: $e')));
+      showError(context, 'Erro ao carregar veículos: $e');
     }
   }
 
@@ -655,20 +646,10 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
 
       await supabase.from('pneus').insert(injetar(payload));
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pneu cadastrado com sucesso!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      if (mounted) showSuccess(context, 'Pneu cadastrado com sucesso!');
       widget.onSaved();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
     }

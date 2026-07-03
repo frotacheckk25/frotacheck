@@ -5,6 +5,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/veiculo_model.dart';
 import '../../core/models/motorista_model.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 import './checklist_saida_page.dart';
 import './checklist_retorno_page.dart';
 import './historico_checklist_page.dart';
@@ -79,9 +80,7 @@ class _SelecionarVeiculoChecklistPageState
 
   Future<void> _iniciarChecklist() async {
     if (veiculoSelecionado == null || motoristaSelecionado == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione um veículo e um motorista')),
-      );
+      showError(context, 'Selecione um veículo e um motorista');
       return;
     }
 

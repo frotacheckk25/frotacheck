@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 extension type _GeoPosition(JSObject _) implements JSObject {
   external _GeoCoords get coords;
@@ -175,9 +176,7 @@ class _ViagensPageState extends State<ViagensPage> {
       debugPrint('Erro ao carregar viagens: $e');
       if (!mounted) return;
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar viagens: $e')),
-      );
+      showError(context, 'Erro ao carregar viagens: $e');
     }
   }
 
@@ -466,17 +465,13 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
         origemCtrl.text.isEmpty ||
         destinoCtrl.text.isEmpty ||
         kmInicioCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha todos os campos obrigatórios')),
-      );
+      showError(context, 'Preencha todos os campos obrigatórios');
       return;
     }
 
     final kmInicio = double.tryParse(kmInicioCtrl.text.replaceAll(',', '.'));
     if (kmInicio == null || kmInicio < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quilometragem inicial inválida')),
-      );
+      showError(context, 'Quilometragem inicial inválida');
       return;
     }
 
@@ -499,16 +494,12 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
       }));
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Viagem iniciada com sucesso!')),
-      );
+      showSuccess(context, 'Viagem iniciada com sucesso!');
       widget.onSalva();
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao salvar viagem: $e')),
-      );
+      showError(context, 'Erro ao salvar viagem: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -677,23 +668,17 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
 
   Future<void> _concluir() async {
     if (kmFimCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe a quilometragem final')),
-      );
+      showError(context, 'Informe a quilometragem final');
       return;
     }
     final kmFim = double.tryParse(kmFimCtrl.text.replaceAll(',', '.'));
     if (kmFim == null || kmFim < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Quilometragem final inválida')),
-      );
+      showError(context, 'Quilometragem final inválida');
       return;
     }
     final kmInicio = (widget.viagem['quilometragem_inicio'] as num?)?.toDouble() ?? 0;
     if (kmFim < kmInicio) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Quilometragem final não pode ser menor que a inicial ($kmInicio km)')),
-      );
+      showError(context, 'Quilometragem final não pode ser menor que a inicial ($kmInicio km)');
       return;
     }
     final kmPerc = kmFim - kmInicio;
@@ -718,16 +703,12 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       }).eq('id', widget.viagem['id']);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Viagem concluída! ${kmPerc.toStringAsFixed(1)} km percorridos.')),
-      );
+      showSuccess(context, 'Viagem concluída! ${kmPerc.toStringAsFixed(1)} km percorridos.');
       widget.onAtualizada();
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao concluir viagem: $e')),
-      );
+      showError(context, 'Erro ao concluir viagem: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -760,16 +741,12 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
         'data_fim': DateTime.now().toIso8601String(),
       }).eq('id', widget.viagem['id']);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Viagem cancelada'), backgroundColor: AppColors.success),
-      );
+      showSuccess(context, 'Viagem cancelada');
       widget.onAtualizada();
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao cancelar viagem: $e')),
-      );
+      showError(context, 'Erro ao cancelar viagem: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }

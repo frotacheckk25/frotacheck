@@ -8,6 +8,7 @@ import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/guards/permission_guard.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class AdminUsuariosPage extends StatelessWidget {
   const AdminUsuariosPage({super.key});
@@ -193,14 +194,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -272,22 +266,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
       await _carregar();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Empresa "$nomeEmpresa" criada e admin vinculado!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        showSuccess(context, 'Empresa "$nomeEmpresa" criada e admin vinculado!');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao criar empresa: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+      if (mounted) showError(context, 'Erro ao criar empresa: $e');
     }
   }
 
@@ -389,23 +371,9 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('id', vehicleId);
 
       await _carregar();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veículo vinculado com sucesso!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      if (mounted) showSuccess(context, 'Veículo vinculado com sucesso!');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao vincular veículo: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+      if (mounted) showError(context, 'Erro ao vincular veículo: $e');
     }
   }
 
@@ -417,14 +385,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -436,11 +397,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           .eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.danger),
-        );
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -485,11 +442,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       await _supabase.from('user_profiles').update({'nome': salvo}).eq('user_id', userId);
       await _carregar();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: AppColors.danger),
-        );
-      }
+      if (mounted) showError(context, 'Erro ao salvar: $e');
     }
   }
 

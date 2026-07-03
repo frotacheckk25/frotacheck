@@ -4,6 +4,7 @@ import '../../core/auth/app_auth_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class DocumentosPage extends StatefulWidget {
   const DocumentosPage({super.key});
@@ -73,9 +74,7 @@ class _DocumentosPageState extends State<DocumentosPage> {
       debugPrint('Erro ao carregar documentos: $e');
       if (!mounted) return;
       setState(() => carregando = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro ao carregar: $e')));
+      showError(context, 'Erro ao carregar: $e');
     }
   }
 
@@ -776,12 +775,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
     if (dataEmissao != null && dataVencimento.isBefore(dataEmissao!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Data de vencimento não pode ser anterior à data de emissão'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      showError(context, 'Data de vencimento não pode ser anterior à data de emissão');
       return;
     }
     setState(() => isSaving = true);
@@ -826,21 +820,10 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
 
       await supabase.from('documentos').insert(injetar(payload));
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Documento registrado com sucesso!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      if (mounted) showSuccess(context, 'Documento registrado com sucesso!');
       widget.onSaved();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao salvar: $e')));
-      }
+      if (mounted) showError(context, 'Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => isSaving = false);
     }
@@ -1460,17 +1443,11 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
           .eq('id', widget.documento['id']);
       widget.onAtualizado();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Documento excluído.')));
+        showSuccess(context, 'Documento excluído.');
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro: $e')));
-      }
+      if (mounted) showError(context, 'Erro: $e');
     }
   }
 
@@ -1637,20 +1614,9 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                     if (ctx.mounted) {
                       Navigator.pop(ctx);
                     }
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Documento atualizado'),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                    }
+                    if (mounted) showSuccess(context, 'Documento atualizado');
                   } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Erro: $e')));
-                    }
+                    if (mounted) showError(context, 'Erro: $e');
                   }
                 },
                 style: ElevatedButton.styleFrom(

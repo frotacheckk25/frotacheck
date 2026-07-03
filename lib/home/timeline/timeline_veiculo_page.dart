@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/utils/snackbar_utils.dart';
 
 class TimelineVeiculoPage extends StatefulWidget {
   final String veiculoId;
@@ -147,11 +148,7 @@ class _TimelineVeiculoPageState extends State<TimelineVeiculoPage> {
         isLoading = false;
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar timeline: $e')),
-        );
-      }
+      if (mounted) showError(context, 'Erro ao carregar timeline: $e');
       if (mounted) setState(() => isLoading = false);
     }
   }
