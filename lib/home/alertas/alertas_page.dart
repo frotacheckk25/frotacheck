@@ -426,7 +426,7 @@ class _AlertasPageState extends State<AlertasPage> {
       final result = await supabase
           .from('occurrences')
           .select(
-              'id, status, priority, problem_type, problem, location, created_at, vehicle_id, vehicle_plate, driver_id, driver_name, empresa_id')
+              'id, status, priority, problem_type, problem, location, created_at, vehicle_id, driver_id, driver_name, empresa_id')
           .eq('id', occId)
           .maybeSingle();
       if (result == null) {
