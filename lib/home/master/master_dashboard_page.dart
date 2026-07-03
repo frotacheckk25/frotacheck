@@ -145,7 +145,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     if (auth.isMaster) {
       _loadAll();
       _setupRealtime();
-      _timer = Timer.periodic(const Duration(seconds: 60), (_) => _loadAll());
+      // Realtime já cobre mudanças em empresas/vehicles/occurrences; este timer
+      // é só um fallback de segurança (reconexão perdida) e para atualizar o
+      // indicador de "usuários online", que muda com o tempo, não com escrita no banco.
+      _timer = Timer.periodic(const Duration(minutes: 3), (_) => _loadAll());
     } else {
       setState(() => _loading = false);
     }

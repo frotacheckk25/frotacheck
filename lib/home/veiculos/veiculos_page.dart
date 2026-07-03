@@ -41,6 +41,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> motoristas = [];
+  Map<String, Map<String, dynamic>> _motoristasPorId = {};
   List<Map<String, dynamic>> veiculos = [];
   String? motoristaSelecionado;
   bool isSaving = false;
@@ -83,6 +84,9 @@ class _VeiculosPageState extends State<_VeiculosView> {
         motoristas = List<Map<String, dynamic>>.from(
           (results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
+        _motoristasPorId = {
+          for (final m in motoristas) (m['id']?.toString() ?? ''): m,
+        };
         erroMsg = null;
         carregandoVeiculos = false;
       });
@@ -101,12 +105,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
   String _nomeMotorista(Map<String, dynamic> veiculo) {
     final id = veiculo['driver_id']?.toString();
     if (id == null) return 'Sem motorista';
-    try {
-      final m = motoristas.firstWhere((d) => d['id']?.toString() == id, orElse: () => {});
-      return m['name']?.toString() ?? 'Sem motorista';
-    } catch (_) {
-      return 'Sem motorista';
-    }
+    return _motoristasPorId[id]?['name']?.toString() ?? 'Sem motorista';
   }
 
   Future<void> salvarVeiculo() async {

@@ -446,6 +446,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
 
   String? selectedVehicle;
   String? selectedDriver;
+  DateTime selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -510,7 +511,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
       final payload = <String, dynamic>{
         'vehicle_id': selectedVehicle,
         'driver_id': selectedDriver,
-        'fuel_date': DateTime.now().toIso8601String().split('T')[0],
+        'fuel_date': selectedDate.toIso8601String().split('T')[0],
         'liters': double.tryParse(litrosController.text.replaceAll(',', '.')) ?? 0,
         'total_value': double.tryParse(valorController.text.replaceAll(',', '.')) ?? 0,
         'odometer': int.tryParse(odometroController.text) ?? 0,
@@ -659,6 +660,28 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                    return null;
                  },
                ),
+              const SizedBox(height: 14),
+
+              InkWell(
+                onTap: widget.readOnly ? null : () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now().subtract(const Duration(days: 365 * 2)),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setState(() => selectedDate = picked);
+                },
+                child: InputDecorator(
+                  decoration: _dec('Data do abastecimento *', Icons.calendar_today_outlined),
+                  child: Text(
+                    '${selectedDate.day.toString().padLeft(2, '0')}/'
+                    '${selectedDate.month.toString().padLeft(2, '0')}/'
+                    '${selectedDate.year}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
 
               const Text('Fotos (opcional)',

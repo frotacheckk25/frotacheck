@@ -776,6 +776,8 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
     }
   }
 
+  static const int _tamanhoMaximoArquivoBytes = 15 * 1024 * 1024; // 15MB
+
   Future<void> _selecionarArquivo() async {
     final resultado = await FilePicker.platform.pickFiles(
       withData: true,
@@ -783,7 +785,14 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       type: FileType.custom,
     );
     if (resultado != null && resultado.files.isNotEmpty) {
-      if (mounted) setState(() => arquivo = resultado.files.single);
+      final arquivoSelecionado = resultado.files.single;
+      if (arquivoSelecionado.size > _tamanhoMaximoArquivoBytes) {
+        if (mounted) {
+          showError(context, 'Arquivo muito grande. O tamanho máximo permitido é 15MB.');
+        }
+        return;
+      }
+      if (mounted) setState(() => arquivo = arquivoSelecionado);
     }
   }
 

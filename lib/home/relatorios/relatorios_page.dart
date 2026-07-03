@@ -97,7 +97,9 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         oilQ   = oilQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        fuelQ.order('fuel_date', ascending: true).limit(1000),
+        // Mais recentes primeiro: se o limite truncar, descarta os mais antigos,
+        // não os mais recentes (bug anterior fazia o oposto).
+        fuelQ.order('fuel_date', ascending: false).limit(1000),
         multaQ.limit(1000),
         oilQ.limit(1000),
       ]);

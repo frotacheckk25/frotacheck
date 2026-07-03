@@ -53,7 +53,7 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
       final eid = auth.effectiveEmpresaId;
 
       var oilQ  = supabase.from('oil_changes').select('id, vehicle_id, next_change_km, created_at');
-      var ocorrQ = supabase.from('occurrences').select('id, status');
+      var ocorrAbertasQ = supabase.from('occurrences').select('id').eq('status', 'Aberto');
       var veicQ  = supabase.from('vehicles').select('id, odometer');
 
       if (isMotorista) {
@@ -66,30 +66,27 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
           veicQ = veicQ.eq('id', '');
         }
         if (driverId != null) {
-          ocorrQ = ocorrQ.eq('driver_id', driverId);
+          ocorrAbertasQ = ocorrAbertasQ.eq('driver_id', driverId);
         } else {
-          ocorrQ = ocorrQ.eq('driver_id', ''); // força resultado vazio
+          ocorrAbertasQ = ocorrAbertasQ.eq('driver_id', ''); // força resultado vazio
         }
       } else if (eid != null) {
         oilQ  = oilQ.eq('empresa_id', eid);
-        ocorrQ = ocorrQ.eq('empresa_id', eid);
+        ocorrAbertasQ = ocorrAbertasQ.eq('empresa_id', eid);
         veicQ  = veicQ.eq('empresa_id', eid);
       }
 
-      final results = await Future.wait([
-        oilQ.order('created_at', ascending: false),
-        ocorrQ,
-        veicQ,
-      ]);
+      // Ocorrências abertas: contagem feita no banco (não baixa os registros).
+      final oilResult = await oilQ.order('created_at', ascending: false);
+      final ocorrCount = await ocorrAbertasQ.count();
+      final veicResult = await veicQ;
 
       final trocas = List<Map<String, dynamic>>.from(
-        ((results[0] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+        (oilResult).map((e) => Map<String, dynamic>.from(e)),
       );
-      final ocorr = List<Map<String, dynamic>>.from(
-        ((results[1] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
-      );
+      final abertas = ocorrCount.count;
       final veiculos = List<Map<String, dynamic>>.from(
-        ((results[2] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+        (veicResult).map((e) => Map<String, dynamic>.from(e)),
       );
 
       // Monta mapa de odômetro por vehicle_id
@@ -115,12 +112,6 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
         final atualKm = odomMap[vid] ?? 0;
         if (nextKm > 0 && atualKm >= nextKm - 2000) precisamTroca++;
       }
-
-      // Ocorrências abertas (apenas status 'Aberto', excluindo 'Em andamento' e 'Resolvido')
-      final abertas = ocorr.where((o) {
-        final s = (o['status'] ?? '').toString().toLowerCase().trim();
-        return s == 'aberto';
-      }).length;
 
       if (!mounted) return;
       setState(() {
