@@ -42,7 +42,8 @@ class _PneusPageState extends State<PneusPage> {
         vehicleId = v?['id']?.toString();
       }
 
-      var pneusQ = supabase.from('pneus').select('*');
+      var pneusQ = supabase.from('pneus').select(
+          'id, vehicle_id, veiculo_id, status, marca, brand, modelo, model_tire, posicao, position, km_instalacao, km_installation, data_instalacao, installation_date, observacoes, notes, empresa_id, created_at');
       if (auth.isMotorista) {
         if (vehicleId != null) pneusQ = pneusQ.eq('vehicle_id', vehicleId);
       } else if (eid != null) {

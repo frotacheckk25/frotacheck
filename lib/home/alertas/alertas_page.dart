@@ -159,7 +159,7 @@ class _AlertasPageState extends State<AlertasPage> {
       // Planos de manutenção (schema sem empresa_id confirmado — RLS cobre)
       supabase
           .from('maintenance_plans')
-          .select('*')
+          .select('id, vehicle_plate, next_service_km')
           .then((r) {
             rawPlanos = List<Map<String, dynamic>>.from(
               (r as List).map((e) => Map<String, dynamic>.from(e as Map)),
@@ -440,7 +440,8 @@ class _AlertasPageState extends State<AlertasPage> {
     try {
       final result = await supabase
           .from('occurrences')
-          .select('*')
+          .select(
+              'id, status, priority, problem_type, problem, location, created_at, vehicle_id, vehicle_plate, driver_id, driver_name, empresa_id')
           .eq('id', occId)
           .maybeSingle();
       if (result == null) {
