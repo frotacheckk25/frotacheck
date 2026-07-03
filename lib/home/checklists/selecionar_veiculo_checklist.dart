@@ -55,7 +55,11 @@ class _SelecionarVeiculoChecklistPageState
         veiculosResult = await veiQ.order('plate');
       }
       var motorQ = supabase.from('drivers').select('id, name');
-      if (eid != null) motorQ = motorQ.eq('empresa_id', eid);
+      if (auth.isMotorista && auth.driverId != null) {
+        motorQ = motorQ.eq('id', auth.driverId!);
+      } else if (eid != null) {
+        motorQ = motorQ.eq('empresa_id', eid);
+      }
       final motoristasResult = await motorQ.order('name');
 
       if (!mounted) return;
@@ -67,6 +71,9 @@ class _SelecionarVeiculoChecklistPageState
             .map((e) => Motorista.fromMap(e))
             .toList();
         isLoading = false;
+        if (auth.isMotorista && auth.driverId != null) {
+          motoristaSelecionado = auth.driverId;
+        }
       });
     } catch (e) {
       if (mounted) {

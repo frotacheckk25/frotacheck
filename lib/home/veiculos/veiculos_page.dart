@@ -114,6 +114,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
 
     try {
       final isNew = editingId == null;
+      String? savedVehicleId = editingId;
 
       if (isNew) {
         // Insert e retorna a linha criada para atualizar a lista imediatamente
@@ -124,6 +125,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
         if (!mounted) return;
         if (result.isNotEmpty) {
           final novoVeiculo = Map<String, dynamic>.from(result.first as Map);
+          savedVehicleId = novoVeiculo['id']?.toString();
           setState(() {
             veiculos = [novoVeiculo, ...veiculos];
             veiculos.sort((a, b) =>
@@ -151,7 +153,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
               .from('vehicles')
               .update({'driver_id': null})
               .eq('driver_id', newDriverId)
-              .neq('id', editingId ?? '');
+              .neq('id', savedVehicleId ?? '');
         } catch (_) {}
         try {
           final driverRow = await supabase

@@ -49,10 +49,16 @@ class _PlanoManutencaoPageState extends State<PlanoManutencaoPage> {
 
       var oilQ  = supabase
           .from('oil_changes')
-          .select('id, vehicle_id, change_date, oil_type, next_change_km, created_at');
+          .select('id, vehicle_id, oil_change_date, service_type, next_change_km, created_at');
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model, odometer');
       if (isMotorista) {
-        if (vehicleId != null) { oilQ = oilQ.eq('vehicle_id', vehicleId); veicQ = veicQ.eq('id', vehicleId); }
+        if (vehicleId != null) {
+          oilQ = oilQ.eq('vehicle_id', vehicleId);
+          veicQ = veicQ.eq('id', vehicleId);
+        } else {
+          oilQ = oilQ.eq('vehicle_id', '');
+          veicQ = veicQ.eq('id', '');
+        }
       } else if (eid != null) {
         oilQ  = oilQ.eq('empresa_id', eid);
         veicQ = veicQ.eq('empresa_id', eid);
@@ -196,7 +202,7 @@ class _PlanoManutencaoPageState extends State<PlanoManutencaoPage> {
     final kmRestante = _kmRestante(plano);
     final status = _statusLabel(plano);
     final cor = _statusColor(status);
-    final oilType = plano['oil_type']?.toString();
+    final oilType = plano['service_type']?.toString();
 
     return Container(
       padding: const EdgeInsets.all(18),

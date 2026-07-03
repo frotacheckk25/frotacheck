@@ -2082,7 +2082,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
       final bytes = await picked.readAsBytes();
       final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) return;
+      if (userId == null) {
+        setState(() => _uploadingAvatar = false);
+        return;
+      }
 
       final ext = picked.name.split('.').last.toLowerCase();
       final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';

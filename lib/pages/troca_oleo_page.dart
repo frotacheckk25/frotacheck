@@ -90,7 +90,13 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       var oilQ  = supabase.from('oil_changes').select(
           'id, vehicle_id, vehicle_plate, service_type, oil_change_date, created_at, current_km, next_change_km, notes, empresa_id');
       if (isMotorista) {
-        if (vehicleId != null) { veicQ = veicQ.eq('id', vehicleId); oilQ = oilQ.eq('vehicle_id', vehicleId); }
+        if (vehicleId != null) {
+          veicQ = veicQ.eq('id', vehicleId);
+          oilQ = oilQ.eq('vehicle_id', vehicleId);
+        } else {
+          veicQ = veicQ.eq('id', '');
+          oilQ = oilQ.eq('vehicle_id', '');
+        }
       } else if (eid != null) {
         veicQ = veicQ.eq('empresa_id', eid);
         oilQ  = oilQ.eq('empresa_id', eid);

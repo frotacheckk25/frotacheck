@@ -4265,16 +4265,16 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
     } catch (_) {}
 
     try {
-      // Multas by vehicle plate
+      // Multas by tipo/descrição (multas não tem coluna de placa própria)
       final multas = await supabase
           .from('multas')
-          .select('id, placa, descricao')
-          .ilike('placa', '%$term%')
+          .select('id, tipo, descricao')
+          .or('tipo.ilike.%$term%,descricao.ilike.%$term%')
           .limit(4);
       for (final m in multas as List) {
         out.add(_SearchResult(
           icon: Icons.receipt_long,
-          title: m['placa']?.toString() ?? 'Multa',
+          title: m['tipo']?.toString() ?? 'Multa',
           subtitle: m['descricao']?.toString() ?? 'Infração',
           color: const Color(0xFFef4444),
           page: const MultasPage(),

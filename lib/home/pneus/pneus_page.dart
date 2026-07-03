@@ -46,14 +46,14 @@ class _PneusPageState extends State<PneusPage> {
       var pneusQ = supabase.from('pneus').select(
           'id, vehicle_id, status, marca, modelo, posicao, km_instalacao, data_instalacao, observacoes, empresa_id, created_at');
       if (auth.isMotorista) {
-        if (vehicleId != null) pneusQ = pneusQ.eq('vehicle_id', vehicleId);
+        pneusQ = pneusQ.eq('vehicle_id', vehicleId ?? '');
       } else if (eid != null) {
         pneusQ = pneusQ.eq('empresa_id', eid);
       }
 
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
-      if (auth.isMotorista && auth.driverId != null) {
-        veicQ = veicQ.eq('driver_id', auth.driverId!);
+      if (auth.isMotorista) {
+        veicQ = veicQ.eq('driver_id', auth.driverId ?? '');
       } else if (eid != null) {
         veicQ = veicQ.eq('empresa_id', eid);
       }

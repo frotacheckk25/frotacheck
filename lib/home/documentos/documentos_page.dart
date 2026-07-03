@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/enums/app_permission.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
@@ -1648,6 +1649,7 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = context.watch<AppAuthProvider>().can(AppPermission.manageDocuments);
     final doc = widget.documento;
     final tipo = doc['tipo']?.toString() ?? '-';
     final descricao = doc['descricao']?.toString() ?? '-';
@@ -1659,11 +1661,12 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
         title: const Text('Detalhe do Documento'),
         backgroundColor: AppColors.surface,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Editar',
-            onPressed: _abrirEdicao,
-          ),
+          if (canManage)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Editar',
+              onPressed: _abrirEdicao,
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -1813,28 +1816,29 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
             const SizedBox(height: 24),
 
             // Botão excluir
-            OutlinedButton.icon(
-              onPressed: _deletar,
-              icon: const Icon(
-                Icons.delete_outline,
-                color: AppColors.danger,
-                size: 18,
-              ),
-              label: const Text(
-                'Excluir Documento',
-                style: TextStyle(
+            if (canManage)
+              OutlinedButton.icon(
+                onPressed: _deletar,
+                icon: const Icon(
+                  Icons.delete_outline,
                   color: AppColors.danger,
-                  fontWeight: FontWeight.w600,
+                  size: 18,
+                ),
+                label: const Text(
+                  'Excluir Documento',
+                  style: TextStyle(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.danger),
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.danger),
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
           ],
         ),
       ),

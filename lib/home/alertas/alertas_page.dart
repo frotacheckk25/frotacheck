@@ -70,7 +70,7 @@ class _AlertasPageState extends State<AlertasPage> {
         .select('id, vehicle_id, veiculo_id, tipo, valor, data, created_at')
         .eq('status', 'aberta');
     var docQ = supabase.from('documentos').select(
-      'id, vehicle_id, veiculo_id, tipo, descricao, data_vencimento, created_at',
+      'id, vehicle_id, tipo, descricao, data_vencimento, created_at',
     );
     var ocorrQ = supabase
         .from('occurrences')

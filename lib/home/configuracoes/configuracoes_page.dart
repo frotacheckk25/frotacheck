@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/snackbar_utils.dart';
 
@@ -200,6 +201,10 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   // ── Salvar empresa ────────────────────────────────────────────────────────
   Future<void> _salvarEmpresa() async {
     if (_empresaId == null) return;
+    if (!context.read<AppAuthProvider>().can(AppPermission.manageSettings)) {
+      _snack('Você não tem permissão para alterar configurações da empresa.');
+      return;
+    }
     setState(() => _savingEmpresa = true);
     try {
       await _supabase.from('empresas').update({
@@ -336,8 +341,34 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
     }
   }
 
+  bool get _canManageUsers =>
+      context.read<AppAuthProvider>().can(AppPermission.manageUsers);
+
   // ── Alterar role de usuário ───────────────────────────────────────────────
   Future<void> _alterarRole(String userId, String novoRole) async {
+    if (!_canManageUsers) {
+      _snack('Você não tem permissão para alterar o papel de usuários.');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _surface,
+        title: const Text('Confirmar alteração', style: TextStyle(color: _white)),
+        content: Text('Alterar o papel deste usuário para "$novoRole"?',
+            style: const TextStyle(color: _sub)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar', style: TextStyle(color: _muted))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _blue),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar', style: TextStyle(color: _white)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     try {
       await _supabase
           .from('user_profiles')
@@ -351,6 +382,10 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   }
 
   Future<void> _alterarStatus(String userId, String novoStatus) async {
+    if (!_canManageUsers) {
+      _snack('Você não tem permissão para alterar o status de usuários.');
+      return;
+    }
     try {
       await _supabase
           .from('user_profiles')
@@ -634,10 +669,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         const SizedBox(width: 8),
         // Status toggle
         GestureDetector(
-          onTap: () => _alterarStatus(
-            u['user_id'].toString(),
-            isAtivo ? 'inativo' : 'ativo',
-          ),
+          onTap: _canManageUsers
+              ? () => _alterarStatus(
+                    u['user_id'].toString(),
+                    isAtivo ? 'inativo' : 'ativo',
+                  )
+              : null,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -654,18 +691,20 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        // Role change popup
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.settings_rounded, color: _muted, size: 18),
-          color: _card2,
-          onSelected: (val) => _alterarRole(u['user_id'].toString(), val),
-          itemBuilder: (_) => [
-            _popupItem('ADMIN_EMPRESA', 'Tornar Admin', _blue),
-            _popupItem('GESTOR',        'Tornar Gestor', const Color(0xFF8B5CF6)),
-            _popupItem('MOTORISTA',     'Tornar Motorista', _green),
-          ],
-        ),
+        if (_canManageUsers) ...[
+          const SizedBox(width: 8),
+          // Role change popup
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.settings_rounded, color: _muted, size: 18),
+            color: _card2,
+            onSelected: (val) => _alterarRole(u['user_id'].toString(), val),
+            itemBuilder: (_) => [
+              _popupItem('ADMIN_EMPRESA', 'Tornar Admin', _blue),
+              _popupItem('GESTOR',        'Tornar Gestor', const Color(0xFF8B5CF6)),
+              _popupItem('MOTORISTA',     'Tornar Motorista', _green),
+            ],
+          ),
+        ],
       ]),
     );
   }
