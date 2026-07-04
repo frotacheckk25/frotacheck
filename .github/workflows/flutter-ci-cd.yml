@@ -57,7 +57,7 @@ jobs:
         run: flutter build web --release
       
       - name: Upload web build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flutter-web-build
           path: build/web/
@@ -89,7 +89,7 @@ jobs:
         run: flutter build apk --release
       
       - name: Upload APK artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flutter-apk-build
           path: build/app/outputs/flutter-apk/
@@ -115,7 +115,7 @@ jobs:
         run: flutter build ios --release --no-codesign
       
       - name: Upload iOS build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flutter-ios-build
           path: build/ios/Release-iphoneos/
@@ -141,7 +141,7 @@ jobs:
         run: flutter build windows --release
       
       - name: Upload Windows build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flutter-windows-build
           path: build/windows/runner/Release/
