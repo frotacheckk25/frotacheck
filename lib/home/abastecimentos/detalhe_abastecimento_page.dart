@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/signed_network_image.dart';
 
 class DetalheAbastecimentoPage extends StatelessWidget {
   final Map<String, dynamic> abastecimento;
@@ -111,7 +112,7 @@ class DetalheAbastecimentoPage extends StatelessWidget {
         const SizedBox(height: 12),
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(url, errorBuilder: (_, _, _) =>
+          child: SignedNetworkImage(url: url, errorBuilder: (_, _, _) =>
               Container(
                 height: 120,
                 decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),

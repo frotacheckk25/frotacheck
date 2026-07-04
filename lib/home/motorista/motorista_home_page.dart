@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/signed_storage_url.dart';
 import '../abastecimentos/abastecimentos_page.dart';
 import '../checklists/selecionar_veiculo_checklist.dart';
 import '../checklists/historico_checklist_page.dart';
@@ -268,10 +269,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .select('avatar_url')
               .eq('user_id', userId)
               .maybeSingle();
-          avatarUrl = perfil?['avatar_url']?.toString();
-          // cache-bust para forçar reload após upload
-          if (avatarUrl != null && avatarUrl.isNotEmpty) {
-            avatarUrl = _addCacheBust(avatarUrl);
+          final rawAvatarUrl = perfil?['avatar_url']?.toString();
+          if (rawAvatarUrl != null && rawAvatarUrl.isNotEmpty) {
+            final signed = await toSignedStorageUrl(rawAvatarUrl);
+            // cache-bust para forçar reload após upload
+            avatarUrl = _addCacheBust(signed ?? rawAvatarUrl);
           }
         } catch (_) {}
       }
@@ -2107,7 +2109,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           .update({'avatar_url': rawUrl})
           .eq('user_id', userId);
 
-      final urlComBust = _addCacheBust(rawUrl);
+      final signedUrl = await toSignedStorageUrl(rawUrl);
+      final urlComBust = _addCacheBust(signedUrl ?? rawUrl);
       if (mounted) {
         setState(() {
           _avatarUrl = urlComBust;

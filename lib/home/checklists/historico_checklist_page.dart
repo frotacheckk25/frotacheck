@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/signed_network_image.dart';
 
 class HistoricoChecklistPage extends StatefulWidget {
   const HistoricoChecklistPage({super.key});
@@ -327,8 +328,8 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                 itemCount: fotos.length,
                 itemBuilder: (_, idx) => ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    fotos[idx],
+                  child: SignedNetworkImage(
+                    url: fotos[idx],
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stack) => Container(
                       color: AppColors.backgroundSoft,

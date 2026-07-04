@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/widgets/signed_network_image.dart';
 
 class MultasPage extends StatefulWidget {
   const MultasPage({super.key});
@@ -1533,8 +1534,8 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
               const SizedBox(height: 14),
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  fotoUrl,
+                child: SignedNetworkImage(
+                  url: fotoUrl,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,

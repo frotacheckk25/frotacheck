@@ -6,6 +6,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/signed_storage_url.dart';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const _bg      = Color(0xFF080F1E);
@@ -133,7 +134,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         _emailRelCtrl.text = empresa['report_email']?.toString() ?? '';
         _enderecoCtrl.text = empresa['endereco']?.toString()
             ?? empresa['address']?.toString()                     ?? '';
-        _logoUrl = empresa['logo_url']?.toString();
+        _logoUrl = await toSignedStorageUrl(empresa['logo_url']?.toString());
       }
 
       // 2. Configurações extras (tabela company_settings, filtrada por empresa_id)
@@ -277,7 +278,8 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
           );
 
       final rawUrl = _supabase.storage.from('logos').getPublicUrl(path);
-      final url = '$rawUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      final signedUrl = await toSignedStorageUrl(rawUrl);
+      final url = '$signedUrl&t=${DateTime.now().millisecondsSinceEpoch}';
 
       await _supabase
           .from('empresas')
