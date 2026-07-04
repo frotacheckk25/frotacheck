@@ -1000,9 +1000,9 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
                 decoration: _dec('Valor da Multa (R\$) *', Icons.attach_money),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Informe o valor';
-                  if (double.tryParse(v.replaceAll(',', '.')) == null) {
-                    return 'Valor inválido';
-                  }
+                  final parsed = double.tryParse(v.replaceAll(',', '.'));
+                  if (parsed == null) return 'Valor inválido';
+                  if (parsed <= 0) return 'Valor deve ser maior que zero';
                   return null;
                 },
               ),

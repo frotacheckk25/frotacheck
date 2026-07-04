@@ -36,7 +36,8 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
           .from('fuelings')
           .select('*, vehicles (plate), drivers (name)');
       if (eid != null) q = q.eq('empresa_id', eid);
-      final dados = await q.order('fuel_date', ascending: false);
+      // Mais recentes primeiro: se o limite truncar, descarta os mais antigos.
+      final dados = await q.order('fuel_date', ascending: false).limit(1000);
 
       setState(() {
         abastecimentos = List<Map<String, dynamic>>.from(

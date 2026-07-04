@@ -98,7 +98,7 @@ class _ViagensPageState extends State<ViagensPage> {
         if (vMap.isEmpty && driverId != null) {
           try {
             final v = await supabase.from('vehicles')
-                .select('id, plate, brand, model').eq('driver_id', driverId).maybeSingle();
+                .select('id, plate, brand, model, odometer').eq('driver_id', driverId).maybeSingle();
             if (v != null) vMap[v['id'].toString()] = Map<String, dynamic>.from(v);
           } catch (_) {}
         }
@@ -114,7 +114,7 @@ class _ViagensPageState extends State<ViagensPage> {
         // ADMIN/GESTOR: veículos por empresa
         try {
           final vs = await supabase.from('vehicles')
-              .select('id, plate, brand, model').eq('empresa_id', eid).order('plate');
+              .select('id, plate, brand, model, odometer').eq('empresa_id', eid).order('plate');
           for (final v in vs as List) {
             final row = Map<String, dynamic>.from(v as Map);
             vMap[row['id'].toString()] = row;
@@ -157,7 +157,8 @@ class _ViagensPageState extends State<ViagensPage> {
       } else if (eid != null) {
         viaQ = viaQ.eq('empresa_id', eid);
       }
-      final viaResp = await viaQ.order('data_inicio', ascending: false);
+      // Mais recentes primeiro: se o limite truncar, descarta as mais antigas.
+      final viaResp = await viaQ.order('data_inicio', ascending: false).limit(1000);
       final viaList = List<Map<String, dynamic>>.from(
         (viaResp as List).map((e) => Map<String, dynamic>.from(e as Map)),
       );
@@ -471,6 +472,11 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
       showError(context, 'Quilometragem inicial inválida');
       return;
     }
+    final odometroAtual = (widget.veiculosMap[veiculoId]?['odometer'] as num?)?.toDouble();
+    if (odometroAtual != null && kmInicio < odometroAtual) {
+      showError(context, 'Menor que o último odômetro registrado (${odometroAtual.toInt()} km)');
+      return;
+    }
 
     setState(() => isLoading = true);
     final injetar = context.read<AppAuthProvider>().inject;
@@ -698,6 +704,18 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
         // ignore: use_null_aware_elements
         if (localizacao != null) 'localizacao_fim': localizacao,
       }).eq('id', widget.viagem['id']);
+
+      // Atualiza o odômetro do veículo se a viagem terminou com km maior que o registrado
+      final veiculoId = widget.viagem['veiculo_id']?.toString();
+      if (veiculoId != null) {
+        try {
+          await supabase
+              .from('vehicles')
+              .update({'odometer': kmFim.toInt()})
+              .eq('id', veiculoId)
+              .lt('odometer', kmFim.toInt());
+        } catch (_) {}
+      }
 
       if (!mounted) return;
       showSuccess(context, 'Viagem concluída! ${kmPerc.toStringAsFixed(1)} km percorridos.');

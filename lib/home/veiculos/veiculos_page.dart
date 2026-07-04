@@ -497,7 +497,9 @@ class _VeiculosPageState extends State<_VeiculosView> {
                       keyboardType: TextInputType.number,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Informe o Km';
-                        if (int.tryParse(v.trim()) == null) return 'Km inválido — use apenas números';
+                        final parsed = int.tryParse(v.trim());
+                        if (parsed == null) return 'Km inválido — use apenas números';
+                        if (parsed < 0) return 'Km não pode ser negativo';
                         return null;
                       },
                     ),

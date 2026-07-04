@@ -566,7 +566,10 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     carregarDashboard();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+    // Esta tela raiz não é descartada ao navegar (Navigator.push só a cobre),
+    // então o timer continua rodando por baixo enquanto o usuário está em
+    // outra tela. Intervalo maior reduz a carga redundante no banco.
+    _refreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
       if (mounted) carregarDashboard();
     });
   }
@@ -725,15 +728,24 @@ class _HomePageState extends State<HomePage> {
         criticas = List<Map<String, dynamic>>.from(
           (critRes as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
-        // Resolve placa
-        for (final c in criticas) {
-          final vid = c['vehicle_id']?.toString();
-          if (vid != null) {
-            try {
-              final v = await supabase.from('vehicles').select('plate').eq('id', vid).maybeSingle();
-              c['_placa'] = v?['plate'] ?? '-';
-            } catch (_) {}
-          }
+        // Resolve placa — uma única query para todos os veículos, em vez de
+        // uma consulta por ocorrência.
+        final vids = criticas
+            .map((c) => c['vehicle_id']?.toString())
+            .whereType<String>()
+            .toSet()
+            .toList();
+        if (vids.isNotEmpty) {
+          try {
+            final vs = await supabase.from('vehicles').select('id, plate').inFilter('id', vids);
+            final placaPorId = <String, String>{
+              for (final v in (vs as List))
+                (v as Map)['id'].toString(): v['plate']?.toString() ?? '-',
+            };
+            for (final c in criticas) {
+              c['_placa'] = placaPorId[c['vehicle_id']?.toString()] ?? '-';
+            }
+          } catch (_) {}
         }
       } catch (_) {}
 

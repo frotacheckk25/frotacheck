@@ -179,6 +179,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     }
   }
 
+  // ── Helper: contagem real no banco (não baixa os registros) ───────────────
+  // O chamador passa a query já terminada em `.count()`.
+  Future<int> _safeCount(Future<dynamic> query) async {
+    try {
+      final res = await query;
+      return (res.count as int?) ?? 0;
+    } catch (e) {
+      debugPrint('Dashboard count error: $e');
+      return 0;
+    }
+  }
+
   // ── Carregamento de dados ───────────────────────────────────────────────────
   Future<void> _loadAll() async {
     try {
@@ -204,13 +216,17 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             .select('id, empresa_id, total_value, fuel_date, vehicle_id, created_at')
             .gte('fuel_date', sixMonthsAgo.toIso8601String().split('T')[0])
             .order('created_at', ascending: false)),
-        // 5: checklists (sem limit — Supabase default 1000)
+        // 5: checklists — só os últimos 2 meses (suficiente para a tendência
+        // mês-a-mês; total real vem de uma contagem separada, abaixo)
         _safeQ(_supabase.from('checklists')
             .select('id, empresa_id, tipo, vehicle_id, driver_id, created_at')
+            .gte('created_at', lastMonth.toIso8601String())
             .order('created_at', ascending: false)),
-        // 6: ocorrências (sem limit — Supabase default 1000)
+        // 6: ocorrências — últimos 2 meses (idem; abertas antigas são cobertas
+        // pela contagem separada de "ocorrências abertas", abaixo)
         _safeQ(_supabase.from('occurrences')
             .select('id, empresa_id, status, created_at')
+            .gte('created_at', lastMonth.toIso8601String())
             .order('created_at', ascending: false)),
         // 7: oil_changes (manutenções)
         _safeQ(_supabase.from('oil_changes').select('id, vehicle_id, created_at')),
@@ -222,9 +238,20 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 now.subtract(const Duration(minutes: 30)).toIso8601String())),
         // 9: manutencoes (tabela opcional — safeQ retorna [] se não existir)
         _safeQ(_supabase.from('manutencoes').select('id').limit(500)),
-        // 10: total abastecimentos sem filtro de data (contagem real)
-        _safeQ(_supabase.from('fuelings').select('id')),
       ]);
+
+      // Contagens reais no banco — não truncam e não baixam os registros.
+      final countResults = await Future.wait([
+        _safeCount(_supabase.from('fuelings').select('id').count(CountOption.exact)),
+        _safeCount(_supabase.from('occurrences').select('id').count(CountOption.exact)),
+        _safeCount(_supabase.from('occurrences')
+            .select('id')
+            .inFilter('status', ['Aberto', 'Em andamento', 'Em Andamento', 'aberto', 'em_andamento'])
+            .count(CountOption.exact)),
+      ]);
+      final totalAbastecimentosReal = countResults[0];
+      final totalOcorrenciasReal = countResults[1];
+      final ocorrAbertasReal = countResults[2];
 
       final empresas = results[0];
       final profiles = results[1];
@@ -236,7 +263,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final oilChanges = results[7];
       final online = results[8];
       final manutExtra = results[9];
-      final allFuelings = results[10];
       final manutTotal = manutExtra.length + oilChanges.length;
 
       final onlineIds = online.map((p) => p['empresa_id']).whereType<String>().toSet();
@@ -310,11 +336,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         return dt.isBefore(in30Days) && dt.isAfter(now);
       }).length;
 
-      // Ocorrências abertas
-      final ocorrAbertas = ocorrencias.where((o) {
-        final s = (o['status'] ?? '').toString().toLowerCase();
-        return s == 'aberto' || s == 'em_andamento' || s == 'em andamento';
-      }).length;
+      // Ocorrências abertas — contagem real no banco (ocorrAbertasReal),
+      // não filtrada em memória a partir da janela de 2 meses acima, porque
+      // uma ocorrência aberta há mais tempo continuaria "aberta" e não pode
+      // ser perdida por causa da janela.
+      final ocorrAbertas = ocorrAbertasReal;
 
       // Empresas com mensalidade atrasada (status suspenso/cancelado)
       final mensAtrasadas = empresas.where((e) {
@@ -500,8 +526,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _totalUsuarios = profiles.length;
         _totalVeiculos = veiculos.length;
         _totalMotoristas = motoristas.length;
-        _totalAbastecimentos = allFuelings.length;
-        _totalOcorrencias = ocorrencias.length;
+        _totalAbastecimentos = totalAbastecimentosReal;
+        _totalOcorrencias = totalOcorrenciasReal;
         _totalManutencoes = manutTotal;
         _receitaMes = recMes;
         _novasEmpresas = novasEmp;
@@ -1850,17 +1876,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                       await tmpClient.dispose();
                     }
 
-                    // Inserir perfil do usuário (master tem permissão)
-                    try {
-                      await _supabase.from('user_profiles').upsert({
-                        'user_id': userId,
-                        'email': email,
-                        'nome': nome,
-                        'role': 'MOTORISTA',
-                        'empresa_id': empresaSelecionadaId,
-                        'status': 'ativo',
-                      }, onConflict: 'user_id');
-                    } catch (_) {}
+                    // Inserir perfil do usuário (master tem permissão).
+                    // Não silenciar: se isso falhar, a conta fica criada no Auth
+                    // mas sem role/empresa_id, e o motorista trava em "pendente"
+                    // sem ninguém saber o motivo.
+                    await _supabase.from('user_profiles').upsert({
+                      'user_id': userId,
+                      'email': email,
+                      'nome': nome,
+                      'role': 'MOTORISTA',
+                      'empresa_id': empresaSelecionadaId,
+                      'status': 'ativo',
+                    }, onConflict: 'user_id');
                   } else {
                     // ── Vincular conta existente por e-mail ──────────────────
                     final existing = await _supabase
