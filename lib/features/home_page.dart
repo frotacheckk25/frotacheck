@@ -1318,11 +1318,13 @@ class _HomePageState extends State<HomePage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.search),
-              onPressed: () {},
+              tooltip: 'Buscar',
+              onPressed: _showSearchDialog,
             ),
             IconButton(
               icon: const Icon(Icons.notifications_none),
-              onPressed: () {},
+              tooltip: 'Alertas',
+              onPressed: _showAlertsPanel,
             ),
           ],
           elevation: 0,

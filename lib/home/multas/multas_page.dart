@@ -8,15 +8,28 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/widgets/signed_network_image.dart';
+import '../../core/guards/permission_guard.dart';
 
-class MultasPage extends StatefulWidget {
+class MultasPage extends StatelessWidget {
   const MultasPage({super.key});
 
   @override
-  State<MultasPage> createState() => _MultasPageState();
+  Widget build(BuildContext context) {
+    return const PermissionGuard(
+      permission: AppPermission.viewMultas,
+      child: _MultasView(),
+    );
+  }
 }
 
-class _MultasPageState extends State<MultasPage> {
+class _MultasView extends StatefulWidget {
+  const _MultasView();
+
+  @override
+  State<_MultasView> createState() => _MultasPageState();
+}
+
+class _MultasPageState extends State<_MultasView> {
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> multas = [];
@@ -774,13 +787,15 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
     setState(() => isSaving = true);
-    final injetar = context.read<AppAuthProvider>().inject;
+    final auth = context.read<AppAuthProvider>();
+    final injetar = auth.inject;
+    final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
     try {
       // Upload foto (silencioso se bucket não existir)
       String? fotoUrl;
       if (fotoBytes != null) {
         try {
-          final fileName = 'multa_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          final fileName = '$pastaEmpresa/multa_${DateTime.now().millisecondsSinceEpoch}.jpg';
           await supabase.storage
               .from('multas')
               .uploadBinary(

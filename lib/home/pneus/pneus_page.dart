@@ -2,17 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/enums/app_permission.dart';
+import '../../core/guards/permission_guard.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 
-class PneusPage extends StatefulWidget {
+class PneusPage extends StatelessWidget {
   const PneusPage({super.key});
 
   @override
-  State<PneusPage> createState() => _PneusPageState();
+  Widget build(BuildContext context) {
+    return const PermissionGuard(
+      permission: AppPermission.viewTires,
+      child: _PneusView(),
+    );
+  }
 }
 
-class _PneusPageState extends State<PneusPage> {
+class _PneusView extends StatefulWidget {
+  const _PneusView();
+
+  @override
+  State<_PneusView> createState() => _PneusPageState();
+}
+
+class _PneusPageState extends State<_PneusView> {
   final supabase = Supabase.instance.client;
   List<Map<String, dynamic>> pneus = [];
   Map<String, Map<String, dynamic>> veiculosMap = {};

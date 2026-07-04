@@ -139,7 +139,9 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
     }
 
     setState(() => isLoading = true);
-    final injetar = context.read<AppAuthProvider>().inject;
+    final auth = context.read<AppAuthProvider>();
+    final injetar = auth.inject;
+    final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
 
     try {
       final List<String> fotoUrls = [];
@@ -149,7 +151,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
             .toLowerCase()
             .replaceAll(' ', '_');
         final fileName =
-            'retorno_${widget.veiculoId}_${label}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            '$pastaEmpresa/retorno_${widget.veiculoId}_${label}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final url = await _uploadComRetry(bytes, fileName);
         if (url == null) {
           if (mounted) {

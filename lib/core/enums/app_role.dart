@@ -97,6 +97,11 @@ enum AppRole {
           AppPermission.viewChecklists,  AppPermission.manageChecklists,
           AppPermission.viewDocuments,   // próprios documentos (CNH, etc.)
           AppPermission.viewAlerts,      // alertas do seu veículo
+          // Multas e pneus: motorista só REGISTRA (nunca aprova/exclui —
+          // isso é checado à parte via AppPermission.manageMultas/manageTires,
+          // que o motorista não tem)
+          AppPermission.viewMultas,
+          AppPermission.viewTires,
         ];
     }
   }

@@ -205,6 +205,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
 
         // Ao editar, re-vincular conta se email foi preenchido
         if (emailConta.isNotEmpty) {
+          bool vinculoOk = false;
           try {
             final userProfile = await supabase
                 .from('user_profiles')
@@ -214,10 +215,17 @@ class _MotoristasPageState extends State<_MotoristasView> {
             if (userProfile != null) {
               final uId = userProfile['user_id'].toString();
               await linkUserToDriver(supabase, userId: uId, driverId: editingId!);
+              vinculoOk = true;
             }
           } catch (_) {}
+          if (vinculoOk) {
+            _snackSucesso('Motorista atualizado e vinculado à conta $emailConta!');
+          } else {
+            _snackSucesso('Motorista atualizado! Conta "$emailConta" não encontrada — vínculo pendente.');
+          }
+        } else {
+          _snackSucesso('Motorista atualizado!');
         }
-        _snackSucesso('Motorista atualizado!');
       }
       _limparFormulario();
     } catch (e) {

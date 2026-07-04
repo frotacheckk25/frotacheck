@@ -479,9 +479,9 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
     }
   }
 
-  Future<String?> _upload(XFile? img, String bucket) async {
+  Future<String?> _upload(XFile? img, String bucket, String pastaEmpresa) async {
     if (img == null) return null;
-    final nome = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(img.path)}';
+    final nome = '$pastaEmpresa/${DateTime.now().millisecondsSinceEpoch}_${p.basename(img.path)}';
     final bytes = await img.readAsBytes();
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -501,12 +501,14 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
     if (_formKey.currentState?.validate() != true) return;
 
     // captura inject antes dos awaits para evitar uso de context após gap assíncrono
-    final injetar = context.read<AppAuthProvider>().inject;
+    final auth = context.read<AppAuthProvider>();
+    final injetar = auth.inject;
+    final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
     setState(() => isSaving = true);
     try {
-      final odometroUrl = await _upload(odometroPhoto, 'fuelings');
-      final bombaUrl = await _upload(pumpPhoto, 'fuelings');
-      final cupomUrl = await _upload(receiptPhoto, 'fuelings');
+      final odometroUrl = await _upload(odometroPhoto, 'fuelings', pastaEmpresa);
+      final bombaUrl = await _upload(pumpPhoto, 'fuelings', pastaEmpresa);
+      final cupomUrl = await _upload(receiptPhoto, 'fuelings', pastaEmpresa);
 
       final payload = <String, dynamic>{
         'vehicle_id': selectedVehicle,

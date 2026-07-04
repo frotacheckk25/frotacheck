@@ -803,7 +803,9 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       return;
     }
     setState(() => isSaving = true);
-    final injetar = context.read<AppAuthProvider>().inject;
+    final auth = context.read<AppAuthProvider>();
+    final injetar = auth.inject;
+    final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
     try {
       // Upload arquivo (silencioso se bucket não existir)
       String? fileUrl;
@@ -811,7 +813,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
         try {
           final ext = arquivo!.extension ?? 'pdf';
           final fileName =
-              'documento_${DateTime.now().millisecondsSinceEpoch}.$ext';
+              '$pastaEmpresa/documento_${DateTime.now().millisecondsSinceEpoch}.$ext';
           await supabase.storage
               .from('documentos')
               .uploadBinary(

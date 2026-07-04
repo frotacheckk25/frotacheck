@@ -2080,6 +2080,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       );
       if (picked == null || !mounted) return;
 
+      final pastaEmpresa = context.read<AppAuthProvider>().effectiveEmpresaId ?? 'sem-empresa';
       setState(() => _uploadingAvatar = true);
 
       final bytes = await picked.readAsBytes();
@@ -2091,7 +2092,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
       final ext = picked.name.split('.').last.toLowerCase();
       final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
-      final path = '$userId.$ext';
+      final path = '$pastaEmpresa/$userId.$ext';
 
       // Upload para Supabase Storage bucket "avatars"
       await _supabase.storage.from('avatars').uploadBinary(

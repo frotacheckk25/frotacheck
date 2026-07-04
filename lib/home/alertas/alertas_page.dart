@@ -59,7 +59,6 @@ class _AlertasPageState extends State<AlertasPage> {
     List<Map<String, dynamic>> rawDocs = [];
     List<Map<String, dynamic>> rawOcorr = [];
     List<Map<String, dynamic>> rawOleos = [];
-    List<Map<String, dynamic>> rawPlanos = [];
     Map<String, Map<String, dynamic>> veicMap = {};
     Map<String, Map<String, dynamic>> motMap = {};
 
@@ -155,19 +154,6 @@ class _AlertasPageState extends State<AlertasPage> {
           })
           .catchError((e) {
             debugPrint('oil_changes query: $e');
-          }),
-
-      // Planos de manutenção (schema sem empresa_id confirmado — RLS cobre)
-      supabase
-          .from('maintenance_plans')
-          .select('id, vehicle_plate, next_service_km')
-          .then((r) {
-            rawPlanos = List<Map<String, dynamic>>.from(
-              (r as List).map((e) => Map<String, dynamic>.from(e as Map)),
-            );
-          })
-          .catchError((e) {
-            debugPrint('maintenance_plans query: $e');
           }),
 
       // Veículos
@@ -298,40 +284,6 @@ class _AlertasPageState extends State<AlertasPage> {
       });
     }
 
-    // ── Sintéticos: Planos de manutenção ─────────────────────────────────────
-    final alertasManut = <Map<String, dynamic>>[];
-    for (final p in rawPlanos) {
-      final nextKm = p['next_service_km'];
-      if (nextKm == null) continue;
-      final nextInt = (nextKm is num)
-          ? nextKm.toInt()
-          : int.tryParse(nextKm.toString()) ?? 0;
-      final plate = p['vehicle_plate']?.toString() ?? '-';
-      // Tenta encontrar odômetro do veículo pela placa
-      final veiculo = veicMap.values.firstWhere(
-        (v) => v['plate']?.toString() == plate,
-        orElse: () => {},
-      );
-      final currInt = veiculo.isNotEmpty
-          ? ((veiculo['odometer'] is num)
-                ? veiculo['odometer'].toInt()
-                : int.tryParse(veiculo['odometer']?.toString() ?? '') ?? 0)
-          : 0;
-      final faltam = nextInt - currInt;
-      if (faltam > 2000) continue;
-      alertasManut.add({
-        '_source': _srcManut,
-        '_ref_id': p['id']?.toString(),
-        'title': 'Manutenção Prevista — $plate',
-        'subtitle': faltam <= 0
-            ? 'Serviço atrasado! Previsto em $nextInt km'
-            : 'Faltam $faltam km · Próximo serviço em $nextInt km',
-        'tipo': faltam <= 0 ? 'error' : 'warning',
-        'status': 'ativo',
-        'created_at': null,
-      });
-    }
-
     // ── Ocorrências críticas para destaque visual ─────────────────────────────
     final ocorrComDados = rawOcorr.map((o) {
       final vid = o['vehicle_id']?.toString();
@@ -352,7 +304,6 @@ class _AlertasPageState extends State<AlertasPage> {
       ...alertasMultas,
       ...alertasDocs,
       ...alertasOleos,
-      ...alertasManut,
     ];
 
     // Ordena: resolvidos por último; dentro de cada grupo: error > warning > info; depois por data desc

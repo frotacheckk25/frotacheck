@@ -269,7 +269,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       final bytes = await picked.readAsBytes();
       final ext = picked.name.split('.').last.toLowerCase();
       final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
-      final path = '$_empresaId.$ext';
+      final path = '$_empresaId/logo.$ext';
 
       await _supabase.storage.from('logos').uploadBinary(
             path,
