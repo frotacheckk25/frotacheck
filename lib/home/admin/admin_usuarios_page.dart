@@ -217,6 +217,58 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     }
   }
 
+  Future<void> _showNovaEmpresaDialog() async {
+    final controller = TextEditingController();
+    setState(() => _isEditing = true);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: const Text('Nova empresa', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Nome da empresa',
+            labelStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.secondary)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Criar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    final nome = controller.text.trim();
+    controller.dispose();
+    setState(() => _isEditing = false);
+    if (confirmed != true || nome.isEmpty) return;
+    try {
+      final nova = await _supabase.from('empresas').insert({'nome': nome, 'status': 'ativo'}).select('id').single();
+      await _carregar();
+      if (mounted) {
+        setState(() => _empresaSelecionadaId = nova['id']?.toString());
+        showSuccess(context, 'Empresa "$nome" criada!');
+      }
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
   Future<void> _criarEmpresaParaAdmin(
       String userId, Map<String, dynamic> perfil) async {
     final nomeInicial =
@@ -1033,7 +1085,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     final hhmm = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     if (data == hoje) return 'Hoje $hhmm';
     if (data == hoje.subtract(const Duration(days: 1))) return 'Ontem $hhmm';
-    return '${_fmtDate(dt)} $hhmm';
+    return _fmtDate(dt);
   }
 
   Widget _avatar(Map<String, dynamic> u, {double size = 40}) {
@@ -1145,15 +1197,25 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
-            child: const Icon(Icons.people_alt_rounded, color: AppColors.secondary, size: 20),
+            child: const Icon(Icons.group_rounded, color: AppColors.secondary, size: 20),
           ),
           const SizedBox(width: 12),
           if (wide)
             const Padding(
               padding: EdgeInsets.only(right: 24),
-              child: Text(
-                'Gestão de Usuários',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Gestão de Usuários',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    'Hierarquia de empresas, gestores e motoristas',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
+                  ),
+                ],
               ),
             )
           else
@@ -1169,13 +1231,13 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.background,
+                  color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: Colors.white.withOpacity(0.15)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.search, color: AppColors.textSecondary, size: 18),
+                    const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
@@ -1294,6 +1356,17 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                 ),
                 Text('${empresasFiltradas.length}',
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                if (auth.isMaster) ...[
+                  const SizedBox(width: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: _showNovaEmpresaDialog,
+                    child: const Padding(
+                      padding: EdgeInsets.all(2),
+                      child: Icon(Icons.add_circle_outline, color: AppColors.secondary, size: 18),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1516,10 +1589,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           LayoutBuilder(builder: (context, c) {
             final cols = wide ? 4 : 2;
             final cards = [
-              _statCard('Gestores', '${gestores.length}', Icons.shield_outlined, AppColors.info),
-              _statCard('Motoristas', '${motoristas.length}', Icons.groups_rounded, AppColors.secondary),
+              _statCard('Gestores', '${gestores.length}', Icons.group_rounded, AppColors.info),
+              _statCard('Motoristas', '${motoristas.length}', Icons.person, AppColors.secondary),
               _statCard('Veículos', '${veiculos.length}', Icons.directions_car_rounded, AppColors.warning),
-              _statCard('Último acesso', _fmtAcesso(ultimoAcesso), Icons.schedule_rounded, AppColors.success, small: true),
+              _statCard('Último acesso', _fmtAcesso(ultimoAcesso), Icons.history_rounded, AppColors.success, small: true),
             ];
             return GridView.count(
               crossAxisCount: cols,
