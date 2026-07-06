@@ -207,10 +207,12 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         final idx = ocorrencias.indexWhere((o) => o['id']?.toString() == id);
         if (idx >= 0) ocorrencias[idx] = {...ocorrencias[idx], 'status': 'Resolvido'};
       });
-      // Tenta resolver alerta vinculado (silencioso)
+      // Tenta resolver alerta vinculado
       try {
         await supabase.from('alerts').update({'status': 'resolvido'}).eq('occurrence_id', id);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Falha ao sincronizar alerta da ocorrência $id: $e');
+      }
     } catch (e) {
       if (mounted) _snackErro(friendlyError(e));
     }

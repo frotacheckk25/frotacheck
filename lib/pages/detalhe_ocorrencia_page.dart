@@ -89,7 +89,9 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
               .from('alerts')
               .update({'status': 'resolvido'})
               .eq('occurrence_id', ocorrencia['id']);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Falha ao sincronizar alerta da ocorrência ${ocorrencia['id']}: $e');
+        }
       }
 
       setState(() => ocorrencia['status'] = proximo);

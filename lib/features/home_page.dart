@@ -214,11 +214,11 @@ class _HomePageState extends State<HomePage> {
   DateTime _filterEnd = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
 
   int totalVeiculos = 0;
+  int totalVeiculosComMotorista = 0; // veículos com driver_id atribuído — usado como proxy real de "em operação"
   int totalMotoristas = 0;
   int totalAbastecimentos = 0;
   int totalEmManutencao = 0;
-  int totalOcorrenciasAbertas = 0; // total geral (mostra no KPI)
-  int _ocorrenciasAbertasCount = 0; // só as não resolvidas (badge + insights)
+  int _ocorrenciasAbertasCount = 0; // só as não resolvidas — usado no KPI, badge e insights
   double totalGasto = 0;
   List<Map<String, dynamic>> recentFuelings = [];
   List<FlSpot> monthlyFuelSpots = [];
@@ -253,11 +253,14 @@ class _HomePageState extends State<HomePage> {
 
   // ── KPI getters — always show real data; 0 / R$ 0,00 when no records ──────
   int get _kpiTotalVeiculos  => totalVeiculos;
-  int get _kpiVeiculosAtivos => totalVeiculos;
+  // "Ativo" = tem motorista atribuído (driver_id) — não existe coluna de
+  // status ativo/inativo em vehicles; usar sempre o total como "ativos"
+  // fazia o índice da frota mostrar 100% mesmo sem nenhum dado real por trás.
+  int get _kpiVeiculosAtivos => totalVeiculosComMotorista;
   int get _kpiEmManutencao   => totalEmManutencao;
   int get _kpiMotoristas     => totalMotoristas;
   String get _kpiGastoMensal => 'R\$ ${_fmt(totalGasto)}';
-  int get _kpiOcorrencias    => totalOcorrenciasAbertas;
+  int get _kpiOcorrencias    => _ocorrenciasAbertasCount;
   int get _kpiMultas         => totalMultas;
   int get _kpiFleetIndex {
     if (totalVeiculos <= 0) return 0;
@@ -594,7 +597,7 @@ class _HomePageState extends State<HomePage> {
     final prevAbastecimentos  = totalAbastecimentos;
     final prevGasto           = totalGasto;
     final prevMotoristas      = totalMotoristas;
-    final prevOcorrencias     = totalOcorrenciasAbertas;
+    final prevOcorrencias     = _ocorrenciasAbertasCount;
     final prevMultas          = totalMultas;
     final prevAlertas         = alertasImportantes.length;
     final prevCriticas        = ocorrenciasCriticasDash.length;
@@ -698,8 +701,6 @@ class _HomePageState extends State<HomePage> {
         pneus,
         multas,
       );
-      // Total geral de ocorrências (todas as situações)
-      final totalOcorrenciasCount = allTimeAllOcorrencias.length;
       // Ocorrências não resolvidas — base do card "Em Manutenção" e badge
       final openOcorrenciasCount = allTimeAllOcorrencias
           .where((e) => _isOpenStatus(e))
@@ -751,10 +752,10 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         totalVeiculos = veiculos.length;
+        totalVeiculosComMotorista = veiculos.where((v) => v['driver_id'] != null).length;
         totalMotoristas = motoristas.length;
         totalAbastecimentos = abastecimentos.length;
         totalEmManutencao = activeMaintenanceCount;
-        totalOcorrenciasAbertas = totalOcorrenciasCount;
         _ocorrenciasAbertasCount = openOcorrenciasCount;
         totalGasto = dashboardTotalGasto;
         totalMultas = multas.length;
@@ -1674,6 +1675,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildMobileAlertsTab() {
+    // Mesma fonte de dados real usada no painel de alertas do desktop
+    // (ocorrências críticas abertas + alertas reais/sintéticos do banco) —
+    // antes esta aba mostrava 3 cards fixos com texto inventado
+    // ("veículo X", "veículo Y"), sem nenhuma relação com dados reais.
+    final itens = <(String, String)>[
+      for (final o in ocorrenciasCriticasDash)
+        (
+          o['problem_type']?.toString() ?? 'Ocorrência crítica',
+          'Veículo ${o['_placa'] ?? '-'} — ${o['location'] ?? 'sem localização informada'}',
+        ),
+      for (final a in alertasImportantes)
+        (a['title'] ?? 'Alerta', a['subtitle'] ?? ''),
+    ];
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       children: [
@@ -1686,20 +1701,20 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildAlertCard(
-          'Manutenção agendada',
-          'Verifique o checklist do veículo X.',
-        ),
-        const SizedBox(height: 12),
-        _buildAlertCard(
-          'Ocorrência aberta',
-          'Novo registro de ocorrência em viagem.',
-        ),
-        const SizedBox(height: 12),
-        _buildAlertCard(
-          'Combustível baixo',
-          'Abastecer veículo Y nas próximas 24h.',
-        ),
+        if (itens.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: Text(
+              'Nenhum alerta no momento.',
+              style: TextStyle(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          for (final item in itens) ...[
+            _buildAlertCard(item.$1, item.$2),
+            const SizedBox(height: 12),
+          ],
       ],
     );
   }

@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/signed_storage_url.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DocumentosPage extends StatefulWidget {
   const DocumentosPage({super.key});
@@ -807,8 +809,8 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
     final injetar = auth.inject;
     final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
     try {
-      // Upload arquivo (silencioso se bucket não existir)
       String? fileUrl;
+      bool uploadFalhou = false;
       if (arquivo != null && arquivo!.bytes != null) {
         try {
           final ext = arquivo!.extension ?? 'pdf';
@@ -822,7 +824,10 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
                 fileOptions: const FileOptions(upsert: true),
               );
           fileUrl = supabase.storage.from('documentos').getPublicUrl(fileName);
-        } catch (_) {}
+        } catch (e) {
+          uploadFalhou = true;
+          debugPrint('Erro no upload do documento: $e');
+        }
       }
 
       final motoristaId = motoristaAutoId ?? motoristaManualId;
@@ -846,7 +851,14 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
 
       await supabase.from('documentos').insert(injetar(payload));
 
-      if (mounted) showSuccess(context, 'Documento registrado com sucesso!');
+      if (mounted) {
+        if (uploadFalhou) {
+          showError(context,
+              'Documento registrado, mas o arquivo não pôde ser anexado. Edite o documento para tentar anexar novamente.');
+        } else {
+          showSuccess(context, 'Documento registrado com sucesso!');
+        }
+      }
       widget.onSaved();
     } catch (e) {
       if (mounted) showError(context, friendlyError(e));
@@ -1667,6 +1679,23 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
     );
   }
 
+  Future<void> _abrirArquivo(String fileUrl) async {
+    try {
+      final signedUrl = await toSignedStorageUrl(fileUrl);
+      final uri = Uri.tryParse(signedUrl ?? fileUrl);
+      if (uri == null) {
+        if (mounted) showError(context, 'Link do arquivo inválido.');
+        return;
+      }
+      final aberto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!aberto && mounted) {
+        showError(context, 'Não foi possível abrir o arquivo.');
+      }
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final canManage = context.watch<AppAuthProvider>().can(AppPermission.manageDocuments);
@@ -1784,7 +1813,10 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
 
             // Arquivo
             if (fileUrl != null && fileUrl.isNotEmpty)
-              Container(
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _abrirArquivo(fileUrl),
+                child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,
@@ -1831,6 +1863,7 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
             const SizedBox(height: 24),

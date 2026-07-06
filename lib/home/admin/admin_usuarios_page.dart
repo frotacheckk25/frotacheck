@@ -39,6 +39,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   List<Map<String, dynamic>> _usuarios = [];
   List<Map<String, dynamic>> _empresas = [];
   List<Map<String, dynamic>> _vehicles = [];
+  List<Map<String, dynamic>> _drivers = [];
   bool _loading = true;
   String? _erro;
   bool _isEditing = false; // BUG-17: suppresses realtime rebuild during active edits
@@ -49,12 +50,18 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
   String? _empresaSelecionadaId;
   _Aba _aba = _Aba.motoristas;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _carregar();
     _setupRealtime();
+    // Fallback: garante que a tela eventualmente reflita mudanças de vehicles/
+    // drivers mesmo se a conexão Realtime cair silenciosamente.
+    _pollTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (!_isEditing) _carregar();
+    });
   }
 
   void _setupRealtime() {
@@ -72,6 +79,18 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           table: 'empresas',
           callback: (_) { if (!_isEditing) _debouncedCarregar(); },
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'vehicles',
+          callback: (_) { if (!_isEditing) _debouncedCarregar(); },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'drivers',
+          callback: (_) { if (!_isEditing) _debouncedCarregar(); },
+        )
         .subscribe();
   }
 
@@ -87,6 +106,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   @override
   void dispose() {
     _realtimeDebounce?.cancel();
+    _pollTimer?.cancel();
     _channel?.unsubscribe();
     _searchController.dispose();
     super.dispose();
@@ -108,7 +128,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
             .from('user_profiles')
             .select('*, empresas(nome)')
             .order('created_at', ascending: false)
-            .limit(400);
+            .limit(5000);
       } else {
         final minhaEmpresa = auth.empresaId;
         if (minhaEmpresa != null) {
@@ -161,11 +181,31 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
             .toList();
       } catch (_) {}
 
+      // Motoristas de verdade vêm da tabela drivers, não de user_profiles —
+      // um motorista cadastrado sem e-mail de conta (fluxo mais comum, feito
+      // pela tela de Motoristas da empresa) nunca aparecia aqui antes, porque
+      // só existe em "drivers", nunca em "user_profiles".
+      List<Map<String, dynamic>> drivers = [];
+      try {
+        var drQuery = _supabase
+            .from('drivers')
+            .select('id, name, email, phone, cnh_number, empresa_id, user_id, created_at');
+        if (!auth.isMaster) {
+          final minhaEmpresa = auth.empresaId;
+          if (minhaEmpresa != null) drQuery = drQuery.eq('empresa_id', minhaEmpresa);
+        }
+        final drRes = await drQuery.order('name');
+        drivers = (drRes as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } catch (_) {}
+
       if (!mounted) return;
       setState(() {
         _usuarios = lista;
         _empresas = empresas;
         _vehicles = vehicles;
+        _drivers = drivers;
         _loading = false;
 
         // Seleciona automaticamente uma empresa se ainda não houver seleção
@@ -1041,6 +1081,36 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     return map;
   }
 
+  // Motoristas de verdade vêm da tabela drivers (nem todo motorista tem conta
+  // de login vinculada — o cadastro pela tela de Motoristas da empresa não
+  // exige e-mail). Monta uma linha no mesmo formato usado pelo resto da tela
+  // (como se fosse um user_profiles), enriquecida com os dados da conta
+  // vinculada quando ela existir.
+  List<Map<String, dynamic>> _motoristasDaEmpresa(String? empresaId) {
+    final driversDaEmpresa = _drivers.where((d) => d['empresa_id']?.toString() == empresaId).toList();
+    final perfilPorUserId = <String, Map<String, dynamic>>{
+      for (final u in _usuarios)
+        if (u['user_id'] != null) u['user_id'].toString(): u,
+    };
+    return driversDaEmpresa.map((d) {
+      final userId = d['user_id']?.toString();
+      final perfil = userId != null ? perfilPorUserId[userId] : null;
+      final temConta = perfil != null;
+      return <String, dynamic>{
+        'user_id': userId ?? '',
+        'driver_id': d['id']?.toString(),
+        'nome': (perfil?['nome']?.toString().isNotEmpty ?? false) ? perfil!['nome'] : d['name'],
+        'email': perfil?['email'] ?? d['email'],
+        'role': 'MOTORISTA',
+        'status': temConta ? (perfil['status']?.toString() ?? 'ativo') : 'sem_conta',
+        'last_access': perfil?['last_access'],
+        'avatar_url': perfil?['avatar_url'],
+        'empresa_id': empresaId,
+        '_semConta': !temConta,
+      };
+    }).toList();
+  }
+
   Map<String, dynamic>? _veiculoDoMotorista(Map<String, dynamic> u) {
     final driverId = u['driver_id']?.toString();
     if (driverId == null) return null;
@@ -1062,9 +1132,12 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     return maisRecente;
   }
 
+  // Só MASTER pode conceder ADMIN_EMPRESA (evita que um ADMIN_EMPRESA
+  // promova outro funcionário a ADMIN_EMPRESA dentro da própria empresa —
+  // mesma restrição já aplicada em _showNovoUsuarioDialog na criação).
   List<AppRole> _rolesDisponiveis(AppAuthProvider auth) {
     if (auth.isMaster) return AppRole.values;
-    return [AppRole.adminEmpresa, AppRole.gestor, AppRole.motorista];
+    return [AppRole.gestor, AppRole.motorista];
   }
 
   String _initials(String name) {
@@ -1421,7 +1494,9 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                       final nome = empresa['nome']?.toString() ?? '—';
                       final usuariosDaEmpresa = grupos[id] ?? [];
                       final gestores = usuariosDaEmpresa.where((u) => AppRole.fromString(u['role']?.toString()) != AppRole.motorista).length;
-                      final motoristas = usuariosDaEmpresa.where((u) => AppRole.fromString(u['role']?.toString()) == AppRole.motorista).length;
+                      // Motoristas de verdade vêm de "drivers", não de user_profiles
+                      // (nem todo motorista tem conta de login vinculada).
+                      final motoristas = _drivers.where((d) => d['empresa_id']?.toString() == id).length;
                       final selecionada = id == _empresaSelecionadaId;
 
                       return Padding(
@@ -1510,7 +1585,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
     final usuariosDaEmpresa = _usuarios.where((u) => u['empresa_id']?.toString() == _empresaSelecionadaId).toList();
     final gestores = usuariosDaEmpresa.where((u) => AppRole.fromString(u['role']?.toString()) != AppRole.motorista).toList();
-    final motoristas = usuariosDaEmpresa.where((u) => AppRole.fromString(u['role']?.toString()) == AppRole.motorista).toList();
+    final motoristas = _motoristasDaEmpresa(_empresaSelecionadaId);
     final veiculos = _vehicles.where((v) => v['empresa_id']?.toString() == _empresaSelecionadaId).toList();
     final ultimoAcesso = _ultimoAcesso(usuariosDaEmpresa);
     final status = (empresa['status']?.toString() ?? 'ativo');
@@ -2047,10 +2122,15 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
   Widget _statusPill(String status) {
     Color cor;
+    String label = status;
     switch (status) {
       case 'ativo': cor = AppColors.success; break;
       case 'bloqueado': cor = AppColors.danger; break;
       case 'pendente': cor = AppColors.warning; break;
+      case 'sem_conta':
+        cor = AppColors.textSecondary;
+        label = 'Sem conta';
+        break;
       default: cor = AppColors.textSecondary;
     }
     return Container(
@@ -2061,17 +2141,122 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
         children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: cor, shape: BoxShape.circle)),
           const SizedBox(width: 5),
-          Text(status, style: TextStyle(color: cor, fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(label, style: TextStyle(color: cor, fontSize: 11, fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
   // ── Modal "Gerenciar usuário" — reaproveita os mesmos controles/ações já existentes ──
+  Future<void> _vincularContaPorEmailAoDriver(String driverId) async {
+    final emailCtrl = TextEditingController();
+    setState(() => _isEditing = true);
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: AppColors.border)),
+        title: const Text('Vincular conta por e-mail',
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: emailCtrl,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'motorista@email.com',
+            hintStyle: TextStyle(color: AppColors.textSecondary),
+            labelText: 'E-mail da conta já cadastrada',
+            labelStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.secondary)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
+            onPressed: () => Navigator.pop(ctx, emailCtrl.text.trim().toLowerCase()),
+            child: const Text('Vincular', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    emailCtrl.dispose();
+    setState(() => _isEditing = false);
+    if (email == null || email.isEmpty) return;
+    try {
+      final perfil = await _supabase.from('user_profiles').select('user_id').eq('email', email).maybeSingle();
+      if (perfil == null) {
+        if (mounted) showError(context, 'Nenhuma conta encontrada com esse e-mail. Peça para a pessoa se cadastrar no app primeiro.');
+        return;
+      }
+      await linkUserToDriver(_supabase, userId: perfil['user_id'].toString(), driverId: driverId);
+      await _carregar();
+      if (mounted) showSuccess(context, 'Conta vinculada com sucesso!');
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
   void _abrirGerenciarUsuario(Map<String, dynamic> u, AppAuthProvider auth) {
     final userId = u['user_id']?.toString() ?? '';
     final role = AppRole.fromString(u['role']?.toString() ?? 'MOTORISTA');
     final status = u['status']?.toString() ?? 'ativo';
+    final semConta = u['_semConta'] == true;
+
+    if (semConta) {
+      final driverId = u['driver_id']?.toString();
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                _avatar(u, size: 40),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(u['nome']?.toString() ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                      const Text('Este motorista ainda não tem conta de acesso vinculada.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 18),
+              const Divider(color: AppColors.border, height: 1),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: driverId == null ? null : () {
+                  Navigator.pop(ctx);
+                  _vincularContaPorEmailAoDriver(driverId);
+                },
+                icon: const Icon(Icons.link, size: 18),
+                label: const Text('Vincular conta por e-mail'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 46),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,

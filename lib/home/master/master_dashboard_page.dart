@@ -22,7 +22,7 @@ import '../configuracoes/configuracoes_page.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  relatorios, financeiro, configuracoes,
+  relatorios, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -208,7 +208,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         // 1: user_profiles
         _safeQ(_supabase.from('user_profiles').select('user_id, last_access, empresa_id, created_at')),
         // 2: veículos
-        _safeQ(_supabase.from('vehicles').select('id, empresa_id, created_at')),
+        _safeQ(_supabase.from('vehicles').select('id, empresa_id, created_at, odometer')),
         // 3: motoristas
         _safeQ(_supabase.from('drivers').select('id, empresa_id, cnh_expiration, created_at')),
         // 4: abastecimentos últimos 6 meses
@@ -229,7 +229,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             .gte('created_at', lastMonth.toIso8601String())
             .order('created_at', ascending: false)),
         // 7: oil_changes (manutenções)
-        _safeQ(_supabase.from('oil_changes').select('id, vehicle_id, created_at')),
+        _safeQ(_supabase.from('oil_changes')
+            .select('id, vehicle_id, created_at, next_change_km')
+            .order('created_at', ascending: false)),
         // 8: usuários online (last_access recente)
         _safeQ(_supabase.from('user_profiles')
             .select('empresa_id')
@@ -356,13 +358,27 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       }).map((f) => f['vehicle_id']?.toString()).whereType<String>().toSet();
       final veicOffline = veiculos.length - veicComAbast.length;
 
-      // Manutenções vencidas (oil_changes mais antigos sem revisão recente)
-      final manutRecent = oilChanges.where((o) {
-        final raw = o['created_at']?.toString() ?? '';
-        final dt = DateTime.tryParse(raw);
-        return dt != null && dt.isAfter(thisMonth);
-      }).length;
-      final manutVencidas = math.max(0, oilChanges.length - manutRecent);
+      // Manutenções vencidas: para cada veículo, compara o odômetro atual
+      // com o next_change_km da troca de óleo mais recente — mesmo critério
+      // já usado em manutencoes_page.dart/plano_manutencao_page.dart (dentro
+      // de 2000 km do previsto, ou já passado, conta como vencida). O cálculo
+      // anterior ("total histórico menos trocas deste mês") não tinha
+      // nenhuma relação com manutenção realmente vencida.
+      final odomPorVeiculo = <String, int>{
+        for (final v in veiculos)
+          if (v['id'] != null) v['id'].toString(): (v['odometer'] as num?)?.toInt() ?? 0,
+      };
+      int manutVencidas = 0;
+      final vistosManut = <String>{};
+      for (final o in oilChanges) {
+        final vid = o['vehicle_id']?.toString();
+        if (vid == null || vistosManut.contains(vid)) continue;
+        vistosManut.add(vid);
+        final nextKm = (o['next_change_km'] as num?)?.toInt() ?? 0;
+        if (nextKm <= 0) continue;
+        final atualKm = odomPorVeiculo[vid] ?? 0;
+        if (atualKm >= nextKm - 2000) manutVencidas++;
+      }
 
       // ── Distribuição de status ─────────────────────────────────────────────
       int stAtivo = 0, stSusp = 0, stCanc = 0, stBloq = 0;
@@ -702,7 +718,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 navItem(Icons.bar_chart_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
                 navItem(Icons.settings_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
                 navItem(Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
-                navItem(Icons.bar_chart_rounded, 'Financeiro', _Sec.financeiro, () => nav(const ListaAbastecimentosPage())),
                 catHeader('SISTEMA'),
                 navItem(Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
               ],
@@ -845,8 +860,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 const SizedBox(height: 20),
                 _buildMetricsRow(),
                 const SizedBox(height: 20),
-                _buildSystemRow(),
-                const SizedBox(height: 20),
                 _buildAcoesRapidas(),
               ],
             ),
@@ -897,9 +910,16 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           const SizedBox(width: 12),
 
           // Actions
-          _headerIconBtn(Icons.report_problem_rounded, count: _ocorrenciasAbertas),
+          _headerIconBtn(
+            Icons.report_problem_rounded,
+            count: _ocorrenciasAbertas,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage())).then((_) => _loadAll()),
+          ),
           const SizedBox(width: 6),
-          _headerIconBtn(Icons.settings_rounded),
+          _headerIconBtn(
+            Icons.settings_rounded,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage())),
+          ),
           const SizedBox(width: 10),
           ElevatedButton.icon(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage())),
@@ -926,25 +946,29 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     );
   }
 
-  Widget _headerIconBtn(IconData icon, {int count = 0}) {
-    return Stack(children: [
-      Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A1628),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF1E293B)),
+  Widget _headerIconBtn(IconData icon, {int count = 0, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1628),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF1E293B)),
+          ),
+          child: Icon(icon, color: const Color(0xFF94A3B8), size: 18),
         ),
-        child: Icon(icon, color: const Color(0xFF94A3B8), size: 18),
-      ),
-      if (count > 0)
-        Positioned(top: 2, right: 2, child: Container(
-          width: 14, height: 14,
-          decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700)),
-        )),
-    ]);
+        if (count > 0)
+          Positioned(top: 2, right: 2, child: Container(
+            width: 14, height: 14,
+            decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text('$count', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700)),
+          )),
+      ]),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1503,124 +1527,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SYSTEM ROW
-  // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildSystemRow() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF080F1E),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF0E1E33)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Indicadores do sistema', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _sysIndicator(Icons.api_rounded, const Color(0xFF22C55E), 'API', 'Operacional', '99.9%'),
-                const SizedBox(width: 12),
-                _sysIndicator(Icons.storage_rounded, const Color(0xFF3B82F6), 'Banco de Dados', 'Operacional', '100%'),
-                const SizedBox(width: 12),
-                _sysIndicator(Icons.bar_chart_rounded, const Color(0xFF22C55E), 'Serviços', 'Operacional', '99.8%'),
-                const SizedBox(width: 12),
-                _sysIndicator(Icons.report_problem_rounded, const Color(0xFF22C55E), 'Notificações', 'Operacional', '99.9%'),
-                const SizedBox(width: 12),
-                _sysIndicator(Icons.build_rounded, const Color(0xFF22C55E), 'Backup', 'Operacional', 'último: 08:00'),
-                const SizedBox(width: 12),
-                _sysIndicator(Icons.work_rounded, const Color(0xFF22C55E), 'Jobs', 'Operacional', '98.7%'),
-                const SizedBox(width: 12),
-                _sysIndicatorPct(Icons.memory_rounded, const Color(0xFF3B82F6), 'CPU', 0.32),
-                const SizedBox(width: 12),
-                _sysIndicatorPct(Icons.developer_board_rounded, const Color(0xFF8B5CF6), 'Memória', 0.45),
-                const SizedBox(width: 12),
-                _sysIndicatorPct(Icons.sd_storage_rounded, const Color(0xFFF97316), 'Storage', 0.68),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sysIndicator(IconData icon, Color color, String label, String status, String value) {
-    return Container(
-      width: 130,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1628),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1E293B)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 6),
-          Expanded(child: Text(label, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-        ]),
-        const SizedBox(height: 6),
-        Text(status, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(color: Color(0xFF475569), fontSize: 10)),
-        const SizedBox(height: 6),
-        // Mini sparkline decorativa
-        SizedBox(
-          height: 20,
-          child: CustomPaint(
-            painter: _SparklinePainter(
-              List.generate(8, (i) => 85 + (math.sin(i * 0.8) * 5).abs()),
-              color,
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  Widget _sysIndicatorPct(IconData icon, Color color, String label, double pct) {
-    return Container(
-      width: 130,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1628),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1E293B)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w500)),
-        ]),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: LinearProgressIndicator(
-            value: pct, minHeight: 4,
-            backgroundColor: const Color(0xFF1E293B),
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text('${(pct * 100).toInt()}%', style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
-        SizedBox(
-          height: 20,
-          child: CustomPaint(
-            painter: _SparklinePainter(
-              List.generate(8, (i) => pct * 100 + (math.sin(i) * 3).abs()),
-              color,
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // AÇÕES RÁPIDAS
@@ -2472,27 +2378,45 @@ class _SearchDialogState extends State<_SearchDialog> {
               separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (_, i) {
                 final r = _results[i];
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF060C18),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF1E293B)),
-                  ),
-                  child: Row(children: [
-                    Container(
-                      width: 32, height: 32,
-                      decoration: BoxDecoration(
-                          color: r.color.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8)),
-                      child: Icon(r.icon, color: r.color, size: 16),
+                return InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    Navigator.pop(context);
+                    switch (r.type) {
+                      case 'empresa':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsuariosPage()));
+                        break;
+                      case 'veiculo':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()));
+                        break;
+                      case 'motorista':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
+                        break;
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF060C18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF1E293B)),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(r.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text(r.subtitle, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
-                    ])),
-                  ]),
+                    child: Row(children: [
+                      Container(
+                        width: 32, height: 32,
+                        decoration: BoxDecoration(
+                            color: r.color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(8)),
+                        child: Icon(r.icon, color: r.color, size: 16),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(r.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text(r.subtitle, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                      ])),
+                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF334155), size: 18),
+                    ]),
+                  ),
                 );
               },
             )),

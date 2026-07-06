@@ -184,17 +184,21 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
   }
 
   Future<void> _avancarStatus(Map<String, dynamic> item) async {
-    final atualRaw = (item['status']?.toString() ?? 'aberto').trim().toLowerCase();
+    // Normaliza para o padrão capitalizado usado no resto do app
+    // ('Aberto'/'Em andamento'/'Resolvido') — antes gravava valores em
+    // minúsculo, o que desalinhava filtros/cores de status em outras telas
+    // e fazia a checagem de sincronização do alerta abaixo nunca disparar.
+    final atualRaw = (item['status']?.toString() ?? 'Aberto').trim().toLowerCase();
     final atual = switch (atualRaw) {
-      'aberto' => 'aberto',
-      'em andamento' || 'em_andamento' => 'em andamento',
-      'resolvido' => 'resolvido',
-      _ => 'aberto',
+      'aberto' => 'Aberto',
+      'em andamento' || 'em_andamento' => 'Em andamento',
+      'resolvido' => 'Resolvido',
+      _ => 'Aberto',
     };
     final proximo = switch (atual) {
-      'aberto' => 'em andamento',
-      'em andamento' => 'resolvido',
-      _ => 'aberto',
+      'Aberto' => 'Em andamento',
+      'Em andamento' => 'Resolvido',
+      _ => 'Aberto',
     };
     try {
       await supabase
@@ -212,7 +216,9 @@ class _ListaOcorrenciasPageState extends State<ListaOcorrenciasPage> {
               .from('alerts')
               .update({'status': 'resolvido'})
               .eq('occurrence_id', item['id']);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Falha ao sincronizar alerta da ocorrência ${item['id']}: $e');
+        }
       }
     } catch (e) {
       if (mounted) showError(context, friendlyError(e));

@@ -791,8 +791,8 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
     final injetar = auth.inject;
     final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
     try {
-      // Upload foto (silencioso se bucket não existir)
       String? fotoUrl;
+      bool uploadFalhou = false;
       if (fotoBytes != null) {
         try {
           final fileName = '$pastaEmpresa/multa_${DateTime.now().millisecondsSinceEpoch}.jpg';
@@ -804,7 +804,10 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
                 fileOptions: const FileOptions(upsert: true),
               );
           fotoUrl = supabase.storage.from('multas').getPublicUrl(fileName);
-        } catch (_) {}
+        } catch (e) {
+          uploadFalhou = true;
+          debugPrint('Erro no upload da foto da multa: $e');
+        }
       }
 
       final payload = <String, dynamic>{
@@ -823,7 +826,14 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
 
       await supabase.from('multas').insert(injetar(payload));
 
-      if (mounted) showSuccess(context, 'Multa registrada com sucesso!');
+      if (mounted) {
+        if (uploadFalhou) {
+          showError(context,
+              'Multa registrada, mas a foto não pôde ser anexada. Edite o registro para tentar anexar novamente.');
+        } else {
+          showSuccess(context, 'Multa registrada com sucesso!');
+        }
+      }
       widget.onSaved();
     } catch (e) {
       if (mounted) showError(context, friendlyError(e));
@@ -1326,20 +1336,15 @@ class _DetalheMultaPageState extends State<_DetalheMultaPage> {
 
     setState(() => salvando = true);
     try {
-      await supabase.from('multas').update({'status': novoStatus}).eq('id', id);
+      final payload = <String, dynamic>{'status': novoStatus};
       if (novoStatus == 'paga') {
-        try {
-          await supabase
-              .from('multas')
-              .update({
-                'data_pagamento': DateTime.now().toIso8601String().split(
-                  'T',
-                )[0],
-              })
-              .eq('id', id);
-        } catch (_) {}
+        payload['data_pagamento'] = DateTime.now().toIso8601String().split('T')[0];
       }
-      setState(() => multa = {...multa, 'status': novoStatus});
+      // Uma única atualização atômica — evita o cenário em que o status
+      // muda para "paga" mas a data de pagamento falha silenciosamente,
+      // deixando o registro com status pago sem data.
+      await supabase.from('multas').update(payload).eq('id', id);
+      setState(() => multa = {...multa, ...payload});
       widget.onAtualizada();
       if (mounted) {
         showSuccess(
