@@ -9,12 +9,14 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/driver_account_link.dart';
+import '../../core/utils/plano_financeiro.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../admin/admin_usuarios_page.dart';
 import '../veiculos/veiculos_page.dart';
 import '../motoristas/motoristas_page.dart';
 import '../abastecimentos/lista_abastecimentos_page.dart';
 import '../manutencoes/manutencoes_page.dart';
+import '../planos/planos_page.dart';
 import '../../pages/lista_ocorrencias_page.dart';
 import '../checklists/historico_checklist_page.dart';
 import '../relatorios/relatorios_page.dart';
@@ -24,7 +26,7 @@ import '../configuracoes/configuracoes_page.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  relatorios, configuracoes,
+  planos, relatorios, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -95,7 +97,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   int _totalOcorrencias = 0;
   int _totalManutencoes = 0;
   double _receitaMes = 0;
+  double _receitaAnual = 0;
+  double _ticketMedio = 0;
+  int _empresasAtivasPlano = 0;
   int _novasEmpresas = 0;
+
+  // Catálogo de planos e assinaturas vigentes (módulo Planos)
+  List<Map<String, dynamic>> _planosCache = [];
+  List<Map<String, dynamic>> _assinaturas = [];
 
   // Trends
   double _tendEmpresas = 0, _tendUsuarios = 0, _tendVeiculos = 0;
@@ -242,6 +251,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 now.subtract(const Duration(minutes: 30)).toIso8601String())),
         // 9: manutencoes (tabela opcional — safeQ retorna [] se não existir)
         _safeQ(_supabase.from('manutencoes').select('id').limit(500)),
+        // 10: catálogo de planos
+        _safeQ(_supabase.from('planos').select().order('ordem')),
+        // 11: assinaturas vigentes (fonte real da receita — módulo Planos)
+        _safeQ(_supabase.from('assinaturas').select('empresa_id, plano_id, valor_mensal, status, data_inicio')),
       ]);
 
       // Contagens reais no banco — não truncam e não baixam os registros.
@@ -268,6 +281,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final online = results[8];
       final manutExtra = results[9];
       final manutTotal = manutExtra.length + oilChanges.length;
+      final planosCatalogo = results[10];
+      final assinaturas = results[11];
 
       final onlineIds = online.map((p) => p['empresa_id']).whereType<String>().toSet();
 
@@ -301,42 +316,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           prv > 0 ? (cur - prv) / prv * 100 : (cur > 0 ? 100 : 0);
 
       // ── Receita (MRR real) ───────────────────────────────────────────────────
-      // Receita = soma do valor de mensalidade (valor_mensalidade) das empresas
-      // com plano ativo — NÃO é o total que as empresas gastam em
-      // abastecimento/manutenção (isso é custo delas, não faturamento nosso).
-      double valorPlano(Map<String, dynamic> e) {
-        final v = (e['valor_mensalidade'] as num?)?.toDouble();
-        if (v != null && v > 0) return v;
-        switch (e['plano']?.toString()) {
-          case 'profissional': return 259.90;
-          case 'enterprise':   return 359.90;
-          default:              return 139.90;
-        }
-      }
-      double currentMrr() {
-        double soma = 0;
-        for (final e in empresas) {
-          if ((e['status'] ?? 'ativo').toString() != 'ativo') continue;
-          soma += valorPlano(e);
-        }
-        return soma;
-      }
-      // Reconstrói o MRR "como estava" numa data de corte somando o valor de
-      // mensalidade de toda empresa ativa hoje que já existia antes do corte.
-      // É uma aproximação (não há histórico de faturas), mas usa dados reais
-      // de cadastro em vez de um número inventado.
-      double mrrAte(DateTime corte) {
-        double soma = 0;
-        for (final e in empresas) {
-          if ((e['status'] ?? 'ativo').toString() != 'ativo') continue;
-          final criada = DateTime.tryParse(e['created_at']?.toString() ?? '');
-          if (criada != null && criada.isBefore(corte)) soma += valorPlano(e);
-        }
-        return soma;
-      }
-      final recMes = currentMrr();
+      // Fonte de verdade: tabela "assinaturas" (módulo Planos) — NÃO é o total
+      // que as empresas gastam em abastecimento/manutenção (isso é custo
+      // delas, não faturamento nosso).
+      final financeiro = calcularFinanceiroPlanos(assinaturas);
+      final recMes = financeiro.mrr;
       final recThisM = recMes;
-      final recLastM = mrrAte(thisMonth);
+      final recLastM = mrrAteData(assinaturas, thisMonth);
 
       // ── Receita (MRR) 6 meses ────────────────────────────────────────────────
       final months6 = <DateTime>[];
@@ -348,7 +334,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         return mn[d.month - 1];
       }).toList();
       final receita6 = months6
-          .map((d) => mrrAte(DateTime(d.year, d.month + 1, 1)))
+          .map((d) => mrrAteData(assinaturas, DateTime(d.year, d.month + 1, 1)))
           .toList();
 
       // ── Alertas ─────────────────────────────────────────────────────────────
@@ -366,11 +352,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       // ser perdida por causa da janela.
       final ocorrAbertas = ocorrAbertasReal;
 
-      // Empresas com mensalidade atrasada (status suspenso/cancelado)
-      final mensAtrasadas = empresas.where((e) {
-        final s = (e['status'] ?? '').toString();
-        return s == 'suspenso' || s == 'cancelado';
-      }).length;
+      // Empresas com mensalidade atrasada — status real da assinatura
+      // (módulo Planos), não mais um proxy do status operacional da empresa.
+      final mensAtrasadas = financeiro.empresasInadimplentes;
 
       // Veículos sem abastecimento nos últimos 7 dias
       final veicComAbast = fuelings.where((f) {
@@ -527,7 +511,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final sparkOc = weeklyCount(ocorrencias, 'created_at');
       final sparkRec = List.generate(8, (i) {
         final to = now.subtract(Duration(days: (7 - i) * 7));
-        return mrrAte(to);
+        return mrrAteData(assinaturas, to);
       });
       // Online e novas: use total count as flat sparkline with slight variation
       double total = _totalEmpresas.toDouble();
@@ -554,6 +538,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _totalOcorrencias = totalOcorrenciasReal;
         _totalManutencoes = manutTotal;
         _receitaMes = recMes;
+        _receitaAnual = financeiro.arr;
+        _ticketMedio = financeiro.ticketMedio;
+        _empresasAtivasPlano = financeiro.empresasAtivas;
+        _planosCache = planosCatalogo;
+        _assinaturas = assinaturas;
         _novasEmpresas = novasEmp;
 
         _tendEmpresas = trend(empThisM, empLastM);
@@ -615,6 +604,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.all, schema: 'public', table: 'occurrences',
+          callback: (_) => _debounceLoad(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all, schema: 'public', table: 'assinaturas',
           callback: (_) => _debounceLoad(),
         )
         .subscribe();
@@ -725,6 +718,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 catHeader('GESTÃO'),
                 navItem(Icons.bar_chart_rounded, 'Empresas', _Sec.empresas, () => _showEmpresasDialog()),
                 navItem(Icons.settings_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
+                navItem(Icons.payments_outlined, 'Planos', _Sec.planos, () => nav(const PlanosPage())),
                 navItem(Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
                 catHeader('SISTEMA'),
                 navItem(Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
@@ -1017,6 +1011,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           color: const Color(0xFF10B981), spark: _sparkOnline),
       _KpiData(label: 'Receita Mês', value: 'R\$ ${_fmtMoney(_receitaMes)}', icon: Icons.bar_chart_rounded,
           color: const Color(0xFF22C55E), trend: trend(_tendReceita), trendUp: _tendReceita >= 0, spark: _sparkReceita),
+      _KpiData(label: 'Receita Anual', value: 'R\$ ${_fmtMoney(_receitaAnual)}', icon: Icons.account_balance_wallet_rounded,
+          color: const Color(0xFF10B981), trend: trend(_tendReceita), trendUp: _tendReceita >= 0,
+          spark: _sparkReceita.map((v) => v * 12).toList()),
+      _KpiData(label: 'Empresas Ativas', value: '$_empresasAtivasPlano', icon: Icons.group_rounded,
+          color: const Color(0xFF8B5CF6)),
+      _KpiData(label: 'Ticket Médio', value: 'R\$ ${_fmtMoney(_ticketMedio)}', icon: Icons.trending_up_rounded,
+          color: const Color(0xFFF59E0B)),
       _KpiData(label: 'Novas Empresas', value: '$_novasEmpresas', icon: Icons.build_rounded,
           color: const Color(0xFFEAB308), spark: _sparkNovas),
     ];
@@ -1905,18 +1906,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
   );
 
-  static const Map<String, double> _planoValoresPadrao = {
-    'basico': 139.90,
-    'profissional': 259.90,
-    'enterprise': 359.90,
-  };
-
   void _showNovaEmpresaDialog() {
     final nomeCtrl = TextEditingController();
     final cnpjCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
-    String plano = 'basico';
-    final valorCtrl = TextEditingController(text: _planoValoresPadrao['basico']!.toStringAsFixed(2));
+    String? planoId = _planosCache.isNotEmpty ? _planosCache.first['id'].toString() : null;
+    final valorCtrl = TextEditingController(
+      text: _planosCache.isNotEmpty ? ((_planosCache.first['valor_mensal'] as num?)?.toDouble() ?? 0).toStringAsFixed(2) : '0.00',
+    );
     bool saving = false;
     String? error;
     String? successMsg;
@@ -1965,14 +1962,20 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: plano,
+                          value: planoId,
                           isExpanded: true,
+                          hint: const Text('Nenhum plano cadastrado', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                           dropdownColor: const Color(0xFF0F1C30),
                           style: const TextStyle(color: Colors.white, fontSize: 13),
-                          items: _planoValoresPadrao.keys.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                          items: _planosCache.map((p) => DropdownMenuItem(
+                            value: p['id'].toString(),
+                            child: Text((p['nome'] ?? '').toString()),
+                          )).toList(),
                           onChanged: (v) => setS(() {
-                            plano = v ?? plano;
-                            valorCtrl.text = _planoValoresPadrao[plano]!.toStringAsFixed(2);
+                            planoId = v ?? planoId;
+                            final p = _planosCache.firstWhere((pp) => pp['id'].toString() == planoId, orElse: () => const {});
+                            final cat = (p['valor_mensal'] as num?)?.toDouble();
+                            if (cat != null) valorCtrl.text = cat.toStringAsFixed(2);
                           }),
                         ),
                       ),
@@ -1980,7 +1983,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   ]),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: _formField('Valor mensal (R\$) *', valorCtrl, hint: '139.90')),
+                Expanded(child: _formField('Valor mensal (R\$) *', valorCtrl, hint: '149.90')),
               ]),
               const SizedBox(height: 16),
               const Text(
@@ -2009,6 +2012,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
                 if (email.isEmpty) { setS(() => error = 'E-mail do administrador é obrigatório'); return; }
                 if (valorMensal == null || valorMensal < 0) { setS(() => error = 'Valor mensal inválido'); return; }
+                if (planoId == null) { setS(() => error = 'Nenhum plano cadastrado — rode a migração do módulo Planos.'); return; }
                 setS(() { saving = true; error = null; successMsg = null; });
                 try {
                   // 1. Verifica se o usuário com esse e-mail existe
@@ -2063,14 +2067,24 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         'cnpj': cnpjCtrl.text.trim().isEmpty ? null : cnpjCtrl.text.trim(),
                         'email': email,
                         'status': 'ativo',
-                        'plano': plano,
-                        'valor_mensalidade': valorMensal,
                       })
                       .select('id')
                       .single();
 
                   final empresaId = empRes['id']?.toString();
                   if (empresaId == null) throw Exception('Falha ao obter ID da empresa criada');
+
+                  // 2b. Cria a assinatura real da empresa (módulo Planos) —
+                  // fonte de verdade da receita usada no painel e na tela Planos.
+                  final hoje = DateTime.now();
+                  await _supabase.from('assinaturas').insert({
+                    'empresa_id': empresaId,
+                    'plano_id': planoId,
+                    'valor_mensal': valorMensal,
+                    'status': 'ativo',
+                    'data_inicio': hoje.toIso8601String().split('T')[0],
+                    'vencimento_dia': hoje.day,
+                  });
 
                   // 3. Vincula o usuário à empresa e define role como admin
                   final userId = userRes['user_id']?.toString();
@@ -2128,6 +2142,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
               ),
               TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PlanosPage()));
+                },
+                icon: const Icon(Icons.payments_outlined, size: 15, color: Color(0xFF64748B)),
+                label: const Text('Planos', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+              ),
+              TextButton.icon(
                 onPressed: () { Navigator.pop(ctx); _showNovaEmpresaDialog(); },
                 icon: const Icon(Icons.add_rounded, size: 15, color: Color(0xFF3B82F6)),
                 label: const Text('Nova', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12)),
@@ -2147,7 +2169,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                           final nome = (e['nome'] ?? '').toString();
                           final status = (e['status'] ?? 'ativo').toString();
                           final cnpj = (e['cnpj'] ?? '').toString();
-                          final valor = (e['valor_mensalidade'] as num?)?.toDouble() ?? 0;
+                          final assinaturaDaEmpresa = _assinaturas.firstWhere(
+                            (a) => a['empresa_id']?.toString() == e['id']?.toString(),
+                            orElse: () => const {},
+                          );
+                          final valor = (assinaturaDaEmpresa['valor_mensal'] as num?)?.toDouble();
                           final statusColor = status == 'ativo'
                               ? const Color(0xFF22C55E)
                               : status == 'suspenso'
@@ -2184,8 +2210,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                                   Text(cnpj, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
                               ])),
                               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                Text('R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
-                                    style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12, fontWeight: FontWeight.w700)),
+                                Text(
+                                  valor != null ? 'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}' : 'Sem plano',
+                                  style: TextStyle(
+                                    color: valor != null ? const Color(0xFF22C55E) : const Color(0xFF64748B),
+                                    fontSize: 12, fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                                 const SizedBox(height: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -2215,14 +2246,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     );
   }
 
+  // Edita apenas o status operacional da empresa (ativo/suspenso/cancelado).
+  // Plano, valor e status de cobrança agora são geridos na tela "Planos"
+  // (tabela assinaturas) — evita duas telas divergentes sobre o mesmo dado.
   void _showEditarEmpresaDialog(Map<String, dynamic> empresa) {
     final empresaId = empresa['id']?.toString();
     if (empresaId == null) return;
-    String plano = (empresa['plano'] ?? 'basico').toString();
-    if (!_planoValoresPadrao.containsKey(plano)) plano = 'basico';
     String status = (empresa['status'] ?? 'ativo').toString();
-    final valorAtual = (empresa['valor_mensalidade'] as num?)?.toDouble() ?? _planoValoresPadrao[plano]!;
-    final valorCtrl = TextEditingController(text: valorAtual.toStringAsFixed(2));
     bool saving = false;
     String? error;
     String? successMsg;
@@ -2254,28 +2284,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 ),
                 const SizedBox(height: 12),
               ],
-              const Text('Plano', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 6),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF060C18),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: plano,
-                    isExpanded: true,
-                    dropdownColor: const Color(0xFF0F1C30),
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    items: _planoValoresPadrao.keys.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                    onChanged: (v) => setS(() => plano = v ?? plano),
-                  ),
-                ),
+              const Text(
+                'Plano, valor e cobrança são gerenciados na tela "Planos".',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
               ),
-              const SizedBox(height: 12),
-              _formField('Valor mensal (R\$) *', valorCtrl, hint: '139.90'),
               const SizedBox(height: 12),
               const Text('Status', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
               const SizedBox(height: 6),
@@ -2310,13 +2322,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             ),
             ElevatedButton(
               onPressed: saving ? null : () async {
-                final valorMensal = double.tryParse(valorCtrl.text.trim().replaceAll(',', '.'));
-                if (valorMensal == null || valorMensal < 0) { setS(() => error = 'Valor mensal inválido'); return; }
                 setS(() { saving = true; error = null; successMsg = null; });
                 try {
                   await _supabase.from('empresas').update({
-                    'plano': plano,
-                    'valor_mensalidade': valorMensal,
                     'status': status,
                   }).eq('id', empresaId);
 
