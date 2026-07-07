@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/config/supabase_config.dart';
+import '../../core/enums/app_role.dart';
+import '../../core/utils/driver_account_link.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../admin/admin_usuarios_page.dart';
 import '../veiculos/veiculos_page.dart';
@@ -298,36 +300,56 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       double trend(int cur, int prv) =>
           prv > 0 ? (cur - prv) / prv * 100 : (cur > 0 ? 100 : 0);
 
-      // ── Receita ────────────────────────────────────────────────────────────
-      double recMes = 0;
-      final receitaByMonth = <int, double>{};
-      for (final f in fuelings) {
-        final val = (f['total_value'] as num?)?.toDouble() ?? 0;
-        final rawDate = f['fuel_date']?.toString() ?? f['created_at']?.toString() ?? '';
-        final dt = DateTime.tryParse(rawDate);
-        if (dt != null) {
-          final key = dt.year * 100 + dt.month;
-          receitaByMonth[key] = (receitaByMonth[key] ?? 0) + val;
-          if (!dt.isBefore(thisMonth)) recMes += val;
+      // ── Receita (MRR real) ───────────────────────────────────────────────────
+      // Receita = soma do valor de mensalidade (valor_mensalidade) das empresas
+      // com plano ativo — NÃO é o total que as empresas gastam em
+      // abastecimento/manutenção (isso é custo delas, não faturamento nosso).
+      double valorPlano(Map<String, dynamic> e) {
+        final v = (e['valor_mensalidade'] as num?)?.toDouble();
+        if (v != null && v > 0) return v;
+        switch (e['plano']?.toString()) {
+          case 'profissional': return 259.90;
+          case 'enterprise':   return 359.90;
+          default:              return 139.90;
         }
       }
-      final recLastM = receitaByMonth[(lastMonth.year * 100 + lastMonth.month)] ?? 0;
+      double currentMrr() {
+        double soma = 0;
+        for (final e in empresas) {
+          if ((e['status'] ?? 'ativo').toString() != 'ativo') continue;
+          soma += valorPlano(e);
+        }
+        return soma;
+      }
+      // Reconstrói o MRR "como estava" numa data de corte somando o valor de
+      // mensalidade de toda empresa ativa hoje que já existia antes do corte.
+      // É uma aproximação (não há histórico de faturas), mas usa dados reais
+      // de cadastro em vez de um número inventado.
+      double mrrAte(DateTime corte) {
+        double soma = 0;
+        for (final e in empresas) {
+          if ((e['status'] ?? 'ativo').toString() != 'ativo') continue;
+          final criada = DateTime.tryParse(e['created_at']?.toString() ?? '');
+          if (criada != null && criada.isBefore(corte)) soma += valorPlano(e);
+        }
+        return soma;
+      }
+      final recMes = currentMrr();
       final recThisM = recMes;
+      final recLastM = mrrAte(thisMonth);
 
-      // ── Receita 6 meses ────────────────────────────────────────────────────
+      // ── Receita (MRR) 6 meses ────────────────────────────────────────────────
       final months6 = <DateTime>[];
       for (int i = 5; i >= 0; i--) {
-        final dt = DateTime(now.year, now.month - i, 1);
-        months6.add(dt);
+        months6.add(DateTime(now.year, now.month - i, 1));
       }
       final labels6 = months6.map((d) {
         const mn = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
         return mn[d.month - 1];
       }).toList();
-      final receita6 = months6.map((d) {
-        final key = d.year * 100 + d.month;
-        return receitaByMonth[key] ?? 0.0;
-      }).toList();
+      final receita6 = months6
+          .map((d) => mrrAte(DateTime(d.year, d.month + 1, 1)))
+          .toList();
 
       // ── Alertas ─────────────────────────────────────────────────────────────
       // CNHs vencendo em 30 dias
@@ -496,23 +518,6 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
           }).length.toDouble();
         });
       }
-      List<double> weeklySum(List<Map<String,dynamic>> list, String valField, String dateField) {
-        final now2 = DateTime.now();
-        return List.generate(8, (i) {
-          final from = now2.subtract(Duration(days: (7 - i) * 7 + 7));
-          final to = now2.subtract(Duration(days: (7 - i) * 7));
-          double sum = 0;
-          for (final r in list) {
-            final raw = r[dateField]?.toString() ?? r['created_at']?.toString() ?? '';
-            final dt = DateTime.tryParse(raw);
-            if (dt != null && dt.isAfter(from) && dt.isBefore(to)) {
-              sum += (r[valField] as num?)?.toDouble() ?? 0;
-            }
-          }
-          return sum;
-        });
-      }
-
       final sparkEmp = weeklyCount(empresas, 'created_at');
       final sparkUser = weeklyCount(profiles, 'created_at');
       final sparkVeic = weeklyCount(veiculos, 'created_at');
@@ -520,7 +525,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final sparkAb = weeklyCount(fuelings, 'fuel_date');
       final sparkManutWeekly = weeklyCount(oilChanges, 'created_at');
       final sparkOc = weeklyCount(ocorrencias, 'created_at');
-      final sparkRec = weeklySum(fuelings, 'total_value', 'fuel_date');
+      final sparkRec = List.generate(8, (i) {
+        final to = now.subtract(Duration(days: (7 - i) * 7));
+        return mrrAte(to);
+      });
       // Online e novas: use total count as flat sparkline with slight variation
       double total = _totalEmpresas.toDouble();
       final sparkOnl = List.generate(8, (i) => math.max(0.0, total * 0.8 + i * total * 0.03));
@@ -1550,8 +1558,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               children: [
                 _acaoBtn(Icons.build_rounded, const Color(0xFF3B82F6), 'Nova Empresa', _showNovaEmpresaDialog),
                 const SizedBox(width: 10),
-                _acaoBtn(Icons.settings_rounded, const Color(0xFF22C55E), 'Novo Motorista',
-                    _showNovoMotoristaDialog),
+                _acaoBtn(Icons.settings_rounded, const Color(0xFF22C55E), 'Novo Usuário',
+                    _showNovoUsuarioDialog),
                 const SizedBox(width: 10),
                 _acaoBtn(Icons.directions_car_rounded, const Color(0xFF8B5CF6), 'Novo Veículo',
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()))),
@@ -1608,10 +1616,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   // DIALOGS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  void _showNovoMotoristaDialog() {
+  void _showNovoUsuarioDialog() {
     final nomeCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final telefoneCtrl = TextEditingController();
+    AppRole papel = AppRole.motorista;
     bool criarConta = false;
     bool saving = false;
     String? error;
@@ -1627,7 +1636,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             borderRadius: BorderRadius.circular(14),
             side: const BorderSide(color: Color(0xFF1E293B)),
           ),
-          title: const Text('Novo Motorista',
+          title: const Text('Novo Usuário',
               style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
           content: SizedBox(
             width: 420,
@@ -1672,15 +1681,40 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 _fieldLabel('E-mail da conta *'),
                 const SizedBox(height: 4),
                 const Text(
-                  'Use o e-mail com que o motorista criou a conta no app. Se ainda não tem conta, marque a opção abaixo para criar uma e enviar o convite por e-mail.',
+                  'Use o e-mail com que a pessoa já criou conta no app. Se ainda não tem conta, marque a opção abaixo para criar uma e enviar o convite por e-mail.',
                   style: TextStyle(color: Color(0xFF475569), fontSize: 11),
                 ),
                 const SizedBox(height: 6),
-                _formField('Email', emailCtrl, hint: 'motorista@email.com'),
+                _formField('Email', emailCtrl, hint: 'usuario@email.com'),
                 const SizedBox(height: 12),
 
                 // Telefone
                 _formField('Telefone', telefoneCtrl, hint: '(11) 99999-9999'),
+                const SizedBox(height: 12),
+
+                // Papel
+                _fieldLabel('Papel'),
+                const SizedBox(height: 6),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F1C30),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<AppRole>(
+                      value: papel,
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF0F1C30),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      items: const [AppRole.motorista, AppRole.gestor, AppRole.adminEmpresa]
+                          .map((r) => DropdownMenuItem(value: r, child: Text(r.displayName)))
+                          .toList(),
+                      onChanged: (v) => setS(() => papel = v ?? papel),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
 
                 // Empresa
@@ -1726,10 +1760,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     onChanged: (v) => setS(() => criarConta = v ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
                     activeColor: const Color(0xFF3B82F6),
-                    title: const Text('Criar conta de acesso para este motorista',
+                    title: const Text('Criar conta de acesso',
                         style: TextStyle(color: Colors.white, fontSize: 13)),
                     subtitle: const Text(
-                      'Um e-mail com link para o motorista definir a própria senha será enviado.',
+                      'Um e-mail com link para a pessoa definir a própria senha será enviado.',
                       style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
                     ),
                   ),
@@ -1784,13 +1818,13 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
                     // Inserir perfil do usuário (master tem permissão).
                     // Não silenciar: se isso falhar, a conta fica criada no Auth
-                    // mas sem role/empresa_id, e o motorista trava em "pendente"
+                    // mas sem role/empresa_id, e o usuário trava em "pendente"
                     // sem ninguém saber o motivo.
                     await _supabase.from('user_profiles').upsert({
                       'user_id': userId,
                       'email': email,
                       'nome': nome,
-                      'role': 'MOTORISTA',
+                      'role': papel.label,
                       'empresa_id': empresaSelecionadaId,
                       'status': 'ativo',
                     }, onConflict: 'user_id');
@@ -1801,46 +1835,45 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         .select('user_id')
                         .eq('email', email)
                         .maybeSingle();
-                    if (existing != null) {
-                      userId = existing['user_id']?.toString();
+                    if (existing == null) {
+                      setS(() { saving = false; error = 'Conta não encontrada para esse e-mail.'; });
+                      return;
+                    }
+                    userId = existing['user_id']?.toString();
+                    await _supabase.from('user_profiles').update({
+                      'role': papel.label,
+                      'empresa_id': empresaSelecionadaId,
+                      'nome': nome,
+                    }).eq('user_id', userId!);
+                  }
+
+                  // ── Registro de motorista (drivers) só se o papel for Motorista ──
+                  String? driverId;
+                  if (papel == AppRole.motorista) {
+                    final driverPayload = <String, dynamic>{
+                      'name': nome,
+                      'email': email,
+                      if (telefone.isNotEmpty) 'phone': telefone,
+                    };
+                    if (empresaSelecionadaId != null) driverPayload['empresa_id'] = empresaSelecionadaId;
+                    driverPayload['user_id'] = userId;
+
+                    final driverRes = await _supabase
+                        .from('drivers')
+                        .insert(driverPayload)
+                        .select('id')
+                        .single();
+                    driverId = driverRes['id']?.toString();
+
+                    if (driverId != null) {
+                      await linkUserToDriver(_supabase, userId: userId, driverId: driverId);
                     }
                   }
 
-                  // ── Criar registro de motorista (drivers) ────────────────
-                  final driverPayload = <String, dynamic>{
-                    'name': nome,
-                    'email': email,
-                    if (telefone.isNotEmpty) 'phone': telefone,
-                  };
-                  if (empresaSelecionadaId != null) driverPayload['empresa_id'] = empresaSelecionadaId;
-                  if (userId != null) driverPayload['user_id'] = userId;
-
-                  final driverRes = await _supabase
-                      .from('drivers')
-                      .insert(driverPayload)
-                      .select('id')
-                      .single();
-
-                  final driverId = driverRes['id']?.toString();
-
-                  // ── Sincronizar driver_id no perfil do usuário ───────────
-                  if (userId != null && driverId != null) {
-                    final profileUpdate = <String, dynamic>{
-                      'driver_id': driverId,
-                      'role': 'MOTORISTA',
-                    };
-                    if (empresaSelecionadaId != null) profileUpdate['empresa_id'] = empresaSelecionadaId;
-                    await _supabase
-                        .from('user_profiles')
-                        .update(profileUpdate)
-                        .eq('user_id', userId);
-                  }
-
+                  final papelLabel = papel.displayName;
                   final msg = criarConta
-                      ? 'Motorista "$nome" cadastrado! Um e-mail para definir a senha foi enviado a $email.'
-                      : userId != null
-                          ? 'Motorista "$nome" cadastrado e vinculado à conta $email!'
-                          : 'Motorista "$nome" cadastrado! Conta "$email" não encontrada — vínculo pendente quando fizer login.';
+                      ? '$papelLabel "$nome" cadastrado! Um e-mail para definir a senha foi enviado a $email.'
+                      : '$papelLabel "$nome" vinculado com sucesso à conta $email!';
 
                   if (ctx.mounted) {
                     setS(() { saving = false; successMsg = msg; });
@@ -1859,7 +1892,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               ),
               child: saving
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Cadastrar Motorista'),
+                  : Text('Cadastrar ${papel.displayName}'),
             ),
           ],
         ),
@@ -1872,10 +1905,18 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600),
   );
 
+  static const Map<String, double> _planoValoresPadrao = {
+    'basico': 139.90,
+    'profissional': 259.90,
+    'enterprise': 359.90,
+  };
+
   void _showNovaEmpresaDialog() {
     final nomeCtrl = TextEditingController();
     final cnpjCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
+    String plano = 'basico';
+    final valorCtrl = TextEditingController(text: _planoValoresPadrao['basico']!.toStringAsFixed(2));
     bool saving = false;
     String? error;
     String? successMsg;
@@ -1909,6 +1950,38 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               _formField('Nome da empresa *', nomeCtrl),
               const SizedBox(height: 12),
               _formField('CNPJ', cnpjCtrl, hint: '00.000.000/0001-00'),
+              const SizedBox(height: 12),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Plano', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF060C18),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF1E293B)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: plano,
+                          isExpanded: true,
+                          dropdownColor: const Color(0xFF0F1C30),
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          items: _planoValoresPadrao.keys.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                          onChanged: (v) => setS(() {
+                            plano = v ?? plano;
+                            valorCtrl.text = _planoValoresPadrao[plano]!.toStringAsFixed(2);
+                          }),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: _formField('Valor mensal (R\$) *', valorCtrl, hint: '139.90')),
+              ]),
               const SizedBox(height: 16),
               const Text(
                 'E-mail do administrador',
@@ -1932,8 +2005,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               onPressed: saving ? null : () async {
                 final nome = nomeCtrl.text.trim();
                 final email = emailCtrl.text.trim().toLowerCase();
+                final valorMensal = double.tryParse(valorCtrl.text.trim().replaceAll(',', '.'));
                 if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
                 if (email.isEmpty) { setS(() => error = 'E-mail do administrador é obrigatório'); return; }
+                if (valorMensal == null || valorMensal < 0) { setS(() => error = 'Valor mensal inválido'); return; }
                 setS(() { saving = true; error = null; successMsg = null; });
                 try {
                   // 1. Verifica se o usuário com esse e-mail existe
@@ -1988,6 +2063,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                         'cnpj': cnpjCtrl.text.trim().isEmpty ? null : cnpjCtrl.text.trim(),
                         'email': email,
                         'status': 'ativo',
+                        'plano': plano,
+                        'valor_mensalidade': valorMensal,
                       })
                       .select('id')
                       .single();
@@ -2070,12 +2147,16 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                           final nome = (e['nome'] ?? '').toString();
                           final status = (e['status'] ?? 'ativo').toString();
                           final cnpj = (e['cnpj'] ?? '').toString();
+                          final valor = (e['valor_mensalidade'] as num?)?.toDouble() ?? 0;
                           final statusColor = status == 'ativo'
                               ? const Color(0xFF22C55E)
                               : status == 'suspenso'
                                   ? const Color(0xFFF59E0B)
                                   : const Color(0xFFEF4444);
-                          return Container(
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () { Navigator.pop(ctx); _showEditarEmpresaDialog(e); },
+                            child: Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
@@ -2102,15 +2183,21 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                                 if (cnpj.isNotEmpty)
                                   Text(cnpj, style: const TextStyle(color: Color(0xFF475569), fontSize: 11)),
                               ])),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(10),
+                              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                Text('R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
+                                    style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12, fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
                                 ),
-                                child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
-                              ),
+                              ]),
                             ]),
+                            ),
                           );
                         }).toList(),
                       ),
@@ -2124,6 +2211,132 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _showEditarEmpresaDialog(Map<String, dynamic> empresa) {
+    final empresaId = empresa['id']?.toString();
+    if (empresaId == null) return;
+    String plano = (empresa['plano'] ?? 'basico').toString();
+    if (!_planoValoresPadrao.containsKey(plano)) plano = 'basico';
+    String status = (empresa['status'] ?? 'ativo').toString();
+    final valorAtual = (empresa['valor_mensalidade'] as num?)?.toDouble() ?? _planoValoresPadrao[plano]!;
+    final valorCtrl = TextEditingController(text: valorAtual.toStringAsFixed(2));
+    bool saving = false;
+    String? error;
+    String? successMsg;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: const Color(0xFF0A1628),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFF1E293B))),
+          title: Text('Editar "${empresa['nome'] ?? ''}"',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+          content: SizedBox(
+            width: 380,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (error != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Text(error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (successMsg != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFF22C55E).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Text(successMsg!, style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12)),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const Text('Plano', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF060C18),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1E293B)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: plano,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF0F1C30),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    items: _planoValoresPadrao.keys.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                    onChanged: (v) => setS(() => plano = v ?? plano),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _formField('Valor mensal (R\$) *', valorCtrl, hint: '139.90'),
+              const SizedBox(height: 12),
+              const Text('Status', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF060C18),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1E293B)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: status,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF0F1C30),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    items: const [
+                      DropdownMenuItem(value: 'ativo', child: Text('Ativo')),
+                      DropdownMenuItem(value: 'suspenso', child: Text('Suspenso')),
+                      DropdownMenuItem(value: 'cancelado', child: Text('Cancelado')),
+                    ],
+                    onChanged: (v) => setS(() => status = v ?? status),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: saving ? null : () async {
+                final valorMensal = double.tryParse(valorCtrl.text.trim().replaceAll(',', '.'));
+                if (valorMensal == null || valorMensal < 0) { setS(() => error = 'Valor mensal inválido'); return; }
+                setS(() { saving = true; error = null; successMsg = null; });
+                try {
+                  await _supabase.from('empresas').update({
+                    'plano': plano,
+                    'valor_mensalidade': valorMensal,
+                    'status': status,
+                  }).eq('id', empresaId);
+
+                  if (ctx.mounted) {
+                    setS(() { saving = false; successMsg = 'Empresa atualizada!'; });
+                    await Future.delayed(const Duration(seconds: 1));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  }
+                  _loadAll();
+                } catch (e) {
+                  setS(() { saving = false; error = friendlyError(e); });
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Salvar'),
+            ),
+          ],
+        ),
       ),
     );
   }
