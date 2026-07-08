@@ -62,6 +62,7 @@
     <li><strong>Dados da empresa</strong> (para administradores): razão social, CNPJ, e-mail e telefone de contato.</li>
     <li><strong>Dados de uso:</strong> data/hora do último acesso, registros de checklists, abastecimentos, ocorrências e manutenções vinculados à sua conta.</li>
     <li><strong>Localização (somente na versão Web, de forma opcional):</strong> ao registrar o início/fim de uma viagem pela versão Web, o navegador pode solicitar sua localização atual para anexar ao registro. Essa coleta é feita uma única vez por evento, nunca em segundo plano, e não está presente na versão Android.</li>
+    <li><strong>Token de notificação (somente Android, para administradores e gestores):</strong> se você conceder a permissão de notificações, o aplicativo registra um identificador técnico do seu aparelho (fornecido pelo Firebase Cloud Messaging) para poder enviar avisos sobre eventos da frota (abastecimentos, ocorrências, multas e manutenções registrados pelos motoristas). Esse identificador não contém dados pessoais e é removido automaticamente ao sair da conta.</li>
   </ul>
 
   <h2>3. Como usamos seus dados</h2>
@@ -70,7 +71,8 @@
     <li>Autenticar seu acesso e identificar sua empresa;</li>
     <li>Exibir e organizar checklists, abastecimentos, manutenções, multas e documentos vinculados aos veículos e motoristas da sua empresa;</li>
     <li>Gerar relatórios e indicadores operacionais para a empresa contratante;</li>
-    <li>Enviar comunicações operacionais estritamente relacionadas ao uso do aplicativo (ex.: redefinição de senha).</li>
+    <li>Enviar comunicações operacionais estritamente relacionadas ao uso do aplicativo (ex.: redefinição de senha);</li>
+    <li>Enviar notificações push a administradores e gestores sobre eventos registrados pelos motoristas da própria empresa (abastecimentos, ocorrências, multas e manutenções).</li>
   </ul>
   <p>Não vendemos, alugamos nem compartilhamos seus dados pessoais com terceiros para fins de publicidade.</p>
 
@@ -91,6 +93,7 @@
 
   <h2>7. Permissões do aplicativo Android</h2>
   <p>O aplicativo Android solicita acesso à <strong>câmera e galeria de fotos</strong> exclusivamente para permitir o registro de fotos em checklists, abastecimentos, multas, pneus, documentos e foto de perfil. Nenhuma foto é capturada ou enviada sem uma ação explícita do usuário.</p>
+  <p>O aplicativo também pode solicitar permissão para <strong>enviar notificações</strong>, usada apenas para avisar administradores e gestores sobre eventos registrados pelos motoristas de sua empresa. Motoristas não recebem esse tipo de notificação. Você pode negar ou revogar essa permissão a qualquer momento nas configurações do Android, sem afetar o restante do funcionamento do aplicativo.</p>
 
   <h2>8. Retenção e exclusão</h2>
   <p>Os dados são mantidos enquanto sua conta estiver ativa junto à empresa contratante. Ao encerrar o vínculo, a empresa administradora pode solicitar a exclusão da conta e dos dados pessoais associados.</p>

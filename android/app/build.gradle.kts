@@ -6,6 +6,7 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services") apply false
 }
 
 val keystoreProperties = Properties()
@@ -22,6 +23,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Exigido pelo flutter_local_notifications (notificações em primeiro plano).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -64,4 +67,15 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// Só aplica o plugin do Firebase quando google-services.json já existir —
+// evita quebrar o build para quem clonar o projeto antes do arquivo ser
+// baixado do Firebase Console (ver docs/PUSH_NOTIFICATIONS_SETUP.md).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }

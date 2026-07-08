@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -14,6 +16,18 @@ import 'core/auth/app_auth_provider.dart';
 import 'core/enums/app_role.dart';
 import 'core/guards/app_guard.dart';
 import 'core/utils/page_reload.dart';
+import 'core/services/push_notification_service.dart';
+
+Future<void> _initFirebaseIfSupported() async {
+  if (!pushNotificationsSupported) return;
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessageHandler);
+  } catch (e) {
+    // Comum antes do google-services.json existir — não deve derrubar o app.
+    debugPrint('Firebase indisponível (notificações push desativadas): $e');
+  }
+}
 
 void main() {
   bool zoneErrorHandled = false;
@@ -53,6 +67,8 @@ void main() {
         debugPrint('Supabase initialization error: $e');
         debugPrint('Stack trace: $st');
       }
+
+      await _initFirebaseIfSupported();
 
       runApp(
         supabaseReady
@@ -95,12 +111,29 @@ class FrotaCheckApp extends StatelessWidget {
   }
 }
 
-class _MasterAwareRouter extends StatelessWidget {
+class _MasterAwareRouter extends StatefulWidget {
   const _MasterAwareRouter();
+
+  @override
+  State<_MasterAwareRouter> createState() => _MasterAwareRouterState();
+}
+
+class _MasterAwareRouterState extends State<_MasterAwareRouter> {
+  String? _pushInitDoneForUser;
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AppAuthProvider>();
+
+    // Só ADMIN_EMPRESA/GESTOR recebem push de eventos da frota — evita pedir
+    // permissão de notificação de quem nunca vai receber nada (motorista).
+    final wantsPush = auth.role == AppRole.adminEmpresa || auth.role == AppRole.gestor;
+    final userId = auth.profile?.userId;
+    if (wantsPush && userId != null && _pushInitDoneForUser != userId && pushNotificationsSupported) {
+      _pushInitDoneForUser = userId;
+      PushNotificationService.instance.init();
+    }
+
     if (auth.isMaster && !auth.isImpersonating) {
       return const MasterDashboardPage();
     }

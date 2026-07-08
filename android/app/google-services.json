@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "305969217746",
+    "project_id": "frota-check-20db5",
+    "storage_bucket": "frota-check-20db5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:305969217746:android:e001b55ac72aeba6edad0b",
+        "android_client_info": {
+          "package_name": "com.frotacheck.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvm5LHd4Jc5IhmR6FC2wZ44IIgwDKGU3M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

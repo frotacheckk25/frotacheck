@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile.dart';
 import '../enums/app_permission.dart';
 import '../enums/app_role.dart';
+import '../services/push_notification_service.dart';
 
 class AppAuthProvider extends ChangeNotifier {
   UserProfile? _profile;
@@ -169,6 +170,9 @@ class AppAuthProvider extends ChangeNotifier {
     // Limpa impersonation antes de sair para não vazar estado entre sessões
     _impersonatedEmpresaId = null;
     _impersonatedEmpresaNome = null;
+    if (pushNotificationsSupported) {
+      await PushNotificationService.instance.unregister();
+    }
     await _supabase.auth.signOut();
     _profile = null;
     notifyListeners();
