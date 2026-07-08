@@ -517,18 +517,19 @@ class _VeiculosPageState extends State<_VeiculosView> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: motoristaSelecionado,
+                isExpanded: true,
                 decoration: InputDecoration(
                   labelText: 'Motorista responsável',
                   prefixIcon: const Icon(Icons.person_outline, size: 20),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
-                hint: const Text('Selecionar motorista (opcional)'),
+                hint: const Text('Selecionar motorista (opcional)', overflow: TextOverflow.ellipsis),
                 items: [
-                  const DropdownMenuItem<String>(value: null, child: Text('Sem motorista')),
+                  const DropdownMenuItem<String>(value: null, child: Text('Sem motorista', overflow: TextOverflow.ellipsis)),
                   ...motoristas.map((m) => DropdownMenuItem<String>(
                     value: m['id']?.toString(),
-                    child: Text(m['name']?.toString() ?? ''),
+                    child: Text(m['name']?.toString() ?? '', overflow: TextOverflow.ellipsis),
                   )),
                 ],
                 onChanged: (v) => setState(() => motoristaSelecionado = v),

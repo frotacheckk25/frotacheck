@@ -1488,54 +1488,78 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildMobileDashboard() {
     final width = MediaQuery.of(context).size.width;
-    return RefreshIndicator(
-      onRefresh: carregarDashboard,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(width),
-            const SizedBox(height: 20),
-            SizedBox(
-              height: 120,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  _buildMobileStatCard(
-                    'Veículos',
-                    '$totalVeiculos',
-                    AppColors.primary,
-                  ),
-                  _buildMobileStatCard(
-                    'Motoristas',
-                    '$totalMotoristas',
-                    AppColors.success,
-                  ),
-                  _buildMobileStatCard(
-                    'Abastecimentos',
-                    '$totalAbastecimentos',
-                    AppColors.warning,
-                  ),
-                  _buildMobileStatCard(
-                    'Gasto total',
-                    'R\$ ${totalGasto.toStringAsFixed(2)}',
-                    AppColors.danger,
-                  ),
-                ],
+    return Stack(
+      children: [
+        // ── Mesmo fundo com a imagem dos veículos usado na versão Web ────────
+        Positioned.fill(
+          child: Container(color: const Color(0xFF020810)),
+        ),
+        Positioned.fill(
+          child: Opacity(
+            opacity: 0.55,
+            child: Image.asset(
+              'assets/images/frotacheckkk.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.bottomCenter,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF020810).withOpacity(0.35),
+                    const Color(0xFF020810).withOpacity(0.55),
+                    const Color(0xFF020810).withOpacity(0.90),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-            _buildTopKpiRow(width),
-            const SizedBox(height: 20),
-            _buildChartsRow(width),
-            const SizedBox(height: 20),
-            _buildBottomPanels(width),
-          ],
+          ),
         ),
-      ),
+        RefreshIndicator(
+          onRefresh: carregarDashboard,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(width),
+                const SizedBox(height: 20),
+                // Mesmos 8 KPI cards (com sparkline) da versão Web, empilhados
+                // em grade 2 colunas compacta em vez de lado a lado.
+                _buildMobileKpiGrid(),
+                const SizedBox(height: 16),
+                // Mesmo painel "Alertas Críticos" + "Insights da IA" da versão Web.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF020810).withOpacity(0.80),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF0E1E33),
+                        width: 1,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+                      child: _buildV2RightPanelContent(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1902,6 +1926,132 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Grade 2 colunas dos mesmos KpiCard do dashboard V2 (desktop), só que
+  /// empilhados verticalmente — usada no dashboard mobile para mostrar os
+  /// mesmos 8 indicadores/sparklines que aparecem na versão Web.
+  Widget _buildMobileKpiGrid() {
+    Widget row(Widget left, Widget right) {
+      return SizedBox(
+        height: 138,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: left),
+            const SizedBox(width: 10),
+            Expanded(child: right),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        row(
+          KpiCard(
+            compact: true,
+            title: 'Veículos Ativos',
+            value: '$_kpiVeiculosAtivos',
+            icon: Icons.directions_car_rounded,
+            color: const Color(0xFF6366F1),
+            trend: _sparkTrend(sparkVeiculos, 'veículo'),
+            sparkData: sparkVeiculos,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage())).then((_) => carregarDashboard()),
+          ),
+          KpiCard(
+            compact: true,
+            title: 'Motoristas Ativos',
+            value: '$_kpiMotoristas',
+            icon: Icons.person_rounded,
+            color: const Color(0xFF10B981),
+            trend: _sparkTrend(sparkMotoristas, 'motorista'),
+            sparkData: sparkMotoristas,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage())).then((_) => carregarDashboard()),
+          ),
+        ),
+        const SizedBox(height: 10),
+        row(
+          KpiCard(
+            compact: true,
+            title: 'Em Manutenção',
+            value: '$_kpiEmManutencao',
+            unit: 'serviços registrados',
+            icon: Icons.build_rounded,
+            color: const Color(0xFF0EA5E9),
+            trend: _sparkTrend(sparkManutencoes, 'serviço'),
+            sparkData: sparkManutencoes,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage())).then((_) => carregarDashboard()),
+          ),
+          KpiCard(
+            compact: true,
+            title: 'Ocorrências',
+            value: '$_kpiOcorrencias',
+            unit: _ocorrenciasAbertasCount > 0
+                ? '$_ocorrenciasAbertasCount em aberto'
+                : 'total de registros',
+            icon: Icons.warning_amber_rounded,
+            color: const Color(0xFFEF4444),
+            badge: _ocorrenciasAbertasCount > 0 ? 'Abertas' : null,
+            trend: _sparkTrend(sparkOcorrencias, 'ocorrência'),
+            sparkData: sparkOcorrencias,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage())).then((_) => carregarDashboard()),
+          ),
+        ),
+        const SizedBox(height: 10),
+        row(
+          KpiCard(
+            compact: true,
+            title: 'Abastecimentos',
+            value: '$totalAbastecimentos',
+            unit: 'registros no período',
+            icon: Icons.local_gas_station_rounded,
+            color: const Color(0xFFF97316),
+            trend: _sparkTrend(sparkAbastecimentos, 'registro'),
+            sparkData: sparkAbastecimentos,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage())).then((_) => carregarDashboard()),
+          ),
+          KpiCard(
+            compact: true,
+            title: 'Multas',
+            value: '$_kpiMultas',
+            icon: Icons.receipt_long_rounded,
+            color: const Color(0xFFF59E0B),
+            badge: _kpiMultas > 0 ? 'Pendentes' : null,
+            trend: _sparkTrend(sparkMultas, 'multa'),
+            sparkData: sparkMultas,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage())).then((_) => carregarDashboard()),
+          ),
+        ),
+        const SizedBox(height: 10),
+        row(
+          KpiCard(
+            compact: true,
+            title: 'Gasto do Mês',
+            value: _kpiGastoMensal,
+            unit: 'combustível + manutenção',
+            icon: Icons.account_balance_wallet_rounded,
+            color: const Color(0xFF7C3AED),
+            trend: _sparkCostTrend(sparkGasto),
+            sparkData: sparkGasto,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage())).then((_) => carregarDashboard()),
+          ),
+          KpiCard(
+            compact: true,
+            title: 'Índice da Frota',
+            value: '$_kpiFleetIndex%',
+            unit: 'disponibilidade operacional',
+            icon: Icons.speed_rounded,
+            color: _kpiFleetColor,
+            badge: _kpiFleetLabel,
+            badgeColor: _kpiFleetColor,
+            trend: _sparkFleetTrend(sparkFleet),
+            sparkData: sparkFleet,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage())).then((_) => carregarDashboard()),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLeftKpiColumn() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2008,6 +2158,17 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildV2RightPanel() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      child: _buildV2RightPanelContent(),
+    );
+  }
+
+  /// Conteúdo do painel Alertas Críticos + Insights da IA, sem o
+  /// SingleChildScrollView próprio — usado tanto no painel lateral (desktop,
+  /// via _buildV2RightPanel) quanto embutido direto na rolagem vertical do
+  /// dashboard mobile (_buildMobileDashboard), evitando scroll dentro de scroll.
+  Widget _buildV2RightPanelContent() {
     // ── Build unified alert list from real data only ────────────────────────
     final List<_AlertaData> alertas = [
       // Ocorrências críticas abertas (Alta prioridade)
@@ -2047,9 +2208,7 @@ class _HomePageState extends State<HomePage> {
 
     final totalAlertas = alertas.length;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-      child: Column(
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Header Alertas Críticos ──────────────────────
@@ -2271,7 +2430,6 @@ class _HomePageState extends State<HomePage> {
             );
           }),
         ],
-      ),
     );
   }
 
@@ -2896,41 +3054,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildMobileStatCard(String title, String value, Color color) {
-    return Container(
-      width: 220,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMobileInfoTile(String title, String value) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -3204,146 +3327,74 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(width: 20),
 
-        // ── Date picker ───────────────────────────────────────────────────
-        _HeaderDateBtn(label: _currentDateRangeLabel(), onTap: _pickDateRange),
-        const SizedBox(width: 8),
-
-        // ── Filtros ───────────────────────────────────────────────────────
-        if (!compact) ...[
-          _HeaderBtn(
-            icon: Icons.tune_rounded,
-            label: 'Filtros',
-            tooltip: 'Filtrar período',
-            onTap: _pickDateRange,
-          ),
-          const SizedBox(width: 10),
-        ],
-
-        // ── + Novo Registro ───────────────────────────────────────────────
-        _HeaderPrimaryBtn(
-          label: compact ? 'Novo' : 'Novo Registro',
-          onPressed: () => _showNovoRegistroMenu(context),
-        ),
-        const SizedBox(width: 12),
-
-        // Separador vertical
-        Container(width: 1, height: 20, color: const Color(0xFF182235)),
-        const SizedBox(width: 12),
-
-        // ── Search ────────────────────────────────────────────────────────
-        _HeaderBtn(
-          icon: Icons.search_rounded,
-          tooltip: 'Busca',
-          onTap: _showSearchDialog,
-        ),
-        const SizedBox(width: 8),
-
-        // ── Notifications ─────────────────────────────────────────────────
-        _HeaderBtn(
-          icon: Icons.notifications_outlined,
-          tooltip: 'Alertas',
-          onTap: _showAlertsPanel,
-          badgeCount: _kpiOcorrencias,
-        ),
-        const SizedBox(width: 10),
-
-        // ── Avatar ────────────────────────────────────────────────────────
-        _HeaderAvatarBtn(
-          initials: initials,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
-            );
-            carregarDashboard();
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTopKpiRow(double width) {
-    final cards = [
-      _buildKpiTile('Total de Veículos',   '$_kpiTotalVeiculos',  Icons.local_shipping,        const Color(0xFF0ea5e9), subtitle: 'Todos os veículos',    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage())).then((_) => carregarDashboard())),
-      _buildKpiTile('Veículos Ativos',     '$_kpiVeiculosAtivos', Icons.directions_car,         const Color(0xFF22c55e), subtitle: 'Em operação',          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage())).then((_) => carregarDashboard())),
-      _buildKpiTile('Em Manutenção',       '$_kpiEmManutencao',   Icons.build,                  const Color(0xFFeab308), subtitle: 'Indisponíveis',         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage())).then((_) => carregarDashboard())),
-      _buildKpiTile('Motoristas Ativos',   '$_kpiMotoristas',     Icons.person,                 const Color(0xFF0ea5e9), subtitle: 'Motoristas',            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage())).then((_) => carregarDashboard())),
-      _buildKpiTile('Gasto Mensal',        _kpiGastoMensal,       Icons.account_balance_wallet, const Color(0xFF7C3AED), subtitle: 'Total de gastos',      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage())).then((_) => carregarDashboard())),
-      _buildKpiTile('Ocorrências Abertas', '$_kpiOcorrencias',    Icons.notifications_none,     const Color(0xFFef4444), subtitle: 'Aguardando resolução', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OcorrenciasPage())).then((_) => carregarDashboard())),
-    ];
-    return LayoutBuilder(
-      builder: (_, constraints) {
-        final cols = constraints.maxWidth > 900 ? 6 : constraints.maxWidth > 600 ? 3 : 2;
-        final itemW = (constraints.maxWidth - (cols - 1) * 10) / cols;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: cards.map((c) => SizedBox(width: itemW, child: c)).toList(),
-        );
-      },
-    );
-  }
-
-  Widget _buildKpiTile(String title, String value, IconData icon, Color color, {String? subtitle, VoidCallback? onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(11),
-      child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, color: color, size: 19),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+        // Botões à direita ficam num trecho rolável horizontalmente — em telas
+        // estreitas (celular) a soma dos botões fixos não cabe, e isso evita
+        // o RenderFlex overflow em vez de tentar adivinhar mais um breakpoint.
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(color: Color(0xFF9ca3af), fontSize: 11.5),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    height: 1.1,
+                // ── Date picker ─────────────────────────────────────────────
+                _HeaderDateBtn(label: _currentDateRangeLabel(), onTap: _pickDateRange),
+                const SizedBox(width: 8),
+
+                // ── Filtros ─────────────────────────────────────────────────
+                if (!compact) ...[
+                  _HeaderBtn(
+                    icon: Icons.tune_rounded,
+                    label: 'Filtros',
+                    tooltip: 'Filtrar período',
+                    onTap: _pickDateRange,
                   ),
+                  const SizedBox(width: 10),
+                ],
+
+                // ── + Novo Registro ─────────────────────────────────────────
+                _HeaderPrimaryBtn(
+                  label: compact ? 'Novo' : 'Novo Registro',
+                  onPressed: () => _showNovoRegistroMenu(context),
                 ),
-                if (subtitle != null)
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: Color(0xFF6b7280), fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
+                const SizedBox(width: 12),
+
+                // Separador vertical
+                Container(width: 1, height: 20, color: const Color(0xFF182235)),
+                const SizedBox(width: 12),
+
+                // ── Search ──────────────────────────────────────────────────
+                _HeaderBtn(
+                  icon: Icons.search_rounded,
+                  tooltip: 'Busca',
+                  onTap: _showSearchDialog,
+                ),
+                const SizedBox(width: 8),
+
+                // ── Notifications ───────────────────────────────────────────
+                _HeaderBtn(
+                  icon: Icons.notifications_outlined,
+                  tooltip: 'Alertas',
+                  onTap: _showAlertsPanel,
+                  badgeCount: _kpiOcorrencias,
+                ),
+                const SizedBox(width: 10),
+
+                // ── Avatar ──────────────────────────────────────────────────
+                _HeaderAvatarBtn(
+                  initials: initials,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
+                    );
+                    carregarDashboard();
+                  },
+                ),
               ],
             ),
           ),
-        ],
-      ),
-      ),
+        ),
+      ],
     );
   }
 

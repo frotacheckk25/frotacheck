@@ -15,6 +15,9 @@ class KpiCard extends StatefulWidget {
   final String? unit;
   final List<double> sparkData;
   final VoidCallback? onTap;
+  /// Versão reduzida (ícone/fontes/espaçamento menores) — usada no grid 2
+  /// colunas do dashboard mobile, para caber mais conteúdo na tela do celular.
+  final bool compact;
 
   const KpiCard({
     super.key,
@@ -28,6 +31,7 @@ class KpiCard extends StatefulWidget {
     this.unit,
     this.sparkData = const [],
     this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -100,7 +104,10 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutCubic,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(19),
+                  // Sem borderRadius aqui — o ClipRRect externo já arredonda o
+                  // card. Combinar borderRadius com Border não-uniforme (topo/
+                  // esquerda com cores diferentes de direita/baixo) quebra o
+                  // assert do Flutter ("borders with uniform colors").
                   gradient: LinearGradient(
                     colors: [
                       c.withOpacity(_hovered ? 0.10 : 0.050),
@@ -128,12 +135,14 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
                   children: [
                     // ── Conteúdo do card ──────────────────────────────────────
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                      padding: widget.compact
+                          ? const EdgeInsets.fromLTRB(10, 10, 10, 8)
+                          : const EdgeInsets.fromLTRB(16, 16, 16, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildHeader(c),
-                          const SizedBox(height: 10),
+                          SizedBox(height: widget.compact ? 6 : 10),
                           _buildValue(c),
                           if (widget.trend.isNotEmpty) _buildTrend(),
                           const Spacer(),
@@ -178,6 +187,7 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
 
   Widget _buildHeader(Color c) {
     final badgeC = widget.badgeColor ?? c;
+    final iconBox = widget.compact ? 30.0 : 42.0;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -185,11 +195,11 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
         AnimatedContainer(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
-          width: 42,
-          height: 42,
+          width: iconBox,
+          height: iconBox,
           decoration: BoxDecoration(
             color: c.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(widget.compact ? 9 : 12),
             boxShadow: [
               BoxShadow(
                 color: c.withOpacity(_hovered ? 0.52 : 0.18),
@@ -198,27 +208,27 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
               ),
             ],
           ),
-          child: Icon(widget.icon, color: c, size: 22),
+          child: Icon(widget.icon, color: c, size: widget.compact ? 16 : 22),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: widget.compact ? 8 : 12),
         Expanded(
           child: Text(
             widget.title,
             style: TextStyle(
               color: AppColors.textSecondary,
-              fontSize: 11.5,
+              fontSize: widget.compact ? 10.5 : 11.5,
               fontWeight: FontWeight.w500,
-              height: 1.35,
-              letterSpacing: 0.15,
+              height: 1.25,
+              letterSpacing: 0.1,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ),
         if (widget.badge != null) ...[
-          const SizedBox(width: 6),
+          SizedBox(width: widget.compact ? 4 : 6),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+            padding: EdgeInsets.symmetric(horizontal: widget.compact ? 5 : 7, vertical: widget.compact ? 1.5 : 2.5),
             decoration: BoxDecoration(
               color: badgeC.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),
@@ -231,9 +241,9 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
               widget.badge!,
               style: TextStyle(
                 color: badgeC,
-                fontSize: 9,
+                fontSize: widget.compact ? 8 : 9,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.4,
+                letterSpacing: 0.3,
               ),
             ),
           ),
@@ -250,10 +260,10 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
           widget.value,
           style: TextStyle(
             color: Colors.white,
-            fontSize: 28,
+            fontSize: widget.compact ? 20 : 28,
             fontWeight: FontWeight.w700,
             height: 1.0,
-            letterSpacing: -1.0,
+            letterSpacing: -0.6,
             shadows: _hovered
                 ? [Shadow(color: c.withOpacity(0.42), blurRadius: 18)]
                 : null,
@@ -266,12 +276,14 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
             padding: const EdgeInsets.only(top: 2),
             child: Text(
               widget.unit!,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 10,
+                fontSize: widget.compact ? 9 : 10,
                 fontWeight: FontWeight.w400,
                 letterSpacing: 0.2,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],
@@ -294,18 +306,18 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
             ? Icons.trending_up_rounded
             : Icons.trending_down_rounded;
     return Padding(
-      padding: const EdgeInsets.only(top: 5),
+      padding: EdgeInsets.only(top: widget.compact ? 3 : 5),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: tc),
+          Icon(icon, size: widget.compact ? 10 : 12, color: tc),
           const SizedBox(width: 3),
           Flexible(
             child: Text(
               widget.trend,
               style: TextStyle(
                 color: tc,
-                fontSize: 10.5,
+                fontSize: widget.compact ? 9.5 : 10.5,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.05,
               ),
@@ -320,7 +332,7 @@ class _KpiCardState extends State<KpiCard> with SingleTickerProviderStateMixin {
 
   Widget _buildSpark(Color c) {
     return SizedBox(
-      height: 34,
+      height: widget.compact ? 22 : 34,
       child: _AnimatedSparkLine(data: widget.sparkData, color: c),
     );
   }
