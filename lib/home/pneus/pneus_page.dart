@@ -253,6 +253,7 @@ class _PneusPageState extends State<_PneusView> {
 
   @override
   Widget build(BuildContext context) {
+    final canManage = context.watch<AppAuthProvider>().can(AppPermission.manageTires);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -460,30 +461,32 @@ class _PneusPageState extends State<_PneusView> {
                                   if (obs.isNotEmpty) _badge(obs, AppColors.textSecondary),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton.icon(
-                                    onPressed: () => _editarStatusPneu(p),
-                                    icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.secondary),
-                                    label: const Text('Editar status', style: TextStyle(color: AppColors.secondary, fontSize: 12)),
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              if (canManage) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () => _editarStatusPneu(p),
+                                      icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.secondary),
+                                      label: const Text('Editar status', style: TextStyle(color: AppColors.secondary, fontSize: 12)),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
-                                    tooltip: 'Excluir',
-                                    onPressed: () => _deletarPneu(p),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 18),
+                                      tooltip: 'Excluir',
+                                      onPressed: () => _deletarPneu(p),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),

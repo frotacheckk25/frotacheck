@@ -4,6 +4,13 @@
 *.pyc
 *.swp
 .DS_Store
+
+# Chave de assinatura de release do Android — NUNCA versionar.
+# Perder este arquivo = nunca mais poder atualizar o app na Play Store com a
+# mesma identidade. Faça backup em local seguro (gerenciador de senhas/cofre),
+# fora do git.
+android/upload-keystore.jks
+android/key.properties
 .atom/
 .build/
 .buildlog/
@@ -30,7 +37,7 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-#build/
+/build/
 /coverage/
 
 # Symbolication related

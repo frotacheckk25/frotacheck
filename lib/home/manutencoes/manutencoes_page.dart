@@ -199,8 +199,14 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: TextStyle(color: color.withValues(alpha: 0.88))),
+            Text(
+              title,
+              style: TextStyle(color: color.withValues(alpha: 0.88), fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 10),
             carregando
                 ? SizedBox(
@@ -277,26 +283,29 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
               ),
             ),
             const SizedBox(height: 22),
-            Row(
-              children: [
-                _buildStatisticCard(
-                  'Serviços registrados',
-                  '$totalServicos',
-                  const Color(0xFF0D47A1),
-                ),
-                const SizedBox(width: 12),
-                _buildStatisticCard(
-                  'Ocorrências abertas',
-                  '$ocorrenciasAbertas',
-                  const Color(0xFFF59E0B),
-                ),
-                const SizedBox(width: 12),
-                _buildStatisticCard(
-                  'Próxima troca',
-                  trocaLabel,
-                  const Color(0xFF1AA251),
-                ),
-              ],
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildStatisticCard(
+                    'Serviços registrados',
+                    '$totalServicos',
+                    const Color(0xFF0D47A1),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatisticCard(
+                    'Ocorrências abertas',
+                    '$ocorrenciasAbertas',
+                    const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatisticCard(
+                    'Próxima troca',
+                    trocaLabel,
+                    const Color(0xFF1AA251),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 22),
             _buildCard(

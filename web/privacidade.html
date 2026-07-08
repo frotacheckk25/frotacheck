@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Política de Privacidade — FrotaCheck</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0B0F14;
+    --surface: #121820;
+    --border: #262F3A;
+    --text: #E9ECEF;
+    --text-dim: #9AA7B4;
+    --accent: #3B82F6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .page { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  .updated { color: var(--text-dim); font-size: 13px; margin-bottom: 40px; }
+  h2 { font-size: 19px; margin: 40px 0 12px; border-top: 1px solid var(--border); padding-top: 28px; }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  p, li { color: var(--text-dim); font-size: 15px; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  strong { color: var(--text); }
+  .contact {
+    margin-top: 40px;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .contact p { color: var(--text); margin: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Política de Privacidade do FrotaCheck</h1>
+  <p class="updated">Última atualização: 8 de julho de 2026</p>
+
+  <p>Esta Política de Privacidade descreve como o <strong>FrotaCheck</strong> ("nós", "aplicativo") coleta, usa, armazena e protege as informações dos usuários do aplicativo, disponível para Web e Android. Ao usar o FrotaCheck, você concorda com as práticas descritas aqui.</p>
+
+  <h2>1. Quem somos</h2>
+  <p>O FrotaCheck é um sistema de gestão de frotas voltado a empresas que precisam controlar veículos, motoristas, checklists, abastecimentos, manutenções, multas e documentos. Empresas clientes (administradores e gestores) cadastram seus próprios motoristas, que também utilizam o aplicativo.</p>
+
+  <h2>2. Quais dados coletamos</h2>
+  <p>Coletamos apenas os dados necessários para o funcionamento do aplicativo:</p>
+  <ul>
+    <li><strong>Dados de cadastro:</strong> nome, e-mail e telefone.</li>
+    <li><strong>Dados de motorista:</strong> número e validade da CNH, foto de perfil.</li>
+    <li><strong>Dados de veículo:</strong> placa, marca, modelo, ano e odômetro.</li>
+    <li><strong>Fotos operacionais:</strong> fotos de checklist de saída/retorno, fotos de abastecimento (hodômetro, bomba, cupom fiscal), fotos de multas, fotos de pneus e documentos anexados (ex.: cópia de CNH, CRLV).</li>
+    <li><strong>Dados da empresa</strong> (para administradores): razão social, CNPJ, e-mail e telefone de contato.</li>
+    <li><strong>Dados de uso:</strong> data/hora do último acesso, registros de checklists, abastecimentos, ocorrências e manutenções vinculados à sua conta.</li>
+    <li><strong>Localização (somente na versão Web, de forma opcional):</strong> ao registrar o início/fim de uma viagem pela versão Web, o navegador pode solicitar sua localização atual para anexar ao registro. Essa coleta é feita uma única vez por evento, nunca em segundo plano, e não está presente na versão Android.</li>
+  </ul>
+
+  <h2>3. Como usamos seus dados</h2>
+  <p>Usamos os dados exclusivamente para:</p>
+  <ul>
+    <li>Autenticar seu acesso e identificar sua empresa;</li>
+    <li>Exibir e organizar checklists, abastecimentos, manutenções, multas e documentos vinculados aos veículos e motoristas da sua empresa;</li>
+    <li>Gerar relatórios e indicadores operacionais para a empresa contratante;</li>
+    <li>Enviar comunicações operacionais estritamente relacionadas ao uso do aplicativo (ex.: redefinição de senha).</li>
+  </ul>
+  <p>Não vendemos, alugamos nem compartilhamos seus dados pessoais com terceiros para fins de publicidade.</p>
+
+  <h2>4. Onde os dados são armazenados</h2>
+  <p>Os dados são armazenados de forma segura na infraestrutura do <strong>Supabase</strong> (banco de dados PostgreSQL, autenticação e armazenamento de arquivos em nuvem), com controle de acesso por empresa: cada empresa cliente só enxerga os dados dos seus próprios veículos, motoristas e usuários. Fotos e documentos são armazenados em buckets privados, acessíveis apenas por meio de links assinados e temporários.</p>
+
+  <h2>5. Compartilhamento de dados</h2>
+  <p>Dentro de uma mesma empresa cliente, dados de motoristas e veículos são visíveis para os administradores e gestores dessa empresa, conforme o papel de cada usuário — isso é necessário para a gestão operacional da frota. Não compartilhamos dados entre empresas clientes diferentes.</p>
+
+  <h2>6. Seus direitos</h2>
+  <p>Nos termos da Lei Geral de Proteção de Dados (LGPD), você pode solicitar a qualquer momento:</p>
+  <ul>
+    <li>Acesso aos dados que temos sobre você;</li>
+    <li>Correção de dados incompletos ou desatualizados;</li>
+    <li>Exclusão da sua conta e dos dados pessoais associados, ressalvadas obrigações legais de retenção.</li>
+  </ul>
+  <p>Solicitações podem ser feitas diretamente ao administrador da sua empresa (que gerencia seu cadastro) ou pelo contato abaixo.</p>
+
+  <h2>7. Permissões do aplicativo Android</h2>
+  <p>O aplicativo Android solicita acesso à <strong>câmera e galeria de fotos</strong> exclusivamente para permitir o registro de fotos em checklists, abastecimentos, multas, pneus, documentos e foto de perfil. Nenhuma foto é capturada ou enviada sem uma ação explícita do usuário.</p>
+
+  <h2>8. Retenção e exclusão</h2>
+  <p>Os dados são mantidos enquanto sua conta estiver ativa junto à empresa contratante. Ao encerrar o vínculo, a empresa administradora pode solicitar a exclusão da conta e dos dados pessoais associados.</p>
+
+  <h2>9. Alterações nesta política</h2>
+  <p>Podemos atualizar esta Política de Privacidade periodicamente. A data da última atualização é sempre indicada no topo desta página.</p>
+
+  <div class="contact">
+    <p><strong>Contato:</strong> dúvidas sobre privacidade e dados pessoais podem ser enviadas para <a href="mailto:frotafrtotacheck@gmail.com">frotafrtotacheck@gmail.com</a>.</p>
+  </div>
+</div>
+</body>
+</html>

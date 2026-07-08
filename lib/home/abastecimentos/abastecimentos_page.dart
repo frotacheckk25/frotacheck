@@ -585,13 +585,15 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
 
               DropdownButtonFormField<String>(
                 value: selectedVehicle,
+                isExpanded: true,
                 decoration: _dec('Veículo *', Icons.directions_car_outlined),
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: Colors.white),
                 items: widget.vehicles.map((v) => DropdownMenuItem(
                   value: v['id']?.toString(),
                   child: Text('${v['plate'] ?? ''} — ${v['model'] ?? ''}',
-                      style: const TextStyle(color: Colors.white)),
+                      style: const TextStyle(color: Colors.white),
+                      overflow: TextOverflow.ellipsis),
                 )).toList(),
                 validator: (v) => v == null ? 'Selecione um veículo' : null,
                 onChanged: widget.readOnly ? null : (v) => setState(() => selectedVehicle = v),
@@ -600,12 +602,14 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
 
               DropdownButtonFormField<String>(
                 value: selectedDriver,
+                isExpanded: true,
                 decoration: _dec('Motorista *', Icons.person_outline),
                 dropdownColor: AppColors.surface,
                 style: const TextStyle(color: Colors.white),
                 items: widget.drivers.map((d) => DropdownMenuItem(
                   value: d['id']?.toString(),
-                  child: Text(d['name'] ?? '', style: const TextStyle(color: Colors.white)),
+                  child: Text(d['name'] ?? '', style: const TextStyle(color: Colors.white),
+                      overflow: TextOverflow.ellipsis),
                 )).toList(),
                 validator: (v) => v == null ? 'Selecione um motorista' : null,
                 onChanged: widget.readOnly ? null : (v) => setState(() => selectedDriver = v),

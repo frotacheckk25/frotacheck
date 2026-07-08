@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:js_interop';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,39 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
-
-extension type _GeoPosition(JSObject _) implements JSObject {
-  external _GeoCoords get coords;
-}
-
-extension type _GeoCoords(JSObject _) implements JSObject {
-  external double get latitude;
-  external double get longitude;
-}
-
-@JS('navigator.geolocation.getCurrentPosition')
-external void _jsGetPosition(JSFunction success, JSFunction error);
-
-/// Lê a localização atual via Geolocation API.
-/// Best-effort: retorna null se indisponível, sem permissão, ou expirar.
-Future<String?> _obterLocalizacao() async {
-  try {
-    final completer = Completer<String?>();
-    void onSuccess(JSAny? pos) {
-      try {
-        final p = pos as _GeoPosition;
-        completer.complete('${p.coords.latitude},${p.coords.longitude}');
-      } catch (_) {
-        completer.complete(null);
-      }
-    }
-    void onError(JSAny? _) => completer.complete(null);
-    _jsGetPosition(onSuccess.toJS, onError.toJS);
-    return completer.future.timeout(const Duration(seconds: 5), onTimeout: () => null);
-  } catch (_) {
-    return null;
-  }
-}
+import 'geolocation.dart';
 
 class ViagensPage extends StatefulWidget {
   const ViagensPage({super.key});
@@ -480,7 +447,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
 
     setState(() => isLoading = true);
     final injetar = context.read<AppAuthProvider>().inject;
-    final localizacao = await _obterLocalizacao();
+    final localizacao = await obterLocalizacao();
     if (!mounted) return;
     try {
       await supabase.from('viagens').insert(injetar({
@@ -687,7 +654,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
     final kmPerc = kmFim - kmInicio;
 
     setState(() => isLoading = true);
-    final localizacao = await _obterLocalizacao();
+    final localizacao = await obterLocalizacao();
     if (!mounted) return;
     try {
       final dataInicio = DateTime.tryParse(widget.viagem['data_inicio']?.toString() ?? '');

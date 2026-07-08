@@ -249,6 +249,7 @@ class _SelecionarVeiculoChecklistPageState
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
                               value: veiculoSelecionado,
+                              isExpanded: true,
                               decoration: _dec('Selecione o veículo',
                                   Icons.directions_car_outlined),
                               dropdownColor: AppColors.surface,
@@ -259,6 +260,7 @@ class _SelecionarVeiculoChecklistPageState
                                   child: Text(
                                     '${v.placa ?? ''} — ${v.modelo ?? ''}',
                                     style: const TextStyle(color: Colors.white),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 );
                               }).toList(),
@@ -279,6 +281,7 @@ class _SelecionarVeiculoChecklistPageState
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
                               value: motoristaSelecionado,
+                              isExpanded: true,
                               decoration: _dec('Selecione o motorista',
                                   Icons.person_outline),
                               dropdownColor: AppColors.surface,
@@ -287,8 +290,8 @@ class _SelecionarVeiculoChecklistPageState
                                 return DropdownMenuItem(
                                   value: m.id,
                                   child: Text(m.nome ?? '-',
-                                      style:
-                                          const TextStyle(color: Colors.white)),
+                                      style: const TextStyle(color: Colors.white),
+                                      overflow: TextOverflow.ellipsis),
                                 );
                               }).toList(),
                               onChanged: (v) =>

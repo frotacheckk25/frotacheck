@@ -136,7 +136,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .eq('empresa_id', empresaId)
               .eq('motorista_id', driverId)
               .eq('tipo', 'saida')
-              .gte('created_at', inicioHoje)
+              .gte('criado_em', inicioHoje)
               .count();
           checklistSaida = res.count > 0;
         } catch (_) {}
@@ -149,7 +149,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .eq('empresa_id', empresaId)
               .eq('motorista_id', driverId)
               .eq('tipo', 'retorno')
-              .gte('created_at', inicioHoje)
+              .gte('criado_em', inicioHoje)
               .count();
           checklistRetorno = res.count > 0;
         } catch (_) {}
@@ -1931,36 +1931,53 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.notifications,
+            const Icon(Icons.notifications,
                 color: Color(0xFF8B5CF6), size: 20),
-            SizedBox(width: 10),
-            Text('Notificações',
-                style: TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(width: 10),
+            Text(
+              _alertas.isEmpty
+                  ? 'Notificações'
+                  : 'Notificações (${_alertas.length})',
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ),
           ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: 4),
-            Icon(Icons.notifications_off_outlined,
-                color: AppColors.textSecondary, size: 40),
-            SizedBox(height: 12),
-            Text(
-              'Nenhuma notificação no momento.',
-              textAlign: TextAlign.center,
-              style:
-                  TextStyle(color: AppColors.textSecondary, fontSize: 13),
-            ),
-            SizedBox(height: 6),
-            Text(
-              'Você será avisado sobre alertas do veículo, vencimento de documentos e tarefas pendentes.',
-              textAlign: TextAlign.center,
-              style:
-                  TextStyle(color: AppColors.textSecondary, fontSize: 11),
-            ),
-          ],
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _alertas.isEmpty
+              ? const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 4),
+                    Icon(Icons.notifications_off_outlined,
+                        color: AppColors.textSecondary, size: 40),
+                    SizedBox(height: 12),
+                    Text(
+                      'Nenhuma notificação no momento.',
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Você será avisado sobre alertas do veículo, vencimento de documentos e tarefas pendentes.',
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    ),
+                  ],
+                )
+              : ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 360),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: _alertas.map(_alertaBanner).toList(),
+                    ),
+                  ),
+                ),
         ),
         actions: [
           TextButton(
@@ -2232,19 +2249,20 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ? const Color(0xFFF59E0B)
             : const Color(0xFFEF4444);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border(
-          left: BorderSide(color: cor, width: 3),
-          top: BorderSide(color: AppColors.border),
-          right: BorderSide(color: AppColors.border),
-          bottom: BorderSide(color: AppColors.border),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border(
+            left: BorderSide(color: cor, width: 3),
+            top: BorderSide(color: AppColors.border),
+            right: BorderSide(color: AppColors.border),
+            bottom: BorderSide(color: AppColors.border),
+          ),
         ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        child: Row(
         children: [
           Icon(Icons.directions_car, color: cor, size: 18),
           const SizedBox(width: 12),
@@ -2304,6 +2322,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ),
           ],
         ],
+        ),
       ),
     );
   }
@@ -2562,32 +2581,36 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     final titulo = alerta['problem_type']?.toString() ?? 'Alerta';
     return Container(
       margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: cor.withOpacity(0.06),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(7),
-        border: Border(
-          left: BorderSide(color: cor, width: 3),
-          top: BorderSide(color: cor.withOpacity(0.18)),
-          right: BorderSide(color: cor.withOpacity(0.18)),
-          bottom: BorderSide(color: cor.withOpacity(0.18)),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_rounded, color: cor, size: 14),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(titulo,
-                style: TextStyle(
-                    color: cor, fontSize: 12, fontWeight: FontWeight.w600)),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: cor.withOpacity(0.06),
+            border: Border(
+              left: BorderSide(color: cor, width: 3),
+              top: BorderSide(color: cor.withOpacity(0.18)),
+              right: BorderSide(color: cor.withOpacity(0.18)),
+              bottom: BorderSide(color: cor.withOpacity(0.18)),
+            ),
           ),
-          Text(prioridade.toUpperCase(),
-              style: TextStyle(
-                  color: cor.withOpacity(0.70),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700)),
-        ],
+          child: Row(
+            children: [
+              Icon(Icons.warning_rounded, color: cor, size: 14),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(titulo,
+                    style: TextStyle(
+                        color: cor, fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+              Text(prioridade.toUpperCase(),
+                  style: TextStyle(
+                      color: cor.withOpacity(0.70),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
       ),
     );
   }

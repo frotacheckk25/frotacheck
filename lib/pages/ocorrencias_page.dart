@@ -80,7 +80,12 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
 
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
       var drivQ = supabase.from('drivers').select('id, name');
-      if (eid != null) {
+      if (auth.isMotorista && auth.driverId != null) {
+        // Motorista só pode registrar ocorrência no próprio veículo/nome —
+        // nunca a lista completa de veículos/motoristas da empresa.
+        veicQ = veicQ.eq('driver_id', auth.driverId!);
+        drivQ = drivQ.eq('id', auth.driverId!);
+      } else if (eid != null) {
         veicQ = veicQ.eq('empresa_id', eid);
         drivQ = drivQ.eq('empresa_id', eid);
       }

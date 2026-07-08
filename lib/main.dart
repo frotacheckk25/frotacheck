@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:js_interop';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,21 +13,19 @@ import 'core/theme/app_theme.dart';
 import 'core/auth/app_auth_provider.dart';
 import 'core/enums/app_role.dart';
 import 'core/guards/app_guard.dart';
-
-@JS('window.location.reload')
-external void _reloadPage();
+import 'core/utils/page_reload.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  FlutterError.onError = (FlutterErrorDetails details) {
-    debugPrint('FlutterError: ${details.exception}');
-    debugPrint('${details.stack}');
-  };
-
   bool zoneErrorHandled = false;
   runZonedGuarded(
     () async {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      FlutterError.onError = (FlutterErrorDetails details) {
+        debugPrint('FlutterError: ${details.exception}');
+        debugPrint('${details.stack}');
+      };
+
       bool supabaseReady = false;
       String? supabaseError;
 
@@ -185,7 +182,7 @@ class FrotaCheckAppSupabaseError extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: () => _reloadPage(),
+                      onPressed: () => reloadPage(),
                       icon: const Icon(Icons.refresh),
                       label: const Text('Tentar Novamente'),
                       style: ElevatedButton.styleFrom(
