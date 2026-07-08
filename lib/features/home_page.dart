@@ -4236,7 +4236,11 @@ class _GlobalSearchDialogState extends State<_GlobalSearchDialog> {
       return;
     }
     setState(() => _searching = true);
-    final term = q.trim().toLowerCase();
+    // Remove caracteres com significado especial na sintaxe de filtro do
+    // PostgREST (, . ( ) *) antes de interpolar em .or(...) — sem isso, um
+    // termo de busca malicioso poderia injetar condições extras sobre
+    // colunas fora do .select() (ex.: "x),outra_coluna.not.is.null,y.ilike.%").
+    final term = q.trim().toLowerCase().replaceAll(RegExp(r'[,.()*]'), '');
     final out = <_SearchResult>[];
 
     try {

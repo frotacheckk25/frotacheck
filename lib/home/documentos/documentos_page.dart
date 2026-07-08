@@ -781,7 +781,7 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
   static const int _tamanhoMaximoArquivoBytes = 15 * 1024 * 1024; // 15MB
 
   Future<void> _selecionarArquivo() async {
-    final resultado = await FilePicker.platform.pickFiles(
+    final resultado = await FilePicker.pickFiles(
       withData: true,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
       type: FileType.custom,
@@ -1683,7 +1683,7 @@ class _DetalheDocumentoPageState extends State<_DetalheDocumentoPage> {
     try {
       final signedUrl = await toSignedStorageUrl(fileUrl);
       final uri = Uri.tryParse(signedUrl ?? fileUrl);
-      if (uri == null) {
+      if (uri == null || uri.scheme != 'https') {
         if (mounted) showError(context, 'Link do arquivo inválido.');
         return;
       }

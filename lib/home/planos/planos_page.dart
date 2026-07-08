@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/plano_financeiro.dart';
 import '../../core/utils/snackbar_utils.dart';
@@ -31,8 +33,12 @@ class _PlanosPageState extends State<PlanosPage> {
   @override
   void initState() {
     super.initState();
-    _carregar();
-    _setupRealtime();
+    if (context.read<AppAuthProvider>().isMaster) {
+      _carregar();
+      _setupRealtime();
+    } else {
+      _loading = false;
+    }
     _buscaCtrl.addListener(() => setState(() => _busca = _buscaCtrl.text.trim().toLowerCase()));
   }
 
@@ -106,6 +112,13 @@ class _PlanosPageState extends State<PlanosPage> {
   // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AppAuthProvider>();
+    if (!auth.isMaster) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(child: Text('Acesso restrito ao MASTER', style: TextStyle(color: Colors.white))),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
