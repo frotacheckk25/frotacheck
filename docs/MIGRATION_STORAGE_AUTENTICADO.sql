@@ -1,4 +1,12 @@
 -- =============================================================================
+-- ⚠️ SUPERADO — NÃO EXECUTE ESTE ARQUIVO.
+-- Foi útil na época (tirou a leitura pública), mas a policy que ele cria
+-- ("authenticated_read_frotacheck_buckets") não isola por empresa — qualquer
+-- autenticado lê arquivo de qualquer empresa. Isso já foi substituído por
+-- docs/MIGRATION_STORAGE_LEITURA_ISOLADA.sql (isola checklists/multas/
+-- documentos/fuelings por pasta de empresa). Rodar este arquivo de novo
+-- desfaria esse isolamento. Mantido só como histórico.
+-- =============================================================================
 -- Fecha o vazamento público dos buckets de Storage (avatars/checklists/
 -- multas/documentos/logos/fuelings): hoje qualquer pessoa sem login consegue
 -- listar e baixar fotos reais de qualquer empresa cliente.

@@ -64,7 +64,16 @@ CREATE POLICY "company_settings_update" ON public.company_settings
   USING      (empresa_id = get_my_empresa_id() AND get_my_role() = 'ADMIN_EMPRESA')
   WITH CHECK (empresa_id = get_my_empresa_id() AND get_my_role() = 'ADMIN_EMPRESA');
 
--- ─── 5. BUCKETS DE STORAGE ────────────────────────────────────────────────────
+-- ⚠️ SUPERADO A PARTIR DAQUI — NÃO EXECUTE O BLOCO 5.
+-- Este bloco cria os buckets como public=true e uma policy de leitura para
+-- role "public" (não autenticado) — exatamente a vulnerabilidade crítica já
+-- corrigida por docs/MIGRATION_URGENTE_STORAGE_PUBLIC_FLAG.sql (buckets) e
+-- docs/MIGRATION_STORAGE_AUTENTICADO.sql + MIGRATION_STORAGE_LEITURA_ISOLADA.sql
+-- (policies). Se os buckets precisarem ser recriados do zero num ambiente
+-- novo, crie com public=false e aplique as migrações de Storage mais recentes
+-- (autenticado + isolado por pasta de empresa), nunca este bloco.
+--
+-- ─── 5. BUCKETS DE STORAGE (HISTÓRICO — NÃO EXECUTAR) ────────────────────────
 -- O app já chama supabase.storage.from('avatars'|'checklists'|'multas'|
 -- 'documentos') e agora também 'logos'. Nenhum bucket existia — todo upload
 -- de foto falhava silenciosamente. Cria todos como públicos para leitura

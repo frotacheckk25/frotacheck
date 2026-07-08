@@ -1,3 +1,19 @@
+-- =============================================================================
+-- ⚠️ SUPERADO — NÃO EXECUTE ESTE ARQUIVO.
+--
+-- Rascunho antigo de uma versão anterior do schema (referencia
+-- public.veiculos/public.motoristas em português, que não existem mais — o
+-- schema atual usa public.vehicles/public.drivers). As policies de RLS aqui
+-- ("... FOR SELECT USING (auth.role() = 'authenticated')") NÃO isolam por
+-- empresa_id — se executadas sobre o banco atual, reabririam checklists/
+-- multas/documentos de TODAS as empresas para qualquer usuário autenticado
+-- (confirmado ao vivo em auditoria de segurança que essas policies NÃO
+-- existem hoje — só a "empresa_isolation" de supabase_rbac_migration.sql).
+--
+-- Mantido apenas como histórico. Se precisar recriar as tabelas do zero, use
+-- supabase_rbac_migration.sql como referência de schema atual.
+-- =============================================================================
+
 -- Tabela de Checklists (Saída e Retorno)
 CREATE TABLE IF NOT EXISTS public.checklists (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
