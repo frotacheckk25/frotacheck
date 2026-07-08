@@ -1,4 +1,4 @@
-package com.example.frotacheck
+package com.frotacheck.app
 
 import io.flutter.embedding.android.FlutterActivity
 
