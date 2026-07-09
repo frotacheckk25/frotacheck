@@ -1348,6 +1348,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                // Sobrescreve o minimumSize do tema global (Size.fromHeight = largura
+                // infinita) — aqui o botão fica solto num Row, sem Expanded, e a
+                // largura infinita quebra o layout.
+                minimumSize: Size.zero,
               ),
             ),
           if (canVincular) ...[
@@ -1675,7 +1679,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: wide ? 2.1 : 1.7,
+              childAspectRatio: wide ? 2.1 : 1.45,
               children: cards,
             );
           }),
@@ -1683,15 +1687,19 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           Row(
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    _tabButton('Gestores', _Aba.gestores, gestores.length),
-                    const SizedBox(width: 8),
-                    _tabButton('Motoristas', _Aba.motoristas, motoristas.length),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _tabButton('Gestores', _Aba.gestores, gestores.length),
+                      const SizedBox(width: 8),
+                      _tabButton('Motoristas', _Aba.motoristas, motoristas.length),
+                    ],
+                  ),
                 ),
               ),
-              if (canManage)
+              if (canManage) ...[
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () => _showNovoUsuarioDialog(
                     auth,
@@ -1703,8 +1711,12 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                     foregroundColor: AppColors.secondary,
                     side: const BorderSide(color: AppColors.secondary),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    // Idem — sem isso, o tema global força largura infinita neste
+                    // botão que fica solto num Row, sem Expanded.
+                    minimumSize: Size.zero,
                   ),
                 ),
+              ],
             ],
           ),
           const SizedBox(height: 16),

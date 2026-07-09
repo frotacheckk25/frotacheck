@@ -88,7 +88,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
 
       var veicQ = supabase.from('vehicles').select('id, plate, brand, model, odometer');
       var oilQ  = supabase.from('oil_changes').select(
-          'id, vehicle_id, vehicle_plate, service_type, oil_change_date, created_at, current_km, next_change_km, notes, empresa_id');
+          'id, vehicle_id, vehicle_plate, service_type, oil_change_date, created_at, current_km, next_change_km, notes, empresa_id, manutencao_id, manutencoes(status, cost, valor, peca_trocada)');
       if (isMotorista) {
         if (vehicleId != null) {
           veicQ = veicQ.eq('id', vehicleId);
@@ -188,15 +188,24 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
           : (selectedServiceType ?? 'Manutenção');
 
       // ── PRIMÁRIO: grava em manutencoes (fonte do dashboard "Em Manutenção") ──
-      await supabase.from('manutencoes').insert(injetar({
-        'vehicle_id': selectedVehicleId,
-        'tipo'      : selectedServiceType ?? 'Manutenção',
-        'descricao' : desc,
-        'data'      : dataStr,
-        'status'    : 'Aberto',
-        'cost'      : 0,
-        'valor'     : 0,
-      }));
+      String? manutencaoId;
+      try {
+        final manutRes = await supabase.from('manutencoes').insert(injetar({
+          'vehicle_id': selectedVehicleId,
+          'tipo'      : selectedServiceType ?? 'Manutenção',
+          'descricao' : desc,
+          'data'      : dataStr,
+          'status'    : 'Aberto',
+          'cost'      : 0,
+          'valor'     : 0,
+        })).select().single();
+        manutencaoId = manutRes['id']?.toString();
+      } catch (e) {
+        if (!mounted) return;
+        _snackErro(friendlyError(e));
+        debugPrint('ERRO TROCA DE ÓLEO (manutencoes): $e');
+        return;
+      }
 
       if (!mounted) return;
 
@@ -209,6 +218,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
           'service_type'   : selectedServiceType,
           'oil_change_date': dataStr,
           'next_change_km' : proximoKm,
+          'manutencao_id'  : manutencaoId,
         };
         if (observacoesController.text.trim().isNotEmpty) {
           payload['notes'] = observacoesController.text.trim();
@@ -217,6 +227,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         if (result.isNotEmpty && mounted) {
           final novo = Map<String, dynamic>.from(result.first as Map);
           novo['vehicles'] = {'plate': veiculo['plate'], 'model': veiculo['model']};
+          novo['manutencoes'] = {'status': 'Aberto', 'cost': 0, 'valor': 0, 'peca_trocada': null};
           setState(() => historico = [novo, ...historico]);
         }
       } catch (_) {}
@@ -300,6 +311,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AppAuthProvider>();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -334,14 +346,14 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
                       children: [
                         SizedBox(width: 420, child: _buildForm()),
                         const SizedBox(width: 20),
-                        Expanded(child: _buildHistorico()),
+                        Expanded(child: _buildHistorico(auth)),
                       ],
                     ),
                   )
                 else ...[
                   _buildForm(),
                   const SizedBox(height: 20),
-                  _buildHistorico(),
+                  _buildHistorico(auth),
                 ],
               ],
             ),
@@ -688,7 +700,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     );
   }
 
-  Widget _buildHistorico() {
+  Widget _buildHistorico(AppAuthProvider auth) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -728,7 +740,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: historico.length,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (_, i) => _buildHistoricoCard(historico[i]),
+            itemBuilder: (_, i) => _buildHistoricoCard(historico[i], auth),
           ),
       ],
     );
@@ -763,7 +775,90 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     }
   }
 
-  Widget _buildHistoricoCard(Map<String, dynamic> item) {
+  Future<void> _marcarResolvido(Map<String, dynamic> item) async {
+    final manutencaoId = item['manutencao_id']?.toString();
+    if (manutencaoId == null || manutencaoId.isEmpty) {
+      _snackErro('Este registro não tem uma manutenção vinculada para resolver.');
+      return;
+    }
+
+    final pecaController = TextEditingController();
+    final valorController = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final valor = double.tryParse(valorController.text.trim().replaceAll(',', '.'));
+          final podeResolver = pecaController.text.trim().isNotEmpty && valor != null && valor > 0;
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Marcar como Resolvido', style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Informe o que foi trocado e o valor gasto para concluir este registro.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pecaController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _dec('Peça/serviço realizado *', Icons.build_outlined),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: valorController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _dec('Valor gasto (R\$) *', Icons.attach_money),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+                onPressed: podeResolver ? () => Navigator.pop(ctx, true) : null,
+                child: const Text('Marcar como Resolvido', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    final valor = double.tryParse(valorController.text.trim().replaceAll(',', '.')) ?? 0;
+    final peca = pecaController.text.trim();
+    try {
+      await supabase.from('manutencoes').update({
+        'status'      : 'Resolvido',
+        'cost'        : valor,
+        'valor'       : valor,
+        'peca_trocada': peca,
+      }).eq('id', manutencaoId);
+      if (!mounted) return;
+      setState(() {
+        final idx = historico.indexWhere((h) => h['id']?.toString() == item['id']?.toString());
+        if (idx != -1) {
+          historico[idx] = {
+            ...historico[idx],
+            'manutencoes': {'status': 'Resolvido', 'cost': valor, 'valor': valor, 'peca_trocada': peca},
+          };
+        }
+      });
+      _snackSucesso('Registro marcado como resolvido!');
+    } catch (e) {
+      if (mounted) _snackErro(friendlyError(e));
+    }
+  }
+
+  Widget _buildHistoricoCard(Map<String, dynamic> item, AppAuthProvider auth) {
     final vid = item['vehicle_id']?.toString() ?? '';
     final veiculo = veiculosMap[vid];
     final placa = veiculo?['plate']?.toString() ?? item['vehicle_plate']?.toString() ?? '-';
@@ -774,6 +869,12 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     final proximoKm = item['next_change_km'];
     final notas = item['notes']?.toString() ?? '';
     final cor = _serviceColor(tipo);
+
+    final manut = item['manutencoes'] as Map?;
+    final status = manut?['status']?.toString() ?? 'Aberto';
+    final resolved = status.toLowerCase() == 'resolvido';
+    final pecaTrocada = manut?['peca_trocada']?.toString();
+    final valorGasto = manut?['valor'] ?? manut?['cost'];
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -829,22 +930,56 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis),
                 ],
+                const SizedBox(height: 8),
+                if (resolved) ...[
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      _badge('✓ Resolvido', AppColors.success),
+                      if (pecaTrocada != null && pecaTrocada.isNotEmpty) _badge(pecaTrocada, AppColors.textSecondary),
+                      if (valorGasto != null) _badge('R\$ ${_fmtValor(valorGasto)}', AppColors.success),
+                    ],
+                  ),
+                ] else
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _marcarResolvido(item),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.success,
+                        side: BorderSide(color: AppColors.success.withOpacity(0.5)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('Marcar como Resolvido', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
-            tooltip: 'Excluir',
-            onPressed: () {
-              final id = item['id']?.toString() ?? '';
-              if (id.isNotEmpty) _deletarOleo(id);
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
+          // Só gestor/admin/dono pode excluir — motorista nunca exclui o que registrou.
+          if (!auth.isMotorista)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
+              tooltip: 'Excluir',
+              onPressed: () {
+                final id = item['id']?.toString() ?? '';
+                if (id.isNotEmpty) _deletarOleo(id);
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
         ],
       ),
     );
+  }
+
+  String _fmtValor(dynamic v) {
+    final d = (v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
+    return d.toStringAsFixed(2).replaceAll('.', ',');
   }
 
   Widget _badge(String text, Color color) {

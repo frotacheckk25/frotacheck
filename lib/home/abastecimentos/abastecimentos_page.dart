@@ -173,6 +173,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AppAuthProvider>();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -226,7 +227,10 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                               children: [
                                 const Text('Controle de Abastecimento',
                                     style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-                                Text('${fuelings.length} registro(s) • ${_fmtValue(_totalGasto())} total',
+                                Text(
+                                    auth.isMotorista
+                                        ? '${fuelings.length} registro(s)'
+                                        : '${fuelings.length} registro(s) • ${_fmtValue(_totalGasto())} total',
                                     style: const TextStyle(color: Colors.white70, fontSize: 12)),
                               ],
                             ),
@@ -238,8 +242,11 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                     Row(
                       children: [
                         _kpi('Registros', '${fuelings.length}', Icons.local_gas_station, AppColors.warning),
-                        const SizedBox(width: 10),
-                        _kpi('Total Gasto', _fmtValue(_totalGasto()), Icons.account_balance_wallet, AppColors.danger),
+                        // Total gasto é informação financeira — só gestor/admin/dono vê.
+                        if (!auth.isMotorista) ...[
+                          const SizedBox(width: 10),
+                          _kpi('Total Gasto', _fmtValue(_totalGasto()), Icons.account_balance_wallet, AppColors.danger),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 14),

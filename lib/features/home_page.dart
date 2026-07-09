@@ -1744,6 +1744,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildMobileMenuTab() {
+    final auth = context.watch<AppAuthProvider>();
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       children: [
@@ -1755,57 +1756,124 @@ class _HomePageState extends State<HomePage> {
             color: Colors.white,
           ),
         ),
-        const SizedBox(height: 16),
-        _buildMenuOption(Icons.person, 'Motoristas', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const MotoristasPage()),
-          );
-          carregarDashboard();
-        }),
-        _buildMenuOption(Icons.receipt_long, 'Multas', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const MultasPage()),
-          );
-          carregarDashboard();
-        }),
-        _buildMenuOption(Icons.tire_repair, 'Pneus', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PneusPage()),
-          );
-          carregarDashboard();
-        }),
-        _buildMenuOption(Icons.notification_important, 'Alertas', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AlertasPage()),
-          );
-          carregarDashboard();
-        }),
-        _buildMenuOption(Icons.description, 'Documentos', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DocumentosPage()),
-          );
-          carregarDashboard();
-        }),
-        _buildMenuOption(Icons.directions, 'Viagens', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ViagensPage()),
-          );
-          carregarDashboard();
-        }),
-        _buildMenuOption(Icons.settings, 'Configurações', () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
-          );
-          carregarDashboard();
-        }),
+        const SizedBox(height: 8),
+
+        // ── Frota ────────────────────────────────────────────────────────
+        if (auth.can(AppPermission.viewVehicles) ||
+            auth.can(AppPermission.viewDrivers) ||
+            auth.can(AppPermission.viewFuelings) ||
+            auth.can(AppPermission.viewMaintenance)) ...[
+          _menuSectionLabel('Frota'),
+          if (auth.can(AppPermission.viewVehicles))
+            _buildMenuOption(Icons.directions_car, 'Veículos', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const VeiculosPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewDrivers))
+            _buildMenuOption(Icons.person, 'Motoristas', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const MotoristasPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewFuelings))
+            _buildMenuOption(Icons.local_gas_station, 'Abastecimentos', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewMaintenance))
+            _buildMenuOption(Icons.build, 'Manutenções', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage()));
+              carregarDashboard();
+            }),
+        ],
+
+        // ── Operações ────────────────────────────────────────────────────
+        if (auth.can(AppPermission.viewChecklists) ||
+            auth.can(AppPermission.viewOccurrences) ||
+            auth.can(AppPermission.viewMultas) ||
+            auth.can(AppPermission.viewDocuments) ||
+            auth.can(AppPermission.viewTires)) ...[
+          _menuSectionLabel('Operações'),
+          if (auth.can(AppPermission.viewChecklists)) ...[
+            _buildMenuOption(Icons.checklist, 'Checklists', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const SelecionarVeiculoChecklistPage()));
+              carregarDashboard();
+            }),
+            _buildMenuOption(Icons.history, 'Histórico Checklist', () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoricoChecklistPage()));
+            }),
+          ],
+          if (auth.can(AppPermission.viewOccurrences))
+            _buildMenuOption(Icons.report_problem, 'Ocorrências', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ListaOcorrenciasPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewTires))
+            _buildMenuOption(Icons.tire_repair, 'Pneus', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const PneusPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewMultas))
+            _buildMenuOption(Icons.receipt_long, 'Multas', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const MultasPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewDocuments))
+            _buildMenuOption(Icons.description, 'Documentos', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosPage()));
+              carregarDashboard();
+            }),
+          _buildMenuOption(Icons.directions, 'Viagens', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const ViagensPage()));
+            carregarDashboard();
+          }),
+        ],
+
+        // ── Gestão ───────────────────────────────────────────────────────
+        if (auth.can(AppPermission.viewReports) ||
+            auth.can(AppPermission.viewAlerts) ||
+            auth.can(AppPermission.manageSettings)) ...[
+          _menuSectionLabel('Gestão'),
+          if (auth.can(AppPermission.viewReports))
+            _buildMenuOption(Icons.bar_chart, 'Relatórios', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewAlerts))
+            _buildMenuOption(Icons.notification_important, 'Alertas', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.manageSettings))
+            _buildMenuOption(Icons.settings, 'Configurações', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfiguracoesPage()));
+              carregarDashboard();
+            }),
+        ],
+
+        // ── Administração ────────────────────────────────────────────────
+        if (auth.can(AppPermission.viewUsers)) ...[
+          _menuSectionLabel('Administração'),
+          _buildMenuOption(Icons.group, 'Usuários', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUsuariosPage()));
+            carregarDashboard();
+          }),
+        ],
       ],
+    );
+  }
+
+  Widget _menuSectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
     );
   }
 
