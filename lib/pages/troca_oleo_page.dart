@@ -795,29 +795,33 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
             backgroundColor: AppColors.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text('Marcar como Resolvido', style: TextStyle(color: Colors.white)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Informe o que foi trocado e o valor gasto para concluir este registro.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: pecaController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _dec('Peça/serviço realizado *', Icons.build_outlined),
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: valorController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: _dec('Valor gasto (R\$) *', Icons.attach_money),
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-              ],
+            // SingleChildScrollView evita overflow quando o teclado abre e
+            // reduz a altura disponível para o conteúdo do dialog.
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Informe o que foi trocado e o valor gasto para concluir este registro.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: pecaController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dec('Peça/serviço realizado *', Icons.build_outlined),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: valorController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _dec('Valor gasto (R\$) *', Icons.attach_money),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
