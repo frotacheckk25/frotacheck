@@ -230,7 +230,9 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
           novo['manutencoes'] = {'status': 'Aberto', 'cost': 0, 'valor': 0, 'peca_trocada': null};
           setState(() => historico = [novo, ...historico]);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ERRO TROCA DE ÓLEO (oil_changes secundário): $e');
+      }
 
       // Atualiza o odômetro do veículo se este for maior que o registrado
       if (selectedVehicleId != null && kmAtual > 0) {

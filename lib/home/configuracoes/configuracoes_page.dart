@@ -770,6 +770,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
             );
             if (ok == true && mounted) {
               await context.read<AppAuthProvider>().signOut();
+              // ConfiguracoesPage foi empilhada por cima do Dashboard via
+              // Navigator.push — sem isso, a troca para a tela de Login
+              // (feita pelo AppGuard na raiz) fica escondida atrás desta tela.
+              if (mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
             }
           },
         )),

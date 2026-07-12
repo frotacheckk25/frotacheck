@@ -630,6 +630,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> carregarDashboard() async {
+    if (!mounted) return;
     setState(() => carregando = true);
     // Captura empresa do usuário logado (null = MASTER, sem filtro)
     if (mounted) {
@@ -796,6 +797,7 @@ class _HomePageState extends State<HomePage> {
         }
       } catch (_) {}
 
+      if (!mounted) return;
       setState(() {
         totalVeiculos = veiculos.length;
         totalVeiculosComMotorista = veiculos.where((v) => v['driver_id'] != null).length;
@@ -833,7 +835,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       debugPrint('Erro ao carregar dashboard: ${e.toString()}');
     } finally {
-      setState(() => carregando = false);
+      if (mounted) setState(() => carregando = false);
     }
   }
 
