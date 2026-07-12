@@ -3418,7 +3418,13 @@ class _HomePageState extends State<HomePage> {
   // Estilo de botão compacto — sobrescreve minimumSize do tema global (Size.fromHeight = infinito)
 
   Widget _buildHeader(double width) {
-    final compact = width < 900;
+    // Limiar alto de propósito: "Filtros" é redundante com o botão de data
+    // (os dois chamam _pickDateRange) e "Novo Registro"/"Novo" mudam de
+    // tamanho aqui — em larguras comuns de notebook (~1366-1440px) a fileira
+    // de botões (data + filtros + novo registro + busca + alertas +
+    // notificações + avatar) não cabe sem isso, empurrando o avatar e o sino
+    // de notificações pra dentro do scroll horizontal escondido.
+    final compact = width < 1500;
     final auth = context.read<AppAuthProvider>();
     final profile = auth.profile;
     final name = profile?.nome ?? getProfileDisplayName(

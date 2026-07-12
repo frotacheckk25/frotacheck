@@ -485,7 +485,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             _sectionHeader('Tarefas de Hoje'),
             const SizedBox(height: 8),
             SizedBox(
-              height: 110,
+              height: 118,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
