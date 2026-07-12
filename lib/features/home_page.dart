@@ -14,6 +14,7 @@ import '../home/documentos/documentos_page.dart';
 import '../home/manutencoes/manutencoes_page.dart';
 import '../home/motoristas/motoristas_page.dart';
 import '../home/multas/multas_page.dart';
+import '../home/notificacoes/notificacoes_page.dart';
 import '../home/pneus/pneus_page.dart';
 import '../home/relatorios/relatorios_page.dart';
 import '../home/viagens/viagens_page.dart';
@@ -219,6 +220,8 @@ class _HomePageState extends State<HomePage> {
   int totalAbastecimentos = 0;
   int totalEmManutencao = 0;
   int _ocorrenciasAbertasCount = 0; // só as não resolvidas — usado no KPI, badge e insights
+  bool _hasUnreadNotificacoes = false;
+  RealtimeChannel? _notifBadgeChannel;
   double totalGasto = 0;
   List<Map<String, dynamic>> recentFuelings = [];
   List<FlSpot> monthlyFuelSpots = [];
@@ -569,6 +572,16 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     carregarDashboard();
+    _checkUnreadNotificacoes();
+    _notifBadgeChannel = supabase
+        .channel('home_notificacoes_badge_rt')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notificacoes',
+          callback: (_) => _checkUnreadNotificacoes(),
+        )
+        .subscribe();
     // Esta tela raiz não é descartada ao navegar (Navigator.push só a cobre),
     // então o timer continua rodando por baixo enquanto o usuário está em
     // outra tela. Intervalo maior reduz a carga redundante no banco.
@@ -580,7 +593,40 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _notifBadgeChannel?.unsubscribe();
     super.dispose();
+  }
+
+  // ── Sino de Notificações — feed de atividade dos motoristas ────────────────
+  Future<void> _checkUnreadNotificacoes() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      final perfil = await supabase
+          .from('user_profiles')
+          .select('notificacoes_lidas_em')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final lastReadRaw = perfil?['notificacoes_lidas_em']?.toString();
+      final lastRead = lastReadRaw != null ? DateTime.tryParse(lastReadRaw) : null;
+
+      var q = supabase.from('notificacoes').select('id');
+      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+      if (lastRead != null) q = q.gt('created_at', lastRead.toUtc().toIso8601String());
+      final res = await q.order('created_at', ascending: false).limit(1);
+      final hasUnread = (res as List).isNotEmpty;
+      if (mounted) setState(() => _hasUnreadNotificacoes = hasUnread);
+    } catch (e) {
+      debugPrint('Erro ao checar notificações: $e');
+    }
+  }
+
+  Future<void> _abrirNotificacoes() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificacoesPage()),
+    );
+    _checkUnreadNotificacoes();
   }
 
   Future<void> carregarDashboard() async {
@@ -1308,7 +1354,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<AppAuthProvider>(); // rebuild on role/status change
+    final auth = context.watch<AppAuthProvider>(); // rebuild on role/status change
     final width = MediaQuery.of(context).size.width;
 
     if (width <= 760) {
@@ -1327,6 +1373,31 @@ class _HomePageState extends State<HomePage> {
               tooltip: 'Alertas',
               onPressed: _showAlertsPanel,
             ),
+            if (!auth.isMotorista)
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.mark_email_unread_outlined),
+                    tooltip: 'Notificações',
+                    onPressed: _abrirNotificacoes,
+                  ),
+                  if (_hasUnreadNotificacoes)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.surface, width: 1.3),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
           ],
           elevation: 0,
           backgroundColor: AppColors.surface,
@@ -3438,13 +3509,23 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(width: 8),
 
-                // ── Notifications ───────────────────────────────────────────
+                // ── Alertas (ocorrências críticas, documentos vencendo) ──────
                 _HeaderBtn(
                   icon: Icons.notifications_outlined,
                   tooltip: 'Alertas',
                   onTap: _showAlertsPanel,
                   badgeCount: _kpiOcorrencias,
                 ),
+                const SizedBox(width: 8),
+
+                // ── Notificações (feed de atividade dos motoristas) ──────────
+                if (!auth.isMotorista)
+                  _HeaderBtn(
+                    icon: Icons.mark_email_unread_outlined,
+                    tooltip: 'Notificações',
+                    onTap: _abrirNotificacoes,
+                    badgeCount: _hasUnreadNotificacoes ? 1 : 0,
+                  ),
                 const SizedBox(width: 10),
 
                 // ── Avatar ──────────────────────────────────────────────────

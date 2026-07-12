@@ -1,7 +1,8 @@
 // Edge Function: send-push-notification
 //
 // Disparada pelo gatilho public.notify_new_event() (via pg_net) sempre que
-// uma linha nova entra em fuelings/occurrences/multas/oil_changes/alerts.
+// uma linha nova entra em fuelings/occurrences/multas/manutencoes/viagens/
+// checklists/alerts.
 // Busca quem é ADMIN_EMPRESA/GESTOR da empresa do registro, pega os tokens
 // FCM deles em device_tokens, e envia a notificação via Firebase Admin SDK.
 //
@@ -28,7 +29,7 @@ function sufixoContexto(ctx: Contexto): string {
   return partes.length > 0 ? ` — ${partes.join(", ")}` : "";
 }
 
-const MENSAGENS: Record<string, { title: string; body: (r: any, ctx: Contexto) => string }> = {
+const MENSAGENS: Record<string, { title: string | ((r: any) => string); body: (r: any, ctx: Contexto) => string }> = {
   fuelings: {
     title: "Novo abastecimento registrado",
     body: (r, ctx) => `Abastecimento de R$ ${Number(r.total_value ?? 0).toFixed(2)} registrado${sufixoContexto(ctx)}.`,
@@ -41,9 +42,20 @@ const MENSAGENS: Record<string, { title: string; body: (r: any, ctx: Contexto) =
     title: "Nova multa registrada",
     body: (r, ctx) => `Multa: ${r.tipo ?? "infração"} registrada${sufixoContexto(ctx)}.`,
   },
-  oil_changes: {
+  manutencoes: {
     title: "Manutenção registrada",
-    body: (_r, ctx) => `Troca de óleo/manutenção registrada${sufixoContexto(ctx)}.`,
+    // Sem valor aqui de propósito: na criação cost/valor são sempre 0 —
+    // o valor real só é preenchido depois, no fluxo de "Marcar como Resolvido".
+    body: (r, ctx) => `${r.tipo ?? "Manutenção"} registrada${sufixoContexto(ctx)}.`,
+  },
+  viagens: {
+    title: "Viagem iniciada",
+    body: (r, ctx) => `De ${r.origem ?? "?"} para ${r.destino ?? "?"}${sufixoContexto(ctx)}.`,
+  },
+  checklists: {
+    title: (r) => (r.tipo === "retorno" ? "Checklist de retorno registrado" : "Checklist de saída registrado"),
+    body: (r, ctx) =>
+      `Checklist de ${r.tipo === "retorno" ? "retorno" : "saída"} registrado${sufixoContexto(ctx)}.`,
   },
   alerts: {
     title: "Novo alerta",
@@ -100,13 +112,16 @@ Deno.serve(async (req) => {
     }
 
     // 3) Busca placa do veículo e nome do motorista para dar contexto na mensagem.
+    // viagens/checklists usam veiculo_id/motorista_id em vez de vehicle_id/driver_id.
+    const vehicleId = record.vehicle_id ?? record.veiculo_id;
+    const driverId = record.driver_id ?? record.motorista_id;
     const ctx: Contexto = { placa: null, motorista: null };
-    if (record.vehicle_id) {
-      const { data: veic } = await supabase.from("vehicles").select("plate").eq("id", record.vehicle_id).maybeSingle();
+    if (vehicleId) {
+      const { data: veic } = await supabase.from("vehicles").select("plate").eq("id", vehicleId).maybeSingle();
       ctx.placa = veic?.plate ?? null;
     }
-    if (record.driver_id) {
-      const { data: drv } = await supabase.from("drivers").select("name").eq("id", record.driver_id).maybeSingle();
+    if (driverId) {
+      const { data: drv } = await supabase.from("drivers").select("name").eq("id", driverId).maybeSingle();
       ctx.motorista = drv?.name ?? null;
     }
 
@@ -115,6 +130,7 @@ Deno.serve(async (req) => {
       title: "FrotaCheck",
       body: () => "Nova atividade registrada na sua frota.",
     };
+    const titulo = typeof cfg.title === "function" ? cfg.title(record) : cfg.title;
 
     const app = getFirebaseApp();
     const messaging = getMessaging(app);
@@ -123,7 +139,7 @@ Deno.serve(async (req) => {
       tokens.map((t) =>
         messaging.send({
           token: t.fcm_token,
-          notification: { title: cfg.title, body: cfg.body(record, ctx) },
+          notification: { title: titulo, body: cfg.body(record, ctx) },
           data: { table, record_id: String(record.id ?? "") },
         })
       ),

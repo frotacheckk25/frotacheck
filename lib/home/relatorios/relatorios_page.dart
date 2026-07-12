@@ -29,9 +29,14 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
   // ── Multas ───────────────────────────────────────────────────────────────────
   double totalMultasAbertas = 0;
   int qtdMultasAbertas = 0;
+  double totalMultasTotal = 0; // abertas + pagas (exclui contestadas) — usado no Total Geral
 
   // ── Manutenção ───────────────────────────────────────────────────────────────
   int qtdTrocasOleo = 0;
+  double totalGastoManutencao = 0;
+
+  // ── Total Geral ──────────────────────────────────────────────────────────────
+  double totalGeral = 0;
 
   // ── Gráfico mensal ───────────────────────────────────────────────────────────
   List<String> months = [];
@@ -91,10 +96,12 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
           .select('liters, total_value, fuel_date, vehicles(plate), drivers(name)');
       var multaQ = supabase.from('multas').select('valor, status');
       var oilQ = supabase.from('oil_changes').select('id');
+      var manutQ = supabase.from('manutencoes').select('cost, valor');
       if (eid != null) {
         fuelQ  = fuelQ.eq('empresa_id', eid);
         multaQ = multaQ.eq('empresa_id', eid);
         oilQ   = oilQ.eq('empresa_id', eid);
+        manutQ = manutQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
         // Mais recentes primeiro: se o limite truncar, descarta os mais antigos,
@@ -102,11 +109,13 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         fuelQ.order('fuel_date', ascending: false).limit(1000),
         multaQ.limit(1000),
         oilQ.limit(1000),
+        manutQ.limit(1000),
       ]);
 
       final fuelings = List<Map<String, dynamic>>.from(results[0]);
       final multas = List<Map<String, dynamic>>.from(results[1]);
       final oilChanges = List<Map<String, dynamic>>.from(results[2]);
+      final manutencoes = List<Map<String, dynamic>>.from(results[3]);
 
       // ── Fuel KPIs ────────────────────────────────────────────────────────────
       double gasto = 0;
@@ -167,11 +176,27 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
       // ── Multas KPIs ──────────────────────────────────────────────────────────
       double multasAbertas = 0;
       int qtdAbertas = 0;
+      double multasTotal = 0; // abertas + pagas — contestadas ficam de fora
       for (final m in multas) {
-        if ((m['status']?.toString() ?? 'aberta').toLowerCase() == 'aberta') {
-          multasAbertas += _toDouble(m['valor']);
+        final status = (m['status']?.toString() ?? 'aberta').toLowerCase();
+        final valor = _toDouble(m['valor']);
+        if (status == 'aberta') {
+          multasAbertas += valor;
           qtdAbertas++;
         }
+        if (status == 'aberta' || status == 'paga') {
+          multasTotal += valor;
+        }
+      }
+
+      // ── Manutenção KPIs ──────────────────────────────────────────────────────
+      // Mesmo fallback já usado no dashboard principal (home_page.dart):
+      // "Aberto" tem cost/valor = 0 e não distorce a soma.
+      double gastoManutencao = 0;
+      for (final m in manutencoes) {
+        final cost = _toDouble(m['cost']);
+        final valor = _toDouble(m['valor']);
+        gastoManutencao += cost > 0 ? cost : valor;
       }
 
       if (mounted) {
@@ -182,7 +207,10 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
           precoMedioLitro = litros > 0 ? gasto / litros : 0;
           totalMultasAbertas = multasAbertas;
           qtdMultasAbertas = qtdAbertas;
+          totalMultasTotal = multasTotal;
           qtdTrocasOleo = oilChanges.length;
+          totalGastoManutencao = gastoManutencao;
+          totalGeral = gasto + multasTotal + gastoManutencao;
           carregando = false;
         });
       }
@@ -269,6 +297,29 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
               ),
             ),
 
+          // ── Total Geral ──────────────────────────────────────────────────────
+          pw.Container(
+            padding: const pw.EdgeInsets.all(14),
+            decoration: pw.BoxDecoration(
+                color: PdfColors.blue50,
+                border: pw.Border.all(color: PdfColors.blue700),
+                borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(8))),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Total Geral', style: bold(14)),
+                pw.SizedBox(height: 8),
+                kpiRow('Total geral (combustível + multas + manutenção)',
+                    _fmtR(totalGeral)),
+                kpiRow('  Combustível', _fmtR(totalGastoFuel)),
+                kpiRow('  Multas (abertas + pagas)', _fmtR(totalMultasTotal)),
+                kpiRow('  Manutenção', _fmtR(totalGastoManutencao)),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 12),
+
           // ── KPIs Combustível ────────────────────────────────────────────────
           pw.Container(
             padding: const pw.EdgeInsets.all(14),
@@ -309,8 +360,12 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                 kpiRow('Multas abertas (qtd)', '$qtdMultasAbertas'),
                 kpiRow('Valor total de multas abertas',
                     _fmtR(totalMultasAbertas)),
-                kpiRow('Trocas de óleo registradas',
+                kpiRow('Valor total de multas (abertas + pagas)',
+                    _fmtR(totalMultasTotal)),
+                kpiRow('Manutenções registradas',
                     '$qtdTrocasOleo'),
+                kpiRow('Valor total de manutenção',
+                    _fmtR(totalGastoManutencao)),
               ],
             ),
           ),
@@ -504,9 +559,53 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                   ),
                   const SizedBox(height: 16),
 
+                  // ── Total Geral (combustível + multas + manutenção) ──────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.secondary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Total Geral',
+                                  style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                              Text(_fmtR(totalGeral),
+                                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Combustível ${_fmtR(totalGastoFuel)} · Multas ${_fmtR(totalMultasTotal)} · Manutenção ${_fmtR(totalGastoManutencao)}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // ── KPIs Combustível ─────────────────────────────────────────
                   _sectionTitle(
-                      'Combustível (Total Geral)', Icons.local_gas_station, AppColors.secondary),
+                      'Combustível', Icons.local_gas_station, AppColors.secondary),
                   const SizedBox(height: 10),
                   Row(children: [
                     _kpi('Gasto Total', _fmtR(totalGastoFuel),
@@ -538,7 +637,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                         AppColors.danger,
                         Icons.gavel),
                     const SizedBox(width: 10),
-                    _kpi('Trocas de Óleo', '$qtdTrocasOleo registros',
+                    _kpi('Manutenção', '$qtdTrocasOleo registro(s) · ${_fmtR(totalGastoManutencao)}',
                         AppColors.warning, Icons.oil_barrel),
                   ]),
                   const SizedBox(height: 16),
