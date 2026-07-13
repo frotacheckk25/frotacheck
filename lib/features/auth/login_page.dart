@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/utils/credential_storage.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'register_page.dart';
 
@@ -32,8 +33,26 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _loading = false;
   bool _obscure = true;
+  bool _lembrarSenha = true;
 
   void _toggleObscure() => setState(() => _obscure = !_obscure);
+  void _toggleLembrar(bool? v) => setState(() => _lembrarSenha = v ?? true);
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarCredenciaisSalvas();
+  }
+
+  Future<void> _carregarCredenciaisSalvas() async {
+    final salvas = await lerCredenciaisSalvas();
+    if (!mounted || salvas == null) return;
+    setState(() {
+      _emailCtrl.text = salvas['email'] ?? '';
+      _passCtrl.text = salvas['senha'] ?? '';
+      _lembrarSenha = true;
+    });
+  }
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
 
@@ -47,6 +66,11 @@ class _LoginPageState extends State<LoginPage> {
       );
       // Navigation is handled by AppAuthProvider → AppGuard → _MasterAwareRouter.
       // Do NOT push any route here — the guard rebuilds with the correct role.
+      if (_lembrarSenha) {
+        await salvarCredenciais(email: _emailCtrl.text.trim(), senha: _passCtrl.text.trim());
+      } else {
+        await limparCredenciaisSalvas();
+      }
     } catch (e) {
       if (!mounted) return;
       showError(context, _loginError(e.toString()));
@@ -370,23 +394,53 @@ class _LoginForm extends StatelessWidget {
               return null;
             },
           ),
-          // Forgot password
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: state._forgotPassword,
-              style: TextButton.styleFrom(
-                foregroundColor: _sky,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 0,
+          // Lembrar senha + Esqueceu a senha
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => state._toggleLembrar(!state._lembrarSenha),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Checkbox(
+                          value: state._lembrarSenha,
+                          onChanged: state._toggleLembrar,
+                          activeColor: _sky,
+                          side: const BorderSide(color: _muted, width: 1.4),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Lembrar minha senha',
+                        style: TextStyle(color: _muted, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              child: const Text(
-                'Esqueceu a senha?',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              TextButton(
+                onPressed: state._forgotPassword,
+                style: TextButton.styleFrom(
+                  foregroundColor: _sky,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 0,
+                  ),
+                ),
+                child: const Text(
+                  'Esqueceu a senha?',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 8),
           // Login button
