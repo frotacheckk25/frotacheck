@@ -31,6 +31,8 @@ import '../core/utils/date_utils.dart' as app_date_utils;
 import 'package:provider/provider.dart';
 import '../core/auth/app_auth_provider.dart';
 import '../core/enums/app_permission.dart';
+import '../core/utils/notification_sound.dart';
+import '../core/utils/snackbar_utils.dart';
 import '../home/admin/admin_usuarios_page.dart';
 
 // Utilities extracted for testing and reuse
@@ -579,7 +581,7 @@ class _HomePageState extends State<HomePage> {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'notificacoes',
-          callback: (_) => _checkUnreadNotificacoes(),
+          callback: _onNovaNotificacaoRealtime,
         )
         .subscribe();
     // Esta tela raiz não é descartada ao navegar (Navigator.push só a cobre),
@@ -627,6 +629,26 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(builder: (_) => const NotificacoesPage()),
     );
     _checkUnreadNotificacoes();
+  }
+
+  // Dispara a cada INSERT em `notificacoes` (qualquer empresa — o Realtime
+  // não filtra por empresa_id sozinho, só o RLS do SELECT normal). Filtra
+  // aqui, atualiza o badge, e chama atenção com toast + som (só enquanto a
+  // aba/tela do dashboard está aberta — igual ao "toast" que foi pedido).
+  void _onNovaNotificacaoRealtime(PostgresChangePayload payload) {
+    final record = payload.newRecord;
+    final recordEmpresaId = record['empresa_id']?.toString();
+    if (_empresaId != null && recordEmpresaId != _empresaId) return;
+
+    _checkUnreadNotificacoes();
+    if (mounted) {
+      showNotificationToast(
+        context,
+        titulo: record['titulo']?.toString() ?? 'Nova notificação',
+        corpo: record['corpo']?.toString() ?? '',
+      );
+      playNotificationSound();
+    }
   }
 
   Future<void> carregarDashboard() async {

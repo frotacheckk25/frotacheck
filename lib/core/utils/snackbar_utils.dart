@@ -55,6 +55,36 @@ void showSuccess(BuildContext context, String msg) {
     ));
 }
 
+// Alerta de atividade da frota (nova notificação chegando em tempo real) —
+// mais chamativo que showSuccess/showError: fica mais tempo na tela e mostra
+// título + corpo da notificação, para o admin/gestor/dono perceber mesmo
+// sem estar olhando o sino.
+void showNotificationToast(BuildContext context, {required String titulo, required String corpo}) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(titulo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+              if (corpo.isNotEmpty)
+                Text(corpo, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            ],
+          ),
+        ),
+      ]),
+      backgroundColor: AppColors.secondary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 5),
+    ));
+}
+
 void showError(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
