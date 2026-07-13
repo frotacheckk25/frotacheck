@@ -26,6 +26,23 @@
 -- Idempotente — pode rodar mais de uma vez sem erro.
 -- =============================================================================
 
+-- Função auxiliar usada por todo o script abaixo. Recriada aqui (com
+-- CREATE OR REPLACE, então não tem problema se já existir) porque a
+-- migração anterior que a definia (MIGRATION_FECHAR_ISOLAMENTO_FINAL.sql)
+-- não estava aplicada neste banco — sem isso, o script quebrava logo na
+-- primeira linha com "function public._drop_all_policies(unknown) does
+-- not exist".
+CREATE OR REPLACE FUNCTION public._drop_all_policies(tbl text) RETURNS void AS $$
+DECLARE pol record;
+BEGIN
+  FOR pol IN SELECT policyname FROM pg_policies
+             WHERE schemaname = 'public' AND tablename = tbl
+  LOOP
+    EXECUTE format('DROP POLICY %I ON public.%I', pol.policyname, tbl);
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
 -- ── pneus ────────────────────────────────────────────────────────────────────
 SELECT public._drop_all_policies('pneus');
 

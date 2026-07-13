@@ -1,5 +1,32 @@
-// Implementação usada em plataformas nativas (Android/iOS/desktop). A API
-// Geolocation do navegador não existe fora da Web — best-effort, retorna
-// sempre null (mesmo comportamento de "localização indisponível" já previsto
-// pelo chamador).
-Future<String?> obterLocalizacao() async => null;
+import 'package:geolocator/geolocator.dart';
+
+/// Implementação usada em plataformas nativas (Android/iOS/desktop) via
+/// package:geolocator. Best-effort: retorna null se o serviço de
+/// localização estiver desligado, a permissão for negada, ou a leitura
+/// expirar — mesmo contrato da versão Web (nunca lança exceção para quem
+/// chama, "localização indisponível" já é tratado no viagens_page.dart).
+Future<String?> obterLocalizacao() async {
+  try {
+    if (!await Geolocator.isLocationServiceEnabled()) return null;
+
+    var permissao = await Geolocator.checkPermission();
+    if (permissao == LocationPermission.denied) {
+      permissao = await Geolocator.requestPermission();
+    }
+    if (permissao == LocationPermission.denied ||
+        permissao == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    final posicao = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        timeLimit: Duration(seconds: 8),
+      ),
+    );
+
+    return '${posicao.latitude},${posicao.longitude}';
+  } catch (_) {
+    return null;
+  }
+}
