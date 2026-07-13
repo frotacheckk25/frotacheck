@@ -6,9 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'relatorio_pdf_layout.dart';
 
 class RelatoriosPage extends StatefulWidget {
   const RelatoriosPage({super.key});
@@ -37,6 +36,10 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
 
   // ── Total Geral ──────────────────────────────────────────────────────────────
   double totalGeral = 0;
+
+  // ── Período do relatório (para o cabeçalho do PDF) ──────────────────────────
+  DateTime periodoInicio = DateTime.now();
+  DateTime periodoFim = DateTime.now();
 
   // ── Gráfico mensal ───────────────────────────────────────────────────────────
   List<String> months = [];
@@ -74,9 +77,6 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
 
   String _fmtR(double v) =>
       'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
-
-  String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   String _fmtChartVal(double v) {
     if (v == 0) return '';
@@ -130,6 +130,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         return '${_shortMonth(d.month)} ${d.year.toString().substring(2)}';
       });
 
+      DateTime? menorDataAbastecimento;
       for (final item in fuelings) {
         final v = _toDouble(item['total_value']);
         final l = _toDouble(item['liters']);
@@ -146,6 +147,9 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
           final key =
               '${_shortMonth(dt.month)} ${dt.year.toString().substring(2)}';
           monthlySpend[key] = (monthlySpend[key] ?? 0) + v;
+          if (menorDataAbastecimento == null || dt.isBefore(menorDataAbastecimento)) {
+            menorDataAbastecimento = dt;
+          }
         }
       }
 
@@ -211,6 +215,8 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
           qtdTrocasOleo = oilChanges.length;
           totalGastoManutencao = gastoManutencao;
           totalGeral = gasto + multasTotal + gastoManutencao;
+          periodoInicio = menorDataAbastecimento ?? DateTime(now.year, now.month, 1);
+          periodoFim = now;
           carregando = false;
         });
       }
@@ -225,221 +231,31 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
 
   // ── PDF ──────────────────────────────────────────────────────────────────────
   Future<Uint8List> _buildPdfBytes() async {
-    final doc = pw.Document();
+    final auth = context.read<AppAuthProvider>();
+    final companyName = visaoAgregada
+        ? 'Todas as empresas (visão agregada)'
+        : (auth.empresaNome ?? 'FrotaCheck');
 
-    pw.TextStyle bold(double size) =>
-        pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: size);
-    pw.TextStyle normal(double size) => pw.TextStyle(fontSize: size);
-    pw.TextStyle grey(double size) =>
-        pw.TextStyle(fontSize: size, color: PdfColors.grey700);
-
-    pw.Widget kpiRow(String label, String value) => pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(vertical: 3),
-          child: pw.Row(
-            children: [
-              pw.Expanded(child: pw.Text(label, style: normal(11))),
-              pw.Text(value, style: bold(11)),
-            ],
-          ),
-        );
-
-    pw.Widget rankRow(int pos, String name, double value) => pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(vertical: 3),
-          child: pw.Row(
-            children: [
-              pw.SizedBox(
-                  width: 20,
-                  child: pw.Text('$pos.', style: grey(10))),
-              pw.Expanded(child: pw.Text(name, style: normal(10))),
-              pw.Text(_fmtR(value), style: bold(10)),
-            ],
-          ),
-        );
-
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        header: (_) => pw.Container(
-          padding: const pw.EdgeInsets.only(bottom: 10),
-          decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                  bottom: pw.BorderSide(color: PdfColors.grey400))),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('FrotaCheck — Relatório de Frota', style: bold(16)),
-              pw.Text('Gerado em ${_fmtDate(DateTime.now())}',
-                  style: grey(10)),
-            ],
-          ),
-        ),
-        footer: (ctx) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text('Página ${ctx.pageNumber} de ${ctx.pagesCount}',
-              style: grey(9)),
-        ),
-        build: (ctx) => [
-          pw.SizedBox(height: 18),
-
-          if (visaoAgregada)
-            pw.Container(
-              margin: const pw.EdgeInsets.only(bottom: 12),
-              padding: const pw.EdgeInsets.all(10),
-              decoration: pw.BoxDecoration(
-                color: PdfColors.amber50,
-                border: pw.Border.all(color: PdfColors.amber700),
-                borderRadius: pw.BorderRadius.circular(4),
-              ),
-              child: pw.Text(
-                'VISÃO AGREGADA MASTER — dados de TODAS as empresas cadastradas na plataforma, não de uma empresa específica.',
-                style: pw.TextStyle(color: PdfColors.amber900, fontSize: 10, fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-
-          // ── Total Geral ──────────────────────────────────────────────────────
-          pw.Container(
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-                color: PdfColors.blue50,
-                border: pw.Border.all(color: PdfColors.blue700),
-                borderRadius: const pw.BorderRadius.all(
-                    pw.Radius.circular(8))),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Total Geral', style: bold(14)),
-                pw.SizedBox(height: 8),
-                kpiRow('Total geral (combustível + multas + manutenção)',
-                    _fmtR(totalGeral)),
-                kpiRow('  Combustível', _fmtR(totalGastoFuel)),
-                kpiRow('  Multas (abertas + pagas)', _fmtR(totalMultasTotal)),
-                kpiRow('  Manutenção', _fmtR(totalGastoManutencao)),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 12),
-
-          // ── KPIs Combustível ────────────────────────────────────────────────
-          pw.Container(
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey300),
-                borderRadius: const pw.BorderRadius.all(
-                    pw.Radius.circular(8))),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Combustível', style: bold(14)),
-                pw.SizedBox(height: 8),
-                kpiRow('Total gasto em combustível',
-                    _fmtR(totalGastoFuel)),
-                kpiRow('Total de litros abastecidos',
-                    '${totalLitros.toStringAsFixed(1)} L'),
-                kpiRow('Número de abastecimentos',
-                    '$qtdAbastecimentos'),
-                kpiRow('Preço médio por litro',
-                    _fmtR(precoMedioLitro)),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 12),
-
-          // ── Multas + Manutenção ─────────────────────────────────────────────
-          pw.Container(
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey300),
-                borderRadius: const pw.BorderRadius.all(
-                    pw.Radius.circular(8))),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text('Multas & Manutenção', style: bold(14)),
-                pw.SizedBox(height: 8),
-                kpiRow('Multas abertas (qtd)', '$qtdMultasAbertas'),
-                kpiRow('Valor total de multas abertas',
-                    _fmtR(totalMultasAbertas)),
-                kpiRow('Valor total de multas (abertas + pagas)',
-                    _fmtR(totalMultasTotal)),
-                kpiRow('Manutenções registradas',
-                    '$qtdTrocasOleo'),
-                kpiRow('Valor total de manutenção',
-                    _fmtR(totalGastoManutencao)),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 12),
-
-          // ── Gasto mensal ────────────────────────────────────────────────────
-          pw.Text('Gasto mensal (combustível)', style: bold(14)),
-          pw.SizedBox(height: 8),
-          pw.Table(
-            border: pw.TableBorder.all(color: PdfColors.grey300),
-            columnWidths: {
-              0: const pw.FlexColumnWidth(2),
-              1: const pw.FlexColumnWidth(1),
-            },
-            children: [
-              pw.TableRow(
-                decoration:
-                    const pw.BoxDecoration(color: PdfColors.grey200),
-                children: [
-                  pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text('Mês', style: bold(10))),
-                  pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text('Valor', style: bold(10))),
-                ],
-              ),
-              ...List.generate(months.length, (i) {
-                return pw.TableRow(children: [
-                  pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(months[i], style: normal(10))),
-                  pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(
-                          _fmtR(monthlyValues.isNotEmpty
-                              ? monthlyValues[i].y
-                              : 0),
-                          style: normal(10))),
-                ]);
-              }),
-            ],
-          ),
-          pw.SizedBox(height: 12),
-
-          // ── Top Veículos ────────────────────────────────────────────────────
-          if (topVeiculos.isNotEmpty) ...[
-            pw.Text('Top veículos por gasto em combustível',
-                style: bold(14)),
-            pw.SizedBox(height: 8),
-            ...topVeiculos.take(5).toList().asMap().entries.map((e) {
-              return rankRow(e.key + 1,
-                  e.value['plate'].toString(),
-                  e.value['value'] as double);
-            }),
-            pw.SizedBox(height: 12),
-          ],
-
-          // ── Top Motoristas ──────────────────────────────────────────────────
-          if (topMotoristas.isNotEmpty) ...[
-            pw.Text('Top motoristas por gasto em combustível',
-                style: bold(14)),
-            pw.SizedBox(height: 8),
-            ...topMotoristas.take(5).toList().asMap().entries.map((e) {
-              return rankRow(e.key + 1,
-                  e.value['name'].toString(),
-                  e.value['value'] as double);
-            }),
-          ],
-        ],
-      ),
+    return buildRelatorioPdfBytes(
+      companyName: companyName,
+      visaoAgregada: visaoAgregada,
+      totalGeral: totalGeral,
+      totalGastoFuel: totalGastoFuel,
+      totalMultasTotal: totalMultasTotal,
+      totalGastoManutencao: totalGastoManutencao,
+      totalLitros: totalLitros,
+      qtdAbastecimentos: qtdAbastecimentos,
+      precoMedioLitro: precoMedioLitro,
+      qtdMultasAbertas: qtdMultasAbertas,
+      totalMultasAbertas: totalMultasAbertas,
+      qtdManutencoes: qtdTrocasOleo,
+      months: months,
+      monthlyValues: monthlyValues.map((s) => s.y).toList(),
+      topVeiculos: topVeiculos,
+      topMotoristas: topMotoristas,
+      periodoInicio: periodoInicio,
+      periodoFim: periodoFim,
     );
-
-    return doc.save();
   }
 
   Future<void> _exportarPDF() async {
