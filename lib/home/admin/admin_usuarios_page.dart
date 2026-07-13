@@ -139,11 +139,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
               .order('created_at', ascending: false)
               .limit(400);
         } else {
-          res = await _supabase
-              .from('user_profiles')
-              .select('*, empresas(nome)')
-              .order('created_at', ascending: false)
-              .limit(400);
+          // Sem empresa_id e sem ser MASTER: estado anômalo — não existe
+          // "todos os usuários" seguro para mostrar aqui, então falha fechado
+          // (lista vazia) em vez de repetir a query irrestrita do MASTER.
+          res = [];
         }
       }
       final lista = (res as List)

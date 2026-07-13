@@ -186,6 +186,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       final desc = observacoesController.text.trim().isNotEmpty
           ? observacoesController.text.trim()
           : (selectedServiceType ?? 'Manutenção');
+      bool oilChangeSecundarioOk = true;
 
       // ── PRIMÁRIO: grava em manutencoes (fonte do dashboard "Em Manutenção") ──
       String? manutencaoId;
@@ -231,6 +232,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
           setState(() => historico = [novo, ...historico]);
         }
       } catch (e) {
+        oilChangeSecundarioOk = false;
         debugPrint('ERRO TROCA DE ÓLEO (oil_changes secundário): $e');
       }
 
@@ -253,7 +255,12 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         }));
       } catch (_) {}
 
-      _snackSucesso('Troca registrada! Próxima em $proximoKm km');
+      if (oilChangeSecundarioOk) {
+        _snackSucesso('Troca registrada! Próxima em $proximoKm km');
+      } else {
+        _snackErro(
+            'Troca registrada, mas houve falha ao salvar o lembrete de próxima troca. Verifique o registro e, se necessário, refaça-o.');
+      }
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;

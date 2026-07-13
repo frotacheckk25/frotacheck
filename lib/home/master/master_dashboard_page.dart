@@ -109,7 +109,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   // Trends
   double _tendEmpresas = 0, _tendUsuarios = 0, _tendVeiculos = 0;
   double _tendMotoristas = 0, _tendAbast = 0, _tendReceita = 0;
-  double _tendChecks = 0, _tendOcorr = 0;
+  double _tendOcorr = 0, _tendManut = 0;
 
   // Alertas
   int _veiculosOffline = 0;
@@ -230,9 +230,9 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         // 5: checklists — só os últimos 2 meses (suficiente para a tendência
         // mês-a-mês; total real vem de uma contagem separada, abaixo)
         _safeQ(_supabase.from('checklists')
-            .select('id, empresa_id, tipo, vehicle_id, driver_id, created_at')
-            .gte('created_at', lastMonth.toIso8601String())
-            .order('created_at', ascending: false)),
+            .select('id, empresa_id, tipo, veiculo_id, motorista_id, criado_em')
+            .gte('criado_em', lastMonth.toIso8601String())
+            .order('criado_em', ascending: false)),
         // 6: ocorrências — últimos 2 meses (idem; abertas antigas são cobertas
         // pela contagem separada de "ocorrências abertas", abaixo)
         _safeQ(_supabase.from('occurrences')
@@ -279,8 +279,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final ocorrencias = results[6];
       final oilChanges = results[7];
       final online = results[8];
-      final manutExtra = results[9];
-      final manutTotal = manutExtra.length + oilChanges.length;
+      // manutencoes (results[9]) e oil_changes são gravadas juntas por
+      // troca_oleo_page.dart para o mesmo evento — somar as duas contaria
+      // cada manutenção 2x. Usa oil_changes.length, mesma fonte já usada em
+      // home_page.dart/relatorios_page.dart/manutencoes_page.dart.
+      final manutTotal = oilChanges.length;
       final planosCatalogo = results[10];
       final assinaturas = results[11];
 
@@ -290,7 +293,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       int cnt(List<Map<String,dynamic>> list, DateTime from, DateTime? to) {
         final toTs = to ?? DateTime.now();
         return list.where((r) {
-          final raw = r['created_at']?.toString() ?? r['fuel_date']?.toString() ?? '';
+          final raw = r['created_at']?.toString() ?? r['fuel_date']?.toString() ?? r['criado_em']?.toString() ?? '';
           final dt = DateTime.tryParse(raw);
           if (dt == null) return false;
           return dt.isAfter(from) && dt.isBefore(toTs);
@@ -307,10 +310,10 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final motLastM = cnt(motoristas, lastMonth, thisMonth);
       final abastThisM = cnt(fuelings, thisMonth, null);
       final abastLastM = cnt(fuelings, lastMonth, thisMonth);
-      final checkThisM = cnt(checklists, thisMonth, null);
-      final checkLastM = cnt(checklists, lastMonth, thisMonth);
       final ocorrThisM = cnt(ocorrencias, thisMonth, null);
       final ocorrLastM = cnt(ocorrencias, lastMonth, thisMonth);
+      final manutThisM = cnt(oilChanges, thisMonth, null);
+      final manutLastM = cnt(oilChanges, lastMonth, thisMonth);
 
       double trend(int cur, int prv) =>
           prv > 0 ? (cur - prv) / prv * 100 : (cur > 0 ? 100 : 0);
@@ -458,7 +461,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       }
       // Checklists recentes
       for (final c in checklists.take(3)) {
-        final hora = fmtHora(c['created_at']?.toString());
+        final hora = fmtHora(c['criado_em']?.toString());
         final tipo = (c['tipo'] ?? 'saida').toString();
         activities.add(_ActivityItem(
           hora, Icons.build_rounded, const Color(0xFF22C55E),
@@ -551,8 +554,8 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         _tendMotoristas = trend(motThisM, motLastM);
         _tendAbast = trend(abastThisM, abastLastM);
         _tendReceita = trend(recThisM.toInt(), recLastM.toInt());
-        _tendChecks = trend(checkThisM, checkLastM);
         _tendOcorr = trend(ocorrThisM, ocorrLastM);
+        _tendManut = trend(manutThisM, manutLastM);
 
         _veiculosOffline = math.max(0, veicOffline);
         _manutencoesVencidas = manutVencidas;
@@ -1004,7 +1007,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       _KpiData(label: 'Abastecimentos', value: _fmtNum(_totalAbastecimentos), icon: Icons.local_gas_station_rounded,
           color: const Color(0xFF8B5CF6), trend: trend(_tendAbast), trendUp: _tendAbast >= 0, spark: _sparkAbast),
       _KpiData(label: 'Manutenções', value: _fmtNum(_totalManutencoes), icon: Icons.build_rounded,
-          color: const Color(0xFFF97316), trend: trend(_tendChecks), trendUp: _tendChecks >= 0, spark: _sparkManut),
+          color: const Color(0xFFF97316), trend: trend(_tendManut), trendUp: _tendManut >= 0, spark: _sparkManut),
       _KpiData(label: 'Ocorrências', value: '$_totalOcorrencias', icon: Icons.report_problem_rounded,
           color: const Color(0xFFEF4444), trend: trend(_tendOcorr), trendUp: _tendOcorr <= 0, spark: _sparkOcorr),
       _KpiData(label: 'Online Agora', value: '$_empresasOnline', icon: Icons.dashboard_rounded,
