@@ -24,10 +24,67 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
   Map<String, Map<String, dynamic>> driversMap = {};
   bool carregando = true;
 
+  // ── Filtros (motorista/placa/período) — motorista/placa só fazem sentido
+  // para quem vê mais de um registro (admin/gestor/dono); o próprio
+  // motorista já é restrito à sua própria placa/nome pela query abaixo.
+  DateTime _filterStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  DateTime _filterEnd = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+  String? _filtroMotoristaId;
+  String? _filtroVeiculoId;
+
   @override
   void initState() {
     super.initState();
     carregarDados();
+  }
+
+  bool get _temFiltroAtivo =>
+      _filtroMotoristaId != null ||
+      _filtroVeiculoId != null ||
+      _filterStart.year != DateTime.now().year ||
+      _filterStart.month != DateTime.now().month;
+
+  void _limparFiltros() {
+    setState(() {
+      _filtroMotoristaId = null;
+      _filtroVeiculoId = null;
+      _filterStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+      _filterEnd = DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+    });
+    carregarDados();
+  }
+
+  Future<void> _pickDateRange() async {
+    final result = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 3)),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _filterStart, end: _filterEnd),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: Theme.of(ctx).colorScheme.copyWith(
+                primary: AppColors.secondary,
+                onPrimary: Colors.white,
+                surface: AppColors.surface,
+                onSurface: Colors.white,
+              ),
+        ),
+        child: child!,
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _filterStart = result.start;
+        _filterEnd = result.end;
+      });
+      carregarDados();
+    }
+  }
+
+  String _dateRangeLabel() {
+    String pad(int n) => n.toString().padLeft(2, '0');
+    return '${pad(_filterStart.day)}/${pad(_filterStart.month)}/${_filterStart.year} - '
+        '${pad(_filterEnd.day)}/${pad(_filterEnd.month)}/${_filterEnd.year}';
   }
 
   Future<void> carregarDados() async {
@@ -35,6 +92,8 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
+      final dateStart = _filterStart.toIso8601String().split('T')[0];
+      final dateEnd = _filterEnd.toIso8601String().split('T')[0];
       var fuelingsQ = supabase.from('fuelings').select(
           'id, vehicle_id, driver_id, fuel_date, created_at, liters, total_value, odometer, empresa_id');
       if (auth.isMotorista && auth.driverId != null) {
@@ -42,6 +101,9 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
       } else if (eid != null) {
         fuelingsQ = fuelingsQ.eq('empresa_id', eid);
       }
+      fuelingsQ = fuelingsQ.gte('fuel_date', dateStart).lte('fuel_date', dateEnd);
+      if (_filtroMotoristaId != null) fuelingsQ = fuelingsQ.eq('driver_id', _filtroMotoristaId!);
+      if (_filtroVeiculoId != null) fuelingsQ = fuelingsQ.eq('vehicle_id', _filtroVeiculoId!);
 
       var veicQ = supabase.from('vehicles').select('id, plate, model, odometer');
       var drivQ = supabase.from('drivers').select('id, name');
@@ -54,7 +116,9 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        fuelingsQ.order('fuel_date', ascending: false).limit(50),
+        // Filtrado por período (+ motorista/placa opcionais) — sem cap
+        // artificial de 50, já que agora o filtro de data controla o volume.
+        fuelingsQ.order('fuel_date', ascending: false).limit(500),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);
@@ -250,7 +314,16 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    const Text('Histórico', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                    _buildFiltros(auth),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Text('Histórico', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        Text('${fuelings.length} no período',
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                      ],
+                    ),
                     const SizedBox(height: 10),
                   ],
                 ),
@@ -371,6 +444,104 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
       ),
     );
   }
+
+  // ── Filtros: período sempre disponível; motorista/placa só fazem sentido
+  // para quem enxerga mais de um registro (admin/gestor/dono) — o motorista
+  // já é restrito à própria placa/nome pela query em carregarDados().
+  Widget _buildFiltros(AppAuthProvider auth) {
+    final mostrarFiltrosPorPessoa = !auth.isMotorista;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        InkWell(
+          onTap: _pickDateRange,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundSoft,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 15, color: AppColors.secondary),
+                const SizedBox(width: 8),
+                Text(_dateRangeLabel(), style: const TextStyle(color: Colors.white, fontSize: 12.5)),
+              ],
+            ),
+          ),
+        ),
+        if (mostrarFiltrosPorPessoa) ...[
+          SizedBox(
+            width: 190,
+            child: DropdownButtonFormField<String>(
+              value: _filtroMotoristaId,
+              isExpanded: true,
+              decoration: _filtroDec('Motorista', Icons.person_outline),
+              dropdownColor: AppColors.surface,
+              style: const TextStyle(color: Colors.white, fontSize: 12.5),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Todos')),
+                ...drivers.map((d) => DropdownMenuItem(
+                      value: d['id']?.toString(),
+                      child: Text(d['name']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+                    )),
+              ],
+              onChanged: (v) {
+                setState(() => _filtroMotoristaId = v);
+                carregarDados();
+              },
+            ),
+          ),
+          SizedBox(
+            width: 190,
+            child: DropdownButtonFormField<String>(
+              value: _filtroVeiculoId,
+              isExpanded: true,
+              decoration: _filtroDec('Veículo', Icons.directions_car_outlined),
+              dropdownColor: AppColors.surface,
+              style: const TextStyle(color: Colors.white, fontSize: 12.5),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Todos')),
+                ...vehicles.map((v) => DropdownMenuItem(
+                      value: v['id']?.toString(),
+                      child: Text(v['plate']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+                    )),
+              ],
+              onChanged: (v) {
+                setState(() => _filtroVeiculoId = v);
+                carregarDados();
+              },
+            ),
+          ),
+        ],
+        if (_temFiltroAtivo)
+          TextButton.icon(
+            onPressed: _limparFiltros,
+            icon: const Icon(Icons.filter_alt_off_outlined, size: 16, color: AppColors.textSecondary),
+            label: const Text('Limpar filtros', style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+            style: TextButton.styleFrom(minimumSize: Size.zero, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+          ),
+      ],
+    );
+  }
+
+  InputDecoration _filtroDec(String label, IconData icon) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 16),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        filled: true,
+        fillColor: AppColors.backgroundSoft,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.secondary)),
+      );
 
   Widget _kpi(String label, String value, IconData icon, Color color) {
     return Expanded(
