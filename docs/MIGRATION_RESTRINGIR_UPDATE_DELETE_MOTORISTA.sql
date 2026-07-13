@@ -193,7 +193,14 @@ EXCEPTION WHEN undefined_table THEN NULL; END $$;
 -- é SECURITY DEFINER e ignora RLS por design — esse é um cinto-e-suspensório
 -- contra o caso, hoje improvável, de um driver_id acabar associado a um
 -- veículo de outra empresa).
+--
+-- DROP antes do CREATE: a função já existente no banco tem uma assinatura
+-- de retorno (colunas/tipos das OUT params) diferente da definida abaixo, e
+-- o Postgres não deixa CREATE OR REPLACE mudar isso — exige apagar antes
+-- (erro 42P13 "cannot change return type of existing function").
 -- =============================================================================
+DROP FUNCTION IF EXISTS public.get_my_vehicle();
+
 CREATE OR REPLACE FUNCTION public.get_my_vehicle()
 RETURNS TABLE (
   id     uuid,
