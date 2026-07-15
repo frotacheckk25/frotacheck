@@ -20,13 +20,15 @@ import '../planos/planos_page.dart';
 import '../../pages/lista_ocorrencias_page.dart';
 import '../checklists/historico_checklist_page.dart';
 import '../relatorios/relatorios_page.dart';
+import '../distribuicao/distribuicao_app_page.dart';
+import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  planos, relatorios, configuracoes,
+  planos, relatorios, distribuicao, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -723,6 +725,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 navItem(Icons.settings_rounded, 'Usuários', _Sec.usuarios, () => nav(const AdminUsuariosPage())),
                 navItem(Icons.payments_outlined, 'Planos', _Sec.planos, () => nav(const PlanosPage())),
                 navItem(Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
+                navItem(Icons.qr_code_2_rounded, 'Distribuição do App', _Sec.distribuicao, () => nav(const DistribuicaoAppPage())),
                 catHeader('SISTEMA'),
                 navItem(Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
               ],
@@ -2230,6 +2233,12 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                                   child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
                                 ),
                               ]),
+                              IconButton(
+                                onPressed: () => showCompartilharAppDialog(context, empresaNome: nome),
+                                icon: const Icon(Icons.share_rounded, size: 17, color: Color(0xFF64748B)),
+                                tooltip: 'Compartilhar App',
+                                visualDensity: VisualDensity.compact,
+                              ),
                             ]),
                             ),
                           );

@@ -17,6 +17,7 @@ import '../home/multas/multas_page.dart';
 import '../home/notificacoes/notificacoes_page.dart';
 import '../home/pneus/pneus_page.dart';
 import '../home/relatorios/relatorios_page.dart';
+import '../home/distribuicao/distribuicao_app_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -987,7 +988,7 @@ class _HomePageState extends State<HomePage> {
             cols: 'fuel_date,total_value,vehicle_id,driver_id'),
         _sparkSelect('manutencoes', start, end, cols: 'created_at,cost,valor'),
         _sparkSelect('occurrences', start, end, cols: 'created_at'),
-        _sparkSelect('multas', start, end, cols: 'created_at,amount,valor'),
+        _sparkSelect('multas', start, end, cols: 'created_at,valor'),
       ]);
 
       final fuel = rs[0], maint = rs[1], occ = rs[2], mult = rs[3];
@@ -1018,7 +1019,7 @@ class _HomePageState extends State<HomePage> {
       // Total monthly cost (fuel + maintenance + fines)
       final fuelCost  = _monthCostBins(fuel,  dateField: 'fuel_date', costFields: ['total_value']);
       final maintCost = _monthCostBins(maint, costFields: ['cost', 'valor']);
-      final multCost  = _monthCostBins(mult,  costFields: ['amount', 'valor']);
+      final multCost  = _monthCostBins(mult,  costFields: ['valor']);
       final gastoBins = List<double>.generate(6, (i) => fuelCost[i] + maintCost[i] + multCost[i]);
 
       // Fleet index = (total_vehicles - vehicles_in_maintenance_that_month) / total * 100
@@ -1893,7 +1894,8 @@ class _HomePageState extends State<HomePage> {
         // ── Gestão ───────────────────────────────────────────────────────
         if (auth.can(AppPermission.viewReports) ||
             auth.can(AppPermission.viewAlerts) ||
-            auth.can(AppPermission.manageSettings)) ...[
+            auth.can(AppPermission.manageSettings) ||
+            auth.can(AppPermission.viewAppDistribution)) ...[
           _menuSectionLabel('Gestão'),
           if (auth.can(AppPermission.viewReports))
             _buildMenuOption(Icons.bar_chart, 'Relatórios', () async {
@@ -1903,6 +1905,11 @@ class _HomePageState extends State<HomePage> {
           if (auth.can(AppPermission.viewAlerts))
             _buildMenuOption(Icons.notification_important, 'Alertas', () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewAppDistribution))
+            _buildMenuOption(Icons.qr_code_2_rounded, 'Distribuição do App', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const DistribuicaoAppPage()));
               carregarDashboard();
             }),
           if (auth.can(AppPermission.manageSettings))
@@ -2816,7 +2823,8 @@ class _HomePageState extends State<HomePage> {
                     // ─ Gestão ─────────────────────────────────────────────
                     if (auth.can(AppPermission.viewReports) ||
                         auth.can(AppPermission.viewAlerts) ||
-                        auth.can(AppPermission.manageSettings)) ...[
+                        auth.can(AppPermission.manageSettings) ||
+                        auth.can(AppPermission.viewAppDistribution)) ...[
                       _sidebarSection('GESTÃO'),
                       if (auth.can(AppPermission.viewReports))
                         _buildSidebarItem(Icons.bar_chart_rounded, 'Relatórios', () async {
@@ -2826,6 +2834,11 @@ class _HomePageState extends State<HomePage> {
                       if (auth.can(AppPermission.viewAlerts))
                         _buildSidebarItem(Icons.notifications_active_rounded, 'Alertas', () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertasPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewAppDistribution))
+                        _buildSidebarItem(Icons.qr_code_2_rounded, 'Distribuição do App', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const DistribuicaoAppPage()));
                           carregarDashboard();
                         }),
                       if (auth.can(AppPermission.manageSettings))

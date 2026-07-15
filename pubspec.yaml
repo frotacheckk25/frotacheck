@@ -46,6 +46,10 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   geolocator: ^14.0.2
   flutter_secure_storage: ^10.3.1
+  shared_preferences: ^2.5.5
+  qr_flutter: ^4.1.0
+  package_info_plus: ^9.0.1
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +75,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/build_info.json
     - web/config.json
 
 

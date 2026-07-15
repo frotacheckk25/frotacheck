@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../auth/app_auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../../shared/widgets/install_app_banner.dart';
 
 /// Guard raiz: decide o que exibir com base no estado de autenticação.
 /// Toda lógica de redirecionamento fica aqui — as telas não precisam saber.
@@ -27,9 +28,17 @@ class AppGuard extends StatelessWidget {
 
     // Key garante que toda a subárvore é recriada do zero quando
     // um usuário diferente faz login (userId muda → dispose + initState completo).
-    return KeyedSubtree(
-      key: ValueKey(auth.profile?.userId),
-      child: authenticated,
+    // Column (não Stack) para o banner empurrar o conteúdo em vez de cobri-lo.
+    return Column(
+      children: [
+        const InstallAppBanner(),
+        Expanded(
+          child: KeyedSubtree(
+            key: ValueKey(auth.profile?.userId),
+            child: authenticated,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -57,4 +57,8 @@ enum AppPermission {
   viewAllCompanies,
   manageCompanies,
   manageSystem,
+
+  // Distribuição do App (QR Code / link de instalação) — MASTER, ADMIN_EMPRESA,
+  // DONO e GESTOR; MOTORISTA não tem.
+  viewAppDistribution,
 }

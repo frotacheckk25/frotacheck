@@ -101,6 +101,21 @@
   </script>
 
   <script>
+    // Captures the browser's native "add to home screen" prompt so our own
+    // Dart-side banner can trigger it on demand (see lib/core/utils/
+    // pwa_install_web.dart), instead of only relying on each browser's own
+    // passive install UI (which varies a lot and is easy to miss).
+    window.__fcInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__fcInstallPrompt = e;
+    });
+    window.addEventListener('appinstalled', function () {
+      window.__fcInstallPrompt = null;
+    });
+  </script>
+
+  <script>
     // Service worker: registers our own custom_sw.js (network-first with
     // offline cache fallback + auto-update — see web/custom_sw.js for why
     // this replaces Flutter's own generated service worker, which is
@@ -111,14 +126,15 @@
 
       var nativeRegister = navigator.serviceWorker.register.bind(navigator.serviceWorker);
       navigator.serviceWorker.register = function (url, options) {
-        console.log('[fc-sw-guard] register() called with', url);
-        if (typeof url === 'string' && url.indexOf('flutter_service_worker') !== -1) {
-          console.log('[fc-sw-guard] blocking flutter_service_worker registration');
+        // Chromium's Trusted Types policy (flutter_bootstrap.js creates one
+        // named "flutter-js") wraps this URL in a TrustedScriptURL object,
+        // not a plain string — String(url) normalizes both cases.
+        var urlStr = url == null ? '' : String(url);
+        if (urlStr.indexOf('flutter_service_worker') !== -1) {
           return Promise.reject(new Error('Flutter service worker disabled — using custom_sw.js instead'));
         }
         return nativeRegister(url, options);
       };
-      console.log('[fc-sw-guard] override installed');
 
       window.addEventListener('load', function () {
         // A page's very first-ever visit has no controller yet; the SW

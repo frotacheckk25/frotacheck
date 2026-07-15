@@ -65,6 +65,7 @@ enum AppRole {
           AppPermission.viewReports,     AppPermission.exportReports,
           AppPermission.manageSettings,
           AppPermission.viewUsers,       AppPermission.manageUsers,
+          AppPermission.viewAppDistribution,
         ];
 
       // ── GESTOR: administra a operação — sem gestão de usuários, plano ou config ─
@@ -82,6 +83,7 @@ enum AppRole {
           AppPermission.viewTires,
           AppPermission.viewAlerts,
           AppPermission.viewReports,
+          AppPermission.viewAppDistribution,
           // NÃO tem: manageSettings, viewUsers, manageUsers,
           //          viewAllCompanies, manageCompanies, manageSystem
         ];
