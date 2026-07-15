@@ -31,6 +31,7 @@ Future<void> _initFirebaseIfSupported() async {
 
 void main() {
   bool zoneErrorHandled = false;
+  bool appStarted = false;
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
@@ -79,11 +80,17 @@ void main() {
                     'Erro desconhecido ao inicializar Supabase',
               ),
       );
+      appStarted = true;
     },
     (Object error, StackTrace stack) {
       debugPrint('Zoned error: $error');
       debugPrint('$stack');
-      if (!zoneErrorHandled) {
+      // Só substitui o app inteiro pela tela de erro se a falha aconteceu
+      // ANTES do app terminar de subir (ex.: Supabase.initialize falhando).
+      // Uma exceção não tratada em qualquer botão/callback depois que o app
+      // já está rodando não deve derrubar toda a sessão do usuário — ela já
+      // teria (ou deveria ter) seu próprio tratamento local mais específico.
+      if (!zoneErrorHandled && !appStarted) {
         zoneErrorHandled = true;
         runApp(FrotaCheckAppSupabaseError(errorMessage: error.toString()));
       }

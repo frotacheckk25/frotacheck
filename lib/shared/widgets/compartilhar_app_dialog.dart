@@ -70,12 +70,28 @@ Future<void> showCompartilharAppDialog(BuildContext context, {required String em
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    final mensagem = frotaCheckShareMessage(empresaNome);
                     try {
+                      // Fallbacks do share_plus desligados de propósito — ver
+                      // o mesmo comentário em distribuicao_app_page.dart.
                       await SharePlus.instance.share(
-                        ShareParams(text: frotaCheckShareMessage(empresaNome), subject: 'FrotaCheck'),
+                        ShareParams(
+                          text: mensagem,
+                          subject: 'FrotaCheck',
+                          downloadFallbackEnabled: false,
+                          mailToFallbackEnabled: false,
+                        ),
                       );
-                    } catch (e) {
-                      if (context.mounted) showError(context, friendlyError(e));
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      try {
+                        await Clipboard.setData(ClipboardData(text: mensagem));
+                        if (context.mounted) {
+                          showSuccess(context, 'Mensagem copiada! Cole no WhatsApp ou E-mail.');
+                        }
+                      } catch (e) {
+                        if (context.mounted) showError(context, friendlyError(e));
+                      }
                     }
                   },
                   icon: const Icon(Icons.share_rounded, size: 16, color: Colors.white),

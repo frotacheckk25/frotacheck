@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,7 @@ import '../../core/enums/app_permission.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/app_build_info.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/web_download.dart';
 
 class DistribuicaoAppPage extends StatefulWidget {
   const DistribuicaoAppPage({super.key});
@@ -107,12 +109,30 @@ class _DistribuicaoAppPageState extends State<DistribuicaoAppPage> {
   }
 
   Future<void> _compartilhar() async {
+    final mensagem = frotaCheckShareMessage(_empresaAtual);
     try {
+      // downloadFallbackEnabled/mailToFallbackEnabled desligados de propósito:
+      // no Web, boa parte dos navegadores desktop não suporta o Web Share
+      // API nativo, e o fallback de e-mail do share_plus só funciona se o SO
+      // tiver um cliente de e-mail configurado — quando falha, cai no catch
+      // abaixo e usamos nosso próprio fallback (copiar mensagem), que nunca
+      // falha, em vez de abrir um rascunho de e-mail vazio inesperado.
       await SharePlus.instance.share(
-        ShareParams(text: frotaCheckShareMessage(_empresaAtual), subject: 'FrotaCheck'),
+        ShareParams(
+          text: mensagem,
+          subject: 'FrotaCheck',
+          downloadFallbackEnabled: false,
+          mailToFallbackEnabled: false,
+        ),
       );
-    } catch (e) {
-      if (mounted) showError(context, friendlyError(e));
+    } catch (_) {
+      if (!mounted) return;
+      try {
+        await Clipboard.setData(ClipboardData(text: mensagem));
+        if (mounted) showSuccess(context, 'Mensagem copiada! Cole no WhatsApp ou E-mail.');
+      } catch (e) {
+        if (mounted) showError(context, friendlyError(e));
+      }
     }
   }
 
@@ -124,6 +144,16 @@ class _DistribuicaoAppPageState extends State<DistribuicaoAppPage> {
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return;
       final bytes = byteData.buffer.asUint8List();
+
+      if (kIsWeb) {
+        // No Web, baixar direto via <a download> é muito mais confiável do
+        // que o Web Share API (que boa parte dos navegadores desktop não
+        // suporta para arquivos).
+        downloadBytes(bytes, 'frotacheck-qrcode.png', 'image/png');
+        if (mounted) showSuccess(context, 'QR Code baixado!');
+        return;
+      }
+
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile.fromData(bytes, name: 'frotacheck-qrcode.png', mimeType: 'image/png')],

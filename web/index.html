@@ -113,6 +113,28 @@
     window.addEventListener('appinstalled', function () {
       window.__fcInstallPrompt = null;
     });
+
+    // iOS/Safari nunca dispara beforeinstallprompt (a Apple não implementa
+    // essa API) — a única forma de saber que estamos lá é checar a UA, para
+    // mostrar instruções manuais ("Compartilhar > Adicionar à Tela de
+    // Início") em vez de um botão de instalação que nunca funcionaria.
+    var ua = navigator.userAgent.toLowerCase();
+    window.__fcIsIos = /iphone|ipad|ipod/.test(ua) && !window.MSStream;
+    window.__fcIsStandalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      navigator.standalone === true;
+
+    // Download direto via <a download>, sem depender do Web Share API (que
+    // não é suportado de forma confiável em navegadores desktop).
+    window.__fcDownloadDataUrl = function (dataUrl, filename) {
+      var a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
   </script>
 
   <script>

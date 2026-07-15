@@ -18,7 +18,7 @@ class InstallAppBanner extends StatefulWidget {
 
 class _InstallAppBannerState extends State<InstallAppBanner> {
   bool _dismissed = true;
-  bool _available = false;
+  InstallBannerKind _kind = InstallBannerKind.none;
   bool _prompting = false;
 
   @override
@@ -32,9 +32,9 @@ class _InstallAppBannerState extends State<InstallAppBanner> {
     final dismissed = prefs.getBool(_kDismissedKey) ?? false;
     if (!mounted) return;
     setState(() => _dismissed = dismissed);
-    installAvailabilityStream().listen((available) {
+    installBannerKindStream().listen((kind) {
       if (!mounted) return;
-      setState(() => _available = available);
+      setState(() => _kind = kind);
     });
   }
 
@@ -58,7 +58,8 @@ class _InstallAppBannerState extends State<InstallAppBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (_dismissed || !_available) return const SizedBox.shrink();
+    if (_dismissed || _kind == InstallBannerKind.none) return const SizedBox.shrink();
+    final isIos = _kind == InstallBannerKind.iosManual;
 
     return SafeArea(
       bottom: false,
@@ -91,21 +92,27 @@ class _InstallAppBannerState extends State<InstallAppBanner> {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.install_mobile_rounded, color: Colors.white, size: 20),
+                child: Icon(
+                  isIos ? Icons.ios_share_rounded : Icons.install_mobile_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Instalar FrotaCheck',
                       style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Acesso rápido na tela inicial, sem precisar do navegador.',
-                      style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                      isIos
+                          ? 'Toque em Compartilhar e depois em "Adicionar à Tela de Início".'
+                          : 'Acesso rápido na tela inicial, sem precisar do navegador.',
+                      style: const TextStyle(color: Colors.white70, fontSize: 11.5),
                     ),
                   ],
                 ),
@@ -118,16 +125,17 @@ class _InstallAppBannerState extends State<InstallAppBanner> {
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
               else ...[
-                TextButton(
-                  onPressed: _install,
-                  style: TextButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                if (!isIos)
+                  TextButton(
+                    onPressed: _install,
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Instalar', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
                   ),
-                  child: const Text('Instalar', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                ),
                 IconButton(
                   onPressed: _dismiss,
                   icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 18),
