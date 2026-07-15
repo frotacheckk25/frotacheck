@@ -7,6 +7,7 @@ import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/signed_storage_url.dart';
+import '../fiscal/configuracoes_fiscais_page.dart';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const _bg      = Color(0xFF080F1E);
@@ -557,6 +558,25 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
           onTap: _salvarEmpresa,
           color: _blue,
         ),
+        if (context.watch<AppAuthProvider>().can(AppPermission.manageFiscalSettings)) ...[
+          const SizedBox(height: 24),
+          _sectionTitle('Documentos Fiscais'),
+          const SizedBox(height: 12),
+          _card(ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: const Icon(Icons.request_quote_rounded, color: _blue, size: 20),
+            title: const Text('Configurações Fiscais', style: TextStyle(color: _white, fontSize: 14)),
+            subtitle: const Text(
+              'Certificado digital, CNPJ/IE, RNTRC e ambiente para emissão de CT-e.',
+              style: TextStyle(color: _sub, fontSize: 12),
+            ),
+            trailing: const Icon(Icons.chevron_right, color: _muted, size: 18),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ConfiguracoesFiscaisPage()),
+            ),
+          )),
+        ],
       ]),
     );
   }

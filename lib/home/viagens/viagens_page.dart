@@ -23,6 +23,8 @@ class _ViagensPageState extends State<ViagensPage> {
   Map<String, Map<String, dynamic>> motoristasMap = {};
   bool isLoading = true;
   String filtroStatus = 'todas';
+  bool cteHabilitado = false;
+  String ambienteFiscal = 'homologacao';
 
   @override
   void initState() {
@@ -130,12 +132,31 @@ class _ViagensPageState extends State<ViagensPage> {
         (viaResp as List).map((e) => Map<String, dynamic>.from(e as Map)),
       );
 
+      // CT-e habilitado para esta empresa? Controla se a seção "Dados da
+      // Carga" aparece na Nova Viagem. Falha silenciosa de propósito — só
+      // afeta uma seção opcional, não a viagem em si.
+      var cteHab = false;
+      var ambFiscal = 'homologacao';
+      if (!isMotorista && eid != null) {
+        try {
+          final settings = await supabase
+              .from('company_settings')
+              .select('cte_habilitado, ambiente_fiscal')
+              .eq('empresa_id', eid)
+              .maybeSingle();
+          cteHab = settings?['cte_habilitado'] == true;
+          ambFiscal = settings?['ambiente_fiscal']?.toString() ?? 'homologacao';
+        } catch (_) {}
+      }
+
       if (!mounted) return;
       setState(() {
         viagens = viaList;
         veiculosMap = vMap;
         motoristasMap = mMap;
         isLoading = false;
+        cteHabilitado = cteHab;
+        ambienteFiscal = ambFiscal;
       });
     } catch (e) {
       debugPrint('Erro ao carregar viagens: $e');
@@ -354,6 +375,8 @@ class _ViagensPageState extends State<ViagensPage> {
           onSalva: _carregarDados,
           isMotorista: auth.isMotorista,
           ownDriverId: auth.driverId,
+          cteHabilitado: cteHabilitado,
+          ambienteFiscal: ambienteFiscal,
         ),
       ),
     );
@@ -382,6 +405,8 @@ class _NovaViagemPage extends StatefulWidget {
   final VoidCallback onSalva;
   final bool isMotorista;
   final String? ownDriverId;
+  final bool cteHabilitado;
+  final String ambienteFiscal;
 
   const _NovaViagemPage({
     required this.veiculosMap,
@@ -389,6 +414,8 @@ class _NovaViagemPage extends StatefulWidget {
     required this.onSalva,
     this.isMotorista = false,
     this.ownDriverId,
+    this.cteHabilitado = false,
+    this.ambienteFiscal = 'homologacao',
   });
 
   @override
@@ -406,6 +433,20 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
   final destinoCtrl = TextEditingController();
   final kmInicioCtrl = TextEditingController();
 
+  // Dados da Carga (CT-e) — opcional, só aparece se a empresa tiver CT-e
+  // habilitado. Preenchimento aqui só cria um RASCUNHO em cte_documentos; a
+  // emissão real na SEFAZ é sempre uma ação separada e deliberada, feita
+  // depois em "Documentos Fiscais".
+  bool _mostrarCarga = false;
+  final _remetenteNomeCtrl = TextEditingController();
+  final _remetenteDocCtrl = TextEditingController();
+  final _destinatarioNomeCtrl = TextEditingController();
+  final _destinatarioDocCtrl = TextEditingController();
+  final _naturezaCargaCtrl = TextEditingController();
+  final _valorCargaCtrl = TextEditingController();
+  final _valorFreteCtrl = TextEditingController();
+  final _pesoBrutoCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -421,8 +462,19 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
     origemCtrl.dispose();
     destinoCtrl.dispose();
     kmInicioCtrl.dispose();
+    _remetenteNomeCtrl.dispose();
+    _remetenteDocCtrl.dispose();
+    _destinatarioNomeCtrl.dispose();
+    _destinatarioDocCtrl.dispose();
+    _naturezaCargaCtrl.dispose();
+    _valorCargaCtrl.dispose();
+    _valorFreteCtrl.dispose();
+    _pesoBrutoCtrl.dispose();
     super.dispose();
   }
+
+  bool get _cargaPreenchida =>
+      _remetenteNomeCtrl.text.trim().isNotEmpty || _destinatarioNomeCtrl.text.trim().isNotEmpty;
 
   Future<void> _salvar() async {
     if (veiculoId == null ||
@@ -450,18 +502,54 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
     final localizacao = await obterLocalizacao();
     if (!mounted) return;
     try {
-      await supabase.from('viagens').insert(injetar({
-        'veiculo_id': veiculoId,
-        'motorista_id': motoristaId,
-        'data_inicio': DateTime.now().toIso8601String(),
-        'origem': origemCtrl.text.trim(),
-        'destino': destinoCtrl.text.trim(),
-        'quilometragem_inicio': kmInicio,
-        'status': 'em_progresso',
-        'fotos_rota': [],
-        // ignore: use_null_aware_elements
-        if (localizacao != null) 'localizacao_inicio': localizacao,
-      }));
+      final viagemInserida = await supabase
+          .from('viagens')
+          .insert(injetar({
+            'veiculo_id': veiculoId,
+            'motorista_id': motoristaId,
+            'data_inicio': DateTime.now().toIso8601String(),
+            'origem': origemCtrl.text.trim(),
+            'destino': destinoCtrl.text.trim(),
+            'quilometragem_inicio': kmInicio,
+            'status': 'em_progresso',
+            'fotos_rota': [],
+            // ignore: use_null_aware_elements
+            if (localizacao != null) 'localizacao_inicio': localizacao,
+          }))
+          .select('id')
+          .single();
+
+      // Seção "Dados da Carga" preenchida: cria um RASCUNHO em
+      // cte_documentos vinculado a esta viagem. A emissão real na SEFAZ
+      // continua sendo uma ação separada, feita depois em Documentos Fiscais.
+      if (widget.cteHabilitado && _cargaPreenchida) {
+        try {
+          await supabase.from('cte_documentos').insert(injetar({
+            'viagem_id': viagemInserida['id'],
+            'veiculo_id': veiculoId,
+            'motorista_id': motoristaId,
+            'ambiente': widget.ambienteFiscal,
+            'status': 'rascunho',
+            'remetente_nome': _remetenteNomeCtrl.text.trim(),
+            'remetente_doc': _remetenteDocCtrl.text.trim(),
+            'destinatario_nome': _destinatarioNomeCtrl.text.trim(),
+            'destinatario_doc': _destinatarioDocCtrl.text.trim(),
+            'natureza_carga': _naturezaCargaCtrl.text.trim(),
+            if (_valorCargaCtrl.text.trim().isNotEmpty)
+              'valor_carga': double.tryParse(_valorCargaCtrl.text.replaceAll(',', '.')),
+            if (_valorFreteCtrl.text.trim().isNotEmpty)
+              'valor_frete': double.tryParse(_valorFreteCtrl.text.replaceAll(',', '.')),
+            if (_pesoBrutoCtrl.text.trim().isNotEmpty)
+              'peso_bruto': double.tryParse(_pesoBrutoCtrl.text.replaceAll(',', '.')),
+          }));
+        } catch (e) {
+          debugPrint('Erro ao criar rascunho de CT-e: $e');
+          // Não bloqueia a viagem por causa disso — só avisa.
+          if (mounted) {
+            showError(context, 'Viagem criada, mas não foi possível salvar os dados da carga: ${friendlyError(e)}');
+          }
+        }
+      }
 
       if (!mounted) return;
       showSuccess(context, 'Viagem iniciada com sucesso!');
@@ -579,6 +667,76 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
               style: const TextStyle(color: Colors.white),
               decoration: field('Quilometragem Inicial (KM) *', Icons.speed),
             ),
+            if (widget.cteHabilitado) ...[
+              const SizedBox(height: 16),
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: _mostrarCarga,
+                  onExpansionChanged: (v) => setState(() => _mostrarCarga = v),
+                  tilePadding: EdgeInsets.zero,
+                  collapsedBackgroundColor: AppColors.backgroundSoft,
+                  backgroundColor: AppColors.backgroundSoft,
+                  title: const Text('Dados da Carga (CT-e) — opcional',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Preencha se esta viagem terá um CT-e emitido depois.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+                  childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+                  children: [
+                    TextField(
+                      controller: _remetenteNomeCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Remetente (nome)', Icons.business),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _remetenteDocCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Remetente (CNPJ/CPF)', Icons.badge),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _destinatarioNomeCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Destinatário (nome)', Icons.business),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _destinatarioDocCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Destinatário (CNPJ/CPF)', Icons.badge),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _naturezaCargaCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Natureza da carga', Icons.inventory_2),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _valorCargaCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Valor da carga (R\$)', Icons.attach_money),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _valorFreteCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Valor do frete (R\$)', Icons.local_shipping),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _pesoBrutoCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white),
+                      decoration: field('Peso bruto (kg)', Icons.scale),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: isLoading ? null : _salvar,

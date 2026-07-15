@@ -18,6 +18,7 @@ import '../home/notificacoes/notificacoes_page.dart';
 import '../home/pneus/pneus_page.dart';
 import '../home/relatorios/relatorios_page.dart';
 import '../home/distribuicao/distribuicao_app_page.dart';
+import '../home/fiscal/documentos_fiscais_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -1895,7 +1896,8 @@ class _HomePageState extends State<HomePage> {
         if (auth.can(AppPermission.viewReports) ||
             auth.can(AppPermission.viewAlerts) ||
             auth.can(AppPermission.manageSettings) ||
-            auth.can(AppPermission.viewAppDistribution)) ...[
+            auth.can(AppPermission.viewAppDistribution) ||
+            auth.can(AppPermission.viewFiscalDocs)) ...[
           _menuSectionLabel('Gestão'),
           if (auth.can(AppPermission.viewReports))
             _buildMenuOption(Icons.bar_chart, 'Relatórios', () async {
@@ -1910,6 +1912,11 @@ class _HomePageState extends State<HomePage> {
           if (auth.can(AppPermission.viewAppDistribution))
             _buildMenuOption(Icons.qr_code_2_rounded, 'Distribuição do App', () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => const DistribuicaoAppPage()));
+              carregarDashboard();
+            }),
+          if (auth.can(AppPermission.viewFiscalDocs))
+            _buildMenuOption(Icons.request_quote_rounded, 'Documentos Fiscais', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosFiscaisPage()));
               carregarDashboard();
             }),
           if (auth.can(AppPermission.manageSettings))
@@ -2824,7 +2831,8 @@ class _HomePageState extends State<HomePage> {
                     if (auth.can(AppPermission.viewReports) ||
                         auth.can(AppPermission.viewAlerts) ||
                         auth.can(AppPermission.manageSettings) ||
-                        auth.can(AppPermission.viewAppDistribution)) ...[
+                        auth.can(AppPermission.viewAppDistribution) ||
+                        auth.can(AppPermission.viewFiscalDocs)) ...[
                       _sidebarSection('GESTÃO'),
                       if (auth.can(AppPermission.viewReports))
                         _buildSidebarItem(Icons.bar_chart_rounded, 'Relatórios', () async {
@@ -2839,6 +2847,11 @@ class _HomePageState extends State<HomePage> {
                       if (auth.can(AppPermission.viewAppDistribution))
                         _buildSidebarItem(Icons.qr_code_2_rounded, 'Distribuição do App', () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => const DistribuicaoAppPage()));
+                          carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewFiscalDocs))
+                        _buildSidebarItem(Icons.request_quote_rounded, 'Documentos Fiscais', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentosFiscaisPage()));
                           carregarDashboard();
                         }),
                       if (auth.can(AppPermission.manageSettings))

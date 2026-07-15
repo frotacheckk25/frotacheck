@@ -66,6 +66,8 @@ enum AppRole {
           AppPermission.manageSettings,
           AppPermission.viewUsers,       AppPermission.manageUsers,
           AppPermission.viewAppDistribution,
+          AppPermission.viewFiscalDocs,  AppPermission.manageFiscalDocs,
+          AppPermission.manageFiscalSettings,
         ];
 
       // ── GESTOR: administra a operação — sem gestão de usuários, plano ou config ─
@@ -84,8 +86,10 @@ enum AppRole {
           AppPermission.viewAlerts,
           AppPermission.viewReports,
           AppPermission.viewAppDistribution,
+          AppPermission.viewFiscalDocs,  AppPermission.manageFiscalDocs,
           // NÃO tem: manageSettings, viewUsers, manageUsers,
-          //          viewAllCompanies, manageCompanies, manageSystem
+          //          viewAllCompanies, manageCompanies, manageSystem,
+          //          manageFiscalSettings
         ];
 
       // ── MOTORISTA: restrito às próprias operações do dia ─────────────────

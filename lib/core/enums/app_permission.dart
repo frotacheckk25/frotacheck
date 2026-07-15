@@ -61,4 +61,10 @@ enum AppPermission {
   // Distribuição do App (QR Code / link de instalação) — MASTER, ADMIN_EMPRESA,
   // DONO e GESTOR; MOTORISTA não tem.
   viewAppDistribution,
+
+  // Documentos Fiscais (CT-e/MDF-e/CIOT) — MASTER, ADMIN_EMPRESA e GESTOR;
+  // MOTORISTA não tem.
+  viewFiscalDocs,
+  manageFiscalDocs, // emitir/cancelar CT-e, MDF-e, CIOT
+  manageFiscalSettings, // certificado/CNPJ/IE/ambiente — não vai para GESTOR
 }

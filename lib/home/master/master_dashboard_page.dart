@@ -21,6 +21,7 @@ import '../../pages/lista_ocorrencias_page.dart';
 import '../checklists/historico_checklist_page.dart';
 import '../relatorios/relatorios_page.dart';
 import '../distribuicao/distribuicao_app_page.dart';
+import '../fiscal/documentos_fiscais_page.dart';
 import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
 
@@ -28,7 +29,7 @@ import '../configuracoes/configuracoes_page.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  planos, relatorios, distribuicao, configuracoes,
+  planos, relatorios, distribuicao, documentosFiscais, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -726,6 +727,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 navItem(Icons.payments_outlined, 'Planos', _Sec.planos, () => nav(const PlanosPage())),
                 navItem(Icons.bar_chart_rounded, 'Relatórios', _Sec.relatorios, () => nav(const RelatoriosPage())),
                 navItem(Icons.qr_code_2_rounded, 'Distribuição do App', _Sec.distribuicao, () => nav(const DistribuicaoAppPage())),
+                navItem(Icons.request_quote_rounded, 'Documentos Fiscais', _Sec.documentosFiscais, () => nav(const DocumentosFiscaisPage())),
                 catHeader('SISTEMA'),
                 navItem(Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
               ],
