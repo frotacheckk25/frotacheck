@@ -30,6 +30,7 @@ import '../shared/widgets/frota_logo.dart';
 import '../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import '../core/utils/signed_storage_url.dart';
 import 'package:provider/provider.dart';
 import '../core/auth/app_auth_provider.dart';
 import '../core/enums/app_permission.dart';
@@ -242,6 +243,7 @@ class _HomePageState extends State<HomePage> {
 
   // empresa_id do usuário logado (null = MASTER, vê tudo)
   String? _empresaId;
+  String? _empresaLogoUrl;
 
   // Sparkline state — 6-month buckets, loaded async after main data
   List<double> sparkVeiculos = [];
@@ -604,20 +606,70 @@ class _HomePageState extends State<HomePage> {
   // não filtra por empresa_id sozinho, só o RLS do SELECT normal). Filtra
   // aqui, atualiza o badge, e chama atenção com toast + som (só enquanto a
   // aba/tela do dashboard está aberta — igual ao "toast" que foi pedido).
-  void _onNovaNotificacaoRealtime(PostgresChangePayload payload) {
+  void _onNovaNotificacaoRealtime(PostgresChangePayload payload) async {
     final record = payload.newRecord;
     final recordEmpresaId = record['empresa_id']?.toString();
     if (_empresaId != null && recordEmpresaId != _empresaId) return;
 
     _checkUnreadNotificacoes();
+    if (!mounted) return;
+
+    // O payload do Realtime traz só os UUIDs crus (vehicle_id/driver_id) —
+    // resolve placa/marca/modelo/motorista aqui para o toast mostrar quem
+    // registrou, igual ao feed completo de Notificações.
+    var corpo = record['corpo']?.toString() ?? '';
+    final vehicleId = record['vehicle_id']?.toString();
+    final driverId = record['driver_id']?.toString();
+    final partes = <String>[];
+    try {
+      if (vehicleId != null) {
+        final v = await supabase
+            .from('vehicles')
+            .select('plate, brand, model')
+            .eq('id', vehicleId)
+            .maybeSingle();
+        final placa = v?['plate']?.toString();
+        final marcaModelo = [v?['brand'], v?['model']]
+            .where((e) => e != null && e.toString().isNotEmpty)
+            .join(' ');
+        if (placa != null) {
+          partes.add('veículo $placa${marcaModelo.isEmpty ? '' : ' • $marcaModelo'}');
+        }
+      }
+      if (driverId != null) {
+        final d = await supabase.from('drivers').select('name').eq('id', driverId).maybeSingle();
+        final nome = d?['name']?.toString();
+        if (nome != null) partes.add('motorista $nome');
+      }
+    } catch (_) {}
+    if (partes.isNotEmpty) corpo = '$corpo — ${partes.join(', ')}';
+
     if (mounted) {
       showNotificationToast(
         context,
         titulo: record['titulo']?.toString() ?? 'Nova notificação',
-        corpo: record['corpo']?.toString() ?? '',
+        corpo: corpo,
       );
       playNotificationSound();
     }
+  }
+
+  Future<void> _carregarLogoEmpresa() async {
+    final empresaId = context.read<AppAuthProvider>().effectiveEmpresaId;
+    if (empresaId == null) {
+      if (mounted && _empresaLogoUrl != null) setState(() => _empresaLogoUrl = null);
+      return;
+    }
+    try {
+      final row = await supabase
+          .from('empresas')
+          .select('logo_url')
+          .eq('id', empresaId)
+          .maybeSingle();
+      final raw = row?['logo_url']?.toString();
+      final signed = (raw != null && raw.isNotEmpty) ? await toSignedStorageUrl(raw) : null;
+      if (mounted) setState(() => _empresaLogoUrl = signed);
+    } catch (_) {}
   }
 
   Future<void> carregarDashboard() async {
@@ -628,6 +680,7 @@ class _HomePageState extends State<HomePage> {
       final auth = context.read<AppAuthProvider>();
       _empresaId = auth.effectiveEmpresaId;
     }
+    unawaited(_carregarLogoEmpresa());
 
     // Snapshot antes do carregamento para detectar mudanças por módulo
     final prevVeiculos        = totalVeiculos;
@@ -2964,14 +3017,32 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      initials,
-                      style: TextStyle(
-                        color: avatarColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: (_empresaLogoUrl != null && _empresaLogoUrl!.isNotEmpty)
+                        ? ClipOval(
+                            child: Image.network(
+                              _empresaLogoUrl!,
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Text(
+                                initials,
+                                style: TextStyle(
+                                  color: avatarColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            initials,
+                            style: TextStyle(
+                              color: avatarColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                   Positioned(
                     right: 0,
@@ -3522,6 +3593,7 @@ class _HomePageState extends State<HomePage> {
                 // ── Avatar ──────────────────────────────────────────────────
                 _HeaderAvatarBtn(
                   initials: initials,
+                  photoUrl: _empresaLogoUrl,
                   onTap: () async {
                     await Navigator.push(
                       context,
@@ -4295,9 +4367,10 @@ class _HeaderPrimaryBtnState extends State<_HeaderPrimaryBtn> {
 /// Circular avatar button (opens profile/settings).
 class _HeaderAvatarBtn extends StatefulWidget {
   final String initials;
+  final String? photoUrl;
   final VoidCallback onTap;
 
-  const _HeaderAvatarBtn({required this.initials, required this.onTap});
+  const _HeaderAvatarBtn({required this.initials, this.photoUrl, required this.onTap});
 
   @override
   State<_HeaderAvatarBtn> createState() => _HeaderAvatarBtnState();
@@ -4342,15 +4415,34 @@ class _HeaderAvatarBtnState extends State<_HeaderAvatarBtn> {
               ),
             ),
             alignment: Alignment.center,
-            child: Text(
-              widget.initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: (widget.photoUrl != null && widget.photoUrl!.isNotEmpty)
+                ? ClipOval(
+                    child: Image.network(
+                      widget.photoUrl!,
+                      width: 38,
+                      height: 38,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Text(
+                        widget.initials,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  )
+                : Text(
+                    widget.initials,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
           ),
         ),
       ),

@@ -5,6 +5,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../pages/lista_ocorrencias_page.dart';
+import '../abastecimentos/abastecimentos_page.dart';
+import '../alertas/alertas_page.dart';
+import '../checklists/historico_checklist_page.dart';
+import '../manutencoes/manutencoes_page.dart';
+import '../multas/multas_page.dart';
+import '../viagens/viagens_page.dart';
 
 class NotificacoesPage extends StatefulWidget {
   const NotificacoesPage({super.key});
@@ -28,7 +35,10 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
     super.initState();
     _carregar();
     _setupRealtime();
-    _fallbackTimer = Timer.periodic(const Duration(minutes: 2), (_) => _carregar());
+    _fallbackTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _carregar(),
+    );
   }
 
   @override
@@ -64,7 +74,7 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
       final eid = auth.effectiveEmpresaId;
       var q = supabase
           .from('notificacoes')
-          .select('*, vehicles(plate), drivers(name)');
+          .select('*, vehicles(plate, brand, model), drivers(name)');
       if (eid != null) q = q.eq('empresa_id', eid);
 
       final res = await q.order('created_at', ascending: false).limit(100);
@@ -271,73 +281,109 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
     final titulo = n['titulo']?.toString() ?? 'Notificação';
     final corpo = n['corpo']?.toString() ?? '';
     final placa = n['vehicles']?['plate']?.toString();
+    final marca = n['vehicles']?['brand']?.toString();
+    final modelo = n['vehicles']?['model']?.toString();
+    final marcaModelo = [
+      marca,
+      modelo,
+    ].where((v) => v != null && v.isNotEmpty).join(' ');
+    final veiculoDescricao = placa == null
+        ? null
+        : (marcaModelo.isEmpty ? placa : '$placa • $marcaModelo');
     final motorista = n['drivers']?['name']?.toString();
     final cor = _cor(tipo);
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cor.withOpacity(0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: cor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(_icone(tipo), color: cor, size: 18),
+        onTap: () => abrirTelaDaNotificacao(context, tipo),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: cor.withOpacity(0.3)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titulo,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                if (corpo.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    corpo,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
+                child: Icon(_icone(tipo), color: cor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titulo,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                ],
-                if (placa != null || motorista != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    [
-                      if (placa != null) 'Veículo $placa',
-                      if (motorista != null) 'Motorista $motorista',
-                    ].join(' · '),
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                    if (corpo.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        corpo,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    if (veiculoDescricao != null || motorista != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          if (veiculoDescricao != null)
+                            'Veículo $veiculoDescricao',
+                          if (motorista != null) 'Motorista $motorista',
+                        ].join(' · '),
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _fmtRelativo(n['created_at']?.toString()),
+                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            _fmtRelativo(n['created_at']?.toString()),
-            style: const TextStyle(color: AppColors.muted, fontSize: 11),
-          ),
-        ],
+        ),
       ),
     );
   }
+}
+
+/// Navega para a tela relacionada ao tipo de notificação (mesmo mapeamento
+/// usado tanto ao tocar no card dentro do app quanto ao tocar na notificação
+/// nativa na tela do celular — ver PushNotificationService._abrirTela).
+void abrirTelaDaNotificacao(BuildContext context, String tipo) {
+  final Widget? destino = switch (tipo) {
+    'fuelings' => const AbastecimentosPage(),
+    'manutencoes' => const ManutencoesPage(),
+    'viagens' => const ViagensPage(),
+    'checklists' => const HistoricoChecklistPage(),
+    'occurrences' => const ListaOcorrenciasPage(),
+    'multas' => const MultasPage(),
+    'alerts' => const AlertasPage(),
+    _ => null,
+  };
+  if (destino == null) return;
+  Navigator.push(context, MaterialPageRoute(builder: (_) => destino));
 }

@@ -11,20 +11,21 @@
 //   SUPABASE_SERVICE_ROLE_KEY    (já disponível automaticamente)
 //   FIREBASE_SERVICE_ACCOUNT     (JSON da service account do Firebase, como string)
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { initializeApp, cert, getApps } from "npm:firebase-admin@12/app";
-import { getMessaging } from "npm:firebase-admin@12/messaging";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.111.0";
+import { initializeApp, cert, getApps } from "npm:firebase-admin@12.7.0/app";
+import { getMessaging } from "npm:firebase-admin@12.7.0/messaging";
 
 interface Contexto {
   placa: string | null;
+  veiculoDescricao: string | null;
   motorista: string | null;
 }
 
-// Monta o trecho "— veículo ABC-1234, motorista João Silva" a partir do que
-// estiver disponível (nem todo registro tem os dois vinculados).
+// Monta o trecho "— veículo ABC-1234 (Fiat Strada), motorista João Silva" a
+// partir do que estiver disponível (nem todo registro tem os dois vinculados).
 function sufixoContexto(ctx: Contexto): string {
   const partes: string[] = [];
-  if (ctx.placa) partes.push(`veículo ${ctx.placa}`);
+  if (ctx.veiculoDescricao) partes.push(`veículo ${ctx.veiculoDescricao}`);
   if (ctx.motorista) partes.push(`motorista ${ctx.motorista}`);
   return partes.length > 0 ? ` — ${partes.join(", ")}` : "";
 }
@@ -59,7 +60,11 @@ const MENSAGENS: Record<string, { title: string | ((r: any) => string); body: (r
   },
   alerts: {
     title: "Novo alerta",
-    body: (r, ctx) => (r.message ?? "Um novo alerta foi gerado para sua frota") + sufixoContexto(ctx),
+    // alerts não tem coluna "message" — o texto real está em description/descricao
+    // (ou title/titulo, dependendo de quando o alerta foi criado).
+    body: (r, ctx) =>
+      (r.description ?? r.descricao ?? r.title ?? r.titulo ?? "Um novo alerta foi gerado para sua frota") +
+      sufixoContexto(ctx),
   },
 };
 
@@ -111,14 +116,26 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ skipped: "sem tokens cadastrados" }), { status: 200 });
     }
 
-    // 3) Busca placa do veículo e nome do motorista para dar contexto na mensagem.
-    // viagens/checklists usam veiculo_id/motorista_id em vez de vehicle_id/driver_id.
+    // 3) Busca placa/modelo do veículo e nome do motorista para dar contexto
+    // na mensagem. viagens/checklists usam veiculo_id/motorista_id em vez de
+    // vehicle_id/driver_id.
     const vehicleId = record.vehicle_id ?? record.veiculo_id;
-    const driverId = record.driver_id ?? record.motorista_id;
-    const ctx: Contexto = { placa: null, motorista: null };
+    let driverId = record.driver_id ?? record.motorista_id;
+    const ctx: Contexto = { placa: null, veiculoDescricao: null, motorista: null };
     if (vehicleId) {
-      const { data: veic } = await supabase.from("vehicles").select("plate").eq("id", vehicleId).maybeSingle();
-      ctx.placa = veic?.plate ?? null;
+      const { data: veic } = await supabase
+        .from("vehicles")
+        .select("plate, brand, model, driver_id")
+        .eq("id", vehicleId)
+        .maybeSingle();
+      if (veic) {
+        ctx.placa = veic.plate ?? null;
+        const modelo = [veic.brand, veic.model].filter(Boolean).join(" ");
+        ctx.veiculoDescricao = modelo ? `${veic.plate ?? "?"} (${modelo})` : veic.plate ?? null;
+        // manutencoes/alerts não têm coluna de motorista própria — usa o
+        // motorista atualmente atribuído ao veículo.
+        if (!driverId) driverId = veic.driver_id;
+      }
     }
     if (driverId) {
       const { data: drv } = await supabase.from("drivers").select("name").eq("id", driverId).maybeSingle();

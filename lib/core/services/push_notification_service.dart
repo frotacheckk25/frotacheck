@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../home/notificacoes/notificacoes_page.dart' show abrirTelaDaNotificacao;
+import '../navigation/root_navigator_key.dart';
+
 /// Notificações push (FCM) só existem no app Android nativo — a versão Web
 /// ainda não tem um projeto Firebase Web configurado (VAPID key / service
 /// worker), então nem tentamos inicializar lá.
@@ -30,6 +33,7 @@ class PushNotificationService {
   final _localNotifications = FlutterLocalNotificationsPlugin();
   StreamSubscription<String>? _tokenRefreshSub;
   StreamSubscription<RemoteMessage>? _foregroundSub;
+  StreamSubscription<RemoteMessage>? _openedAppSub;
   bool _initialized = false;
 
   static const _androidChannel = AndroidNotificationChannel(
@@ -53,6 +57,9 @@ class PushNotificationService {
         const InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         ),
+        // Toque numa notificação exibida enquanto o app já estava aberto
+        // (via flutter_local_notifications, ver _showForegroundNotification).
+        onDidReceiveNotificationResponse: _onLocalNotificationTap,
       );
 
       final settings = await _messaging.requestPermission(
@@ -69,6 +76,13 @@ class PushNotificationService {
       _tokenRefreshSub = _messaging.onTokenRefresh.listen(_saveToken);
 
       _foregroundSub = FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+
+      // Toque na notificação nativa com o app em segundo plano (não fechado).
+      _openedAppSub = FirebaseMessaging.onMessageOpenedApp.listen(_abrirTelaDoRemoteMessage);
+
+      // App estava fechado e foi aberto tocando na notificação (cold start).
+      final initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) _abrirTelaDoRemoteMessage(initialMessage);
     } catch (e) {
       debugPrint('Erro ao inicializar notificações push: $e');
     }
@@ -109,7 +123,32 @@ class PushNotificationService {
           priority: Priority.high,
         ),
       ),
+      // Repassa o tipo (nome da tabela de origem) para o toque poder abrir a
+      // tela certa — ver _onLocalNotificationTap.
+      payload: message.data['table']?.toString(),
     );
+  }
+
+  // Toque na notificação exibida via flutter_local_notifications (app já
+  // estava em primeiro plano quando ela chegou).
+  void _onLocalNotificationTap(NotificationResponse response) {
+    final tipo = response.payload;
+    if (tipo == null || tipo.isEmpty) return;
+    _abrirTela(tipo);
+  }
+
+  // Toque na notificação nativa exibida pelo próprio FCM (app em segundo
+  // plano ou recém-aberto a partir dela — cold start).
+  void _abrirTelaDoRemoteMessage(RemoteMessage message) {
+    final tipo = message.data['table']?.toString();
+    if (tipo == null || tipo.isEmpty) return;
+    _abrirTela(tipo);
+  }
+
+  void _abrirTela(String tipo) {
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx == null) return;
+    abrirTelaDaNotificacao(ctx, tipo);
   }
 
   /// Chame ao fazer logout — evita que o próximo usuário do mesmo aparelho
@@ -131,5 +170,6 @@ class PushNotificationService {
   void dispose() {
     _tokenRefreshSub?.cancel();
     _foregroundSub?.cancel();
+    _openedAppSub?.cancel();
   }
 }
