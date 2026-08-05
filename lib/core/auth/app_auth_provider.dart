@@ -12,6 +12,33 @@ class AppAuthProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<AuthState>? _authSub;
 
+  // F-06 (auditoria de segurança 2026-07-29): true quando a conta tem um
+  // fator MFA verificado mas a sessão atual ainda não completou o desafio
+  // (aal1, com aal2 disponível) — o AppGuard mostra a tela de desafio em
+  // vez do app até isso ficar false.
+  bool _mfaPending = false;
+  bool get needsMfaChallenge => _mfaPending;
+
+  // Recuperação de senha: true assim que a sessão chega via link de e-mail
+  // "esqueci minha senha" (AuthChangeEvent.passwordRecovery). O AppGuard
+  // mostra a tela de definir nova senha em vez do app normal até isso ficar
+  // false — sem essa checagem, o usuário cairia direto no dashboard com a
+  // senha antiga ainda válida, sem nunca ver a tela de troca.
+  bool _passwordRecoveryPending = false;
+  bool get needsPasswordReset => _passwordRecoveryPending;
+
+  /// Chamado pela tela de nova senha após `auth.updateUser` ter sucesso.
+  Future<void> clearPasswordRecovery() async {
+    _passwordRecoveryPending = false;
+    await _loadProfile();
+  }
+
+  void _refreshMfaStatus() {
+    final aal = _supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    _mfaPending = aal.currentLevel == AuthenticatorAssuranceLevels.aal1 &&
+        aal.nextLevel == AuthenticatorAssuranceLevels.aal2;
+  }
+
   // Monotonically increasing counter — each _loadProfile() call captures its
   // own generation. If a newer call starts before the older one finishes, the
   // older call's results are silently discarded, preventing stale writes.
@@ -88,10 +115,21 @@ class AppAuthProvider extends ChangeNotifier {
         case AuthChangeEvent.signedOut:
         case AuthChangeEvent.userDeleted:
           _profile = null;
+          _mfaPending = false;
+          _passwordRecoveryPending = false;
+          _loading = false;
+          notifyListeners();
+        case AuthChangeEvent.passwordRecovery:
+          // Sessão válida chegou via link de recuperação — NÃO carrega o
+          // perfil ainda (isso levaria o AppGuard a mostrar o dashboard
+          // direto). Só libera o carregamento normal depois que a nova
+          // senha for definida, via clearPasswordRecovery().
+          _passwordRecoveryPending = true;
           _loading = false;
           notifyListeners();
         case AuthChangeEvent.signedIn:
         case AuthChangeEvent.tokenRefreshed:
+        case AuthChangeEvent.mfaChallengeVerified:
           _loadProfile();
         default:
           break;
@@ -120,6 +158,8 @@ class AppAuthProvider extends ChangeNotifier {
         _profile = null;
         return;
       }
+
+      _refreshMfaStatus();
 
       final res = await _supabase
           .from('user_profiles')
@@ -175,6 +215,7 @@ class AppAuthProvider extends ChangeNotifier {
     }
     await _supabase.auth.signOut();
     _profile = null;
+    _mfaPending = false;
     notifyListeners();
   }
 

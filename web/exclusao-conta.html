@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Exclusão de Conta e Dados — FrotaCheck</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0B0F14;
+    --surface: #121820;
+    --border: #262F3A;
+    --text: #E9ECEF;
+    --text-dim: #9AA7B4;
+    --accent: #3B82F6;
+    --warn: #F59E0B;
+    --warn-bg: rgba(245, 158, 11, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .page { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  .updated { color: var(--text-dim); font-size: 13px; margin-bottom: 40px; }
+  h2 { font-size: 19px; margin: 40px 0 12px; border-top: 1px solid var(--border); padding-top: 28px; }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  p, li { color: var(--text-dim); font-size: 15px; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  strong { color: var(--text); }
+  .contact {
+    margin-top: 40px;
+    padding: 18px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .contact p { color: var(--text); margin: 0; }
+  .contact p + p { margin-top: 8px; }
+  .note {
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: var(--warn-bg);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 10px;
+  }
+  .note p { color: var(--text); margin: 0; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  th { color: var(--text); font-weight: 600; }
+  td { color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Exclusão de Conta e Dados do FrotaCheck</h1>
+  <p class="updated">Última atualização: 15 de julho de 2026 — Desenvolvedor: FrotaCheck</p>
+
+  <p>Esta página explica como solicitar a exclusão da sua conta e dos dados pessoais associados ao <strong>FrotaCheck</strong>, aplicativo de gestão de frotas disponível para Web e Android, conforme a Lei Geral de Proteção de Dados (LGPD).</p>
+
+  <h2>1. Quem pode solicitar</h2>
+  <p>Qualquer usuário com conta ativa no FrotaCheck pode solicitar a exclusão — seja <strong>motorista</strong>, <strong>gestor</strong> ou <strong>administrador da empresa (ADMIN_EMPRESA)</strong>.</p>
+
+  <h2>2. Como solicitar a exclusão</h2>
+  <p>Existem duas formas de solicitar, dependendo do seu papel:</p>
+  <ol>
+    <li><strong>Motoristas e gestores:</strong> peça ao administrador da sua empresa (ADMIN_EMPRESA) para remover seu cadastro pela tela de Usuários do aplicativo, ou envie um pedido diretamente para o e-mail de suporte abaixo, informando seu nome completo e a empresa à qual está vinculado.</li>
+    <li><strong>Administradores de empresa:</strong> envie um pedido para o e-mail de suporte abaixo solicitando a exclusão da conta da empresa. Por afetar todos os usuários vinculados (motoristas e gestores), pedimos confirmação por e-mail antes de processar.</li>
+  </ol>
+  <p>Respondemos e concluímos os pedidos em até <strong>15 dias corridos</strong> a partir da confirmação.</p>
+
+  <h2>3. O que é excluído</h2>
+  <table>
+    <tr><th>Dado</th><th>O que acontece</th></tr>
+    <tr><td>Nome, e-mail, telefone, foto de perfil</td><td>Excluídos permanentemente</td></tr>
+    <tr><td>Número e validade da CNH</td><td>Excluídos permanentemente</td></tr>
+    <tr><td>Fotos de checklists, abastecimentos, ocorrências, multas e pneus</td><td>Excluídas permanentemente</td></tr>
+    <tr><td>Documentos anexados (ex.: cópia de CNH, CRLV)</td><td>Excluídos permanentemente</td></tr>
+    <tr><td>Token de notificação (Android)</td><td>Excluído permanentemente</td></tr>
+    <tr><td>Credenciais de acesso (senha)</td><td>Excluídas permanentemente</td></tr>
+  </table>
+
+  <h2>4. O que pode ser mantido, e por quê</h2>
+  <p>Alguns registros vinculados à sua conta podem ser mantidos por período adicional quando a lei exigir, mesmo após a exclusão dos seus dados pessoais diretos:</p>
+  <ul>
+    <li><strong>Documentos fiscais</strong> (ex.: CT-e emitidos com sua vinculação como motorista) — a legislação tributária brasileira exige retenção de documentos fiscais por período determinado, independentemente da exclusão da conta pessoal. Nesses casos, seu nome é desvinculado sempre que tecnicamente possível, mantendo apenas o registro fiscal exigido por lei.</li>
+    <li><strong>Registros de auditoria e segurança</strong> (ex.: logs de acesso) — mantidos pelo prazo mínimo exigido pelo Marco Civil da Internet (Lei nº 12.965/2014), atualmente 6 meses.</li>
+  </ul>
+  <div class="note">
+    <p>Fora dessas exceções legais, não mantemos nenhum dado pessoal após a conclusão do pedido de exclusão.</p>
+  </div>
+
+  <h2>5. Excluir só uma parte dos dados</h2>
+  <p>Se você quiser apenas corrigir ou remover um dado específico (por exemplo, uma foto de perfil), sem excluir a conta inteira, pode solicitar isso da mesma forma, especificando o que deseja remover.</p>
+
+  <div class="contact">
+    <p><strong>E-mail para solicitações:</strong> <a href="mailto:frotafrtotacheck@gmail.com">frotafrtotacheck@gmail.com</a></p>
+    <p>Inclua no e-mail: nome completo, e-mail cadastrado no app, e nome da empresa (se aplicável).</p>
+  </div>
+</div>
+</body>
+</html>

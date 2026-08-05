@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/config/app_links.dart';
 import '../../core/utils/credential_storage.dart';
+import '../../core/utils/login_lockout.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'register_page.dart';
 
@@ -58,20 +60,32 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     if (_formKey.currentState?.validate() != true) return;
+    final email = _emailCtrl.text.trim();
+
+    final bloqueadoPor = await checarBloqueio(email);
+    if (bloqueadoPor > 0) {
+      if (mounted) {
+        showError(context, 'Muitas tentativas. Tente novamente em ${bloqueadoPor}s.');
+      }
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailCtrl.text.trim(),
+        email: email,
         password: _passCtrl.text.trim(),
       );
+      await limparTentativasFalhas(email);
       // Navigation is handled by AppAuthProvider → AppGuard → _MasterAwareRouter.
       // Do NOT push any route here — the guard rebuilds with the correct role.
       if (_lembrarSenha) {
-        await salvarCredenciais(email: _emailCtrl.text.trim(), senha: _passCtrl.text.trim());
+        await salvarCredenciais(email: email, senha: _passCtrl.text.trim());
       } else {
         await limparCredenciaisSalvas();
       }
     } catch (e) {
+      await registrarTentativaFalha(email);
       if (!mounted) return;
       showError(context, _loginError(e.toString()));
     } finally {
@@ -126,12 +140,18 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+      await Supabase.instance.client.auth
+          .resetPasswordForEmail(email, redirectTo: kFrotaCheckPwaUrl);
       if (!mounted) return;
       showSuccess(context, 'Email de recuperação enviado');
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      showError(context, 'Não foi possível enviar. Contate o administrador.');
+      final raw = e.toString().toLowerCase();
+      if (raw.contains('over_email_send_rate_limit') || raw.contains('rate limit')) {
+        showError(context, 'Muitos pedidos de recuperação seguidos. Aguarde alguns minutos e tente de novo.');
+      } else {
+        showError(context, 'Não foi possível enviar. Contate o administrador.');
+      }
     }
   }
 

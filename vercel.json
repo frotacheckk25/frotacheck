@@ -3,7 +3,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/((?!assets|flutter_bootstrap\\.js|main\\.dart\\.js|manifest\\.json|favicon\\.png|icons|canvaskit|flutter_service_worker\\.js|privacidade\\.html).*)", "destination": "/index.html" }
+    { "source": "/((?!assets|flutter_bootstrap\\.js|main\\.dart\\.js|manifest\\.json|favicon\\.png|icons|canvaskit|flutter_service_worker\\.js|privacidade\\.html|fc_boot\\.js|custom_sw\\.js|exclusao-conta\\.html).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -65,7 +65,8 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "Permissions-Policy", "value": "payment=(), usb=(), magnetometer=(), gyroscope=(), interest-cohort=()" }
+        { "key": "Permissions-Policy", "value": "payment=(), usb=(), magnetometer=(), gyroscope=(), interest-cohort=()" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://rseefinwtlrjhzosvmgt.supabase.co; font-src 'self' data:; connect-src 'self' https://rseefinwtlrjhzosvmgt.supabase.co wss://rseefinwtlrjhzosvmgt.supabase.co https://fonts.gstatic.com; media-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" }
       ]
     }
   ]

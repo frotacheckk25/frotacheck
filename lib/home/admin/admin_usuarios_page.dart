@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/config/app_links.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
@@ -973,7 +974,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                               return;
                             }
                             try {
-                              await tmpClient.auth.resetPasswordForEmail(email);
+                              await tmpClient.auth.resetPasswordForEmail(email, redirectTo: kFrotaCheckPwaUrl);
                             } catch (_) {}
                           } finally {
                             await tmpClient.dispose();
