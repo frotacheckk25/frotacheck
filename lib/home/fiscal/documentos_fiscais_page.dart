@@ -9,9 +9,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'configuracoes_fiscais_page.dart';
 import 'novo_cte_page.dart';
+import 'novo_mdfe_page.dart';
 
-/// Lista de Documentos Fiscais (CT-e/MDF-e/CIOT). MDF-e e CIOT ainda não têm
-/// emissão implementada (Fases 2/3) — a aba existe desde já para não exigir
+/// Lista de Documentos Fiscais (CT-e/MDF-e/CIOT). CIOT ainda não tem
+/// emissão implementada (Fase 3) — a aba existe desde já para não exigir
 /// retrabalho de navegação depois.
 class DocumentosFiscaisPage extends StatefulWidget {
   const DocumentosFiscaisPage({super.key});
@@ -32,6 +33,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
   String? _selectedEmpresaNome;
 
   List<Map<String, dynamic>> _cteDocs = [];
+  List<Map<String, dynamic>> _mdfeDocs = [];
 
   @override
   void initState() {
@@ -64,7 +66,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
         _selectedEmpresaNome = auth.empresaNome;
       }
 
-      await _carregarCte();
+      await Future.wait([_carregarCte(), _carregarMdfe()]);
     } catch (e) {
       if (mounted) showError(context, friendlyError(e));
     } finally {
@@ -86,6 +88,20 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
     setState(() => _cteDocs = List<Map<String, dynamic>>.from(res as List));
   }
 
+  Future<void> _carregarMdfe() async {
+    if (_selectedEmpresaId == null) {
+      setState(() => _mdfeDocs = []);
+      return;
+    }
+    final res = await _supabase
+        .from('mdfe_documentos')
+        .select('*')
+        .eq('empresa_id', _selectedEmpresaId!)
+        .order('criado_em', ascending: false)
+        .limit(200);
+    setState(() => _mdfeDocs = List<Map<String, dynamic>>.from(res as List));
+  }
+
   Future<void> _abrirNovoCte() async {
     if (_selectedEmpresaId == null) return;
     final criado = await Navigator.push<bool>(
@@ -93,6 +109,15 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
       MaterialPageRoute(builder: (_) => NovoCtePage(empresaId: _selectedEmpresaId!)),
     );
     if (criado == true) _carregarCte();
+  }
+
+  Future<void> _abrirNovoMdfe() async {
+    if (_selectedEmpresaId == null) return;
+    final criado = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => NovoMdfePage(empresaId: _selectedEmpresaId!)),
+    );
+    if (criado == true) _carregarMdfe();
   }
 
   Future<void> _abrirConfiguracoes() async {
@@ -193,6 +218,123 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
     }
   }
 
+  Future<void> _cancelarMdfe(Map<String, dynamic> doc) async {
+    final justificativaCtrl = TextEditingController();
+    final justificativa = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Cancelar MDF-e', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: justificativaCtrl,
+          maxLines: 3,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Justificativa (mínimo 15 caracteres, exigência da SEFAZ)',
+            hintStyle: TextStyle(color: AppColors.textSecondary),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Voltar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, justificativaCtrl.text),
+            child: const Text('Confirmar Cancelamento', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (justificativa == null || justificativa.length < 15) {
+      if (justificativa != null && mounted) {
+        showError(context, 'Justificativa precisa ter no mínimo 15 caracteres');
+      }
+      return;
+    }
+
+    try {
+      final resposta = await _supabase.functions.invoke('fiscal-mdfe-cancelar', body: {
+        'empresa_id': _selectedEmpresaId,
+        'chave_acesso': doc['chave_acesso'],
+        'justificativa': justificativa,
+      });
+      final data = Map<String, dynamic>.from(resposta.data as Map);
+      if (data['ok'] != true) throw Exception(data['erro'] ?? 'Falha ao cancelar');
+      if (mounted) showSuccess(context, 'MDF-e cancelado!');
+      _carregarMdfe();
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
+  Future<void> _consultarMdfe(Map<String, dynamic> doc) async {
+    try {
+      final resposta = await _supabase.functions.invoke('fiscal-mdfe-consultar', body: {
+        'empresa_id': _selectedEmpresaId,
+        'chave_acesso': doc['chave_acesso'],
+      });
+      final data = Map<String, dynamic>.from(resposta.data as Map);
+      if (data['ok'] != true) throw Exception(data['erro'] ?? 'Falha ao consultar');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('Situação na SEFAZ', style: TextStyle(color: Colors.white)),
+            content: SingleChildScrollView(
+              child: Text(data['resposta_acbr']?.toString() ?? '—',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar'))],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
+  Future<void> _encerrarMdfe(Map<String, dynamic> doc) async {
+    final municipioCtrl = TextEditingController();
+    final municipio = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Encerrar MDF-e', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: municipioCtrl,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Código IBGE do município de encerramento',
+            hintStyle: TextStyle(color: AppColors.textSecondary),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Voltar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, municipioCtrl.text),
+            child: const Text('Confirmar Encerramento'),
+          ),
+        ],
+      ),
+    );
+    if (municipio == null || municipio.trim().isEmpty) return;
+
+    try {
+      final resposta = await _supabase.functions.invoke('fiscal-mdfe-encerrar', body: {
+        'empresa_id': _selectedEmpresaId,
+        'chave_acesso': doc['chave_acesso'],
+        'municipio_codigo_ibge': municipio.trim(),
+      });
+      final data = Map<String, dynamic>.from(resposta.data as Map);
+      if (data['ok'] != true) throw Exception(data['erro'] ?? 'Falha ao encerrar');
+      if (mounted) showSuccess(context, 'MDF-e encerrado!');
+      _carregarMdfe();
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AppAuthProvider>();
@@ -219,11 +361,11 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
           tabs: const [Tab(text: 'CT-e'), Tab(text: 'MDF-e'), Tab(text: 'CIOT')],
         ),
       ),
-      floatingActionButton: (permitido && podeGerenciar && _tabController.index == 0 && _selectedEmpresaId != null)
+      floatingActionButton: (permitido && podeGerenciar && _selectedEmpresaId != null && _tabController.index <= 1)
           ? FloatingActionButton.extended(
-              onPressed: _abrirNovoCte,
+              onPressed: _tabController.index == 0 ? _abrirNovoCte : _abrirNovoMdfe,
               icon: const Icon(Icons.add),
-              label: const Text('Emitir CT-e'),
+              label: Text(_tabController.index == 0 ? 'Emitir CT-e' : 'Emitir MDF-e'),
               backgroundColor: AppColors.primary,
             )
           : null,
@@ -244,9 +386,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
                         controller: _tabController,
                         children: [
                           _cteList(),
-                          const Center(
-                            child: Text('MDF-e — em breve', style: TextStyle(color: AppColors.textSecondary)),
-                          ),
+                          _mdfeList(),
                           const Center(
                             child: Text('CIOT — em breve', style: TextStyle(color: AppColors.textSecondary)),
                           ),
@@ -291,6 +431,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
                   _selectedEmpresaNome = emp['nome']?.toString();
                 });
                 _carregarCte();
+                _carregarMdfe();
               },
             ),
           ),
@@ -310,7 +451,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: _cteDocs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, i) => _cteCard(_cteDocs[i]),
       ),
     );
@@ -382,6 +523,101 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
             if (status == 'erro' || status == 'enviando')
               OutlinedButton.icon(
                 onPressed: () => _consultar(doc),
+                icon: const Icon(Icons.search_rounded, size: 14),
+                label: const Text('Consultar situação', style: TextStyle(fontSize: 12)),
+              ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _mdfeList() {
+    if (_mdfeDocs.isEmpty) {
+      return const Center(
+        child: Text('Nenhum MDF-e emitido ainda.', style: TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _carregarMdfe,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _mdfeDocs.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (context, i) => _mdfeCard(_mdfeDocs[i]),
+      ),
+    );
+  }
+
+  Widget _mdfeCard(Map<String, dynamic> doc) {
+    final status = doc['status']?.toString() ?? 'rascunho';
+    final (statusColor, statusLabel) = switch (status) {
+      'autorizado' => (AppColors.success, 'Autorizado'),
+      'encerrado' => (AppColors.info, 'Encerrado'),
+      'rejeitado' => (AppColors.danger, 'Rejeitado'),
+      'cancelado' => (AppColors.textSecondary, 'Cancelado'),
+      'erro' => (AppColors.danger, 'Erro'),
+      'enviando' => (AppColors.warning, 'Enviando'),
+      _ => (AppColors.info, 'Rascunho'),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text('MDF-e nº ${doc['numero_mdfe'] ?? '—'} / série ${doc['serie'] ?? '—'}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          if (doc['chave_acesso'] != null)
+            Text('Chave: ${doc['chave_acesso']}',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 10.5)),
+          if (status == 'rejeitado' || status == 'erro')
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(doc['motivo_rejeicao']?.toString() ?? '',
+                  style: const TextStyle(color: AppColors.danger, fontSize: 11.5)),
+            ),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            if (doc['xml_autorizado_url'] != null)
+              OutlinedButton.icon(
+                onPressed: () => _verXml(doc['xml_autorizado_url']),
+                icon: const Icon(Icons.description_rounded, size: 14),
+                label: const Text('Ver XML', style: TextStyle(fontSize: 12)),
+              ),
+            if (status == 'autorizado')
+              OutlinedButton.icon(
+                onPressed: () => _encerrarMdfe(doc),
+                icon: const Icon(Icons.flag_rounded, size: 14),
+                label: const Text('Encerrar viagem', style: TextStyle(fontSize: 12)),
+              ),
+            if (status == 'autorizado')
+              OutlinedButton.icon(
+                onPressed: () => _cancelarMdfe(doc),
+                icon: const Icon(Icons.cancel_rounded, size: 14, color: AppColors.danger),
+                label: const Text('Cancelar', style: TextStyle(fontSize: 12, color: AppColors.danger)),
+              ),
+            if (status == 'erro' || status == 'enviando')
+              OutlinedButton.icon(
+                onPressed: () => _consultarMdfe(doc),
                 icon: const Icon(Icons.search_rounded, size: 14),
                 label: const Text('Consultar situação', style: TextStyle(fontSize: 12)),
               ),

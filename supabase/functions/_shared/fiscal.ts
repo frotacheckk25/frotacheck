@@ -3,7 +3,7 @@
 // trigger, fail-open), estas são chamadas direto do Flutter via
 // supabase.functions.invoke(...) e precisam validar o chamador elas mesmas —
 // a RLS deste projeto só garante isolamento de tenant, não permissão fina.
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.111.0";
 
 export interface CallerInfo {
   userId: string;
