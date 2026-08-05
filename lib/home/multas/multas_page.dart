@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/image_validation.dart';
 import '../../core/widgets/signed_network_image.dart';
 import '../../core/guards/permission_guard.dart';
 
@@ -777,6 +778,10 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
       }
       if (img != null) {
         final bytes = await img.readAsBytes();
+        if (!isValidImageBytes(bytes)) {
+          if (mounted) showError(context, 'Arquivo não é uma imagem válida.');
+          return;
+        }
         if (mounted) setState(() => fotoBytes = bytes);
       }
     } catch (e) {

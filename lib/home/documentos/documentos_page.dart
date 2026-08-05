@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/signed_storage_url.dart';
+import '../../core/utils/image_validation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class DocumentosPage extends StatefulWidget {
@@ -791,6 +792,14 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
       if (arquivoSelecionado.size > _tamanhoMaximoArquivoBytes) {
         if (mounted) {
           showError(context, 'Arquivo muito grande. O tamanho máximo permitido é 15MB.');
+        }
+        return;
+      }
+      final ext = arquivoSelecionado.extension?.toLowerCase() ?? '';
+      final bytes = arquivoSelecionado.bytes;
+      if (bytes == null || !isValidDocumentBytes(ext, bytes)) {
+        if (mounted) {
+          showError(context, 'Arquivo inválido ou corrompido.');
         }
         return;
       }

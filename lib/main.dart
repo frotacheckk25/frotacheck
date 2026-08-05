@@ -15,6 +15,7 @@ import 'core/theme/app_theme.dart';
 import 'core/auth/app_auth_provider.dart';
 import 'core/enums/app_role.dart';
 import 'core/guards/app_guard.dart';
+import 'core/navigation/root_navigator_key.dart';
 import 'core/utils/page_reload.dart';
 import 'core/services/push_notification_service.dart';
 
@@ -106,6 +107,7 @@ class FrotaCheckApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => AppAuthProvider()..initialize(),
       child: MaterialApp(
+        navigatorKey: rootNavigatorKey,
         debugShowCheckedModeBanner: false,
         title: 'FrotaCheck',
         theme: AppTheme.darkTheme,

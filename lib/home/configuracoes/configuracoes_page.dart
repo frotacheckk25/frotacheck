@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/signed_storage_url.dart';
+import '../../core/utils/image_validation.dart';
 import '../fiscal/configuracoes_fiscais_page.dart';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
@@ -52,6 +54,16 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
   bool _showNovaSenha    = false;
   bool _showConfirmar    = false;
 
+  // ── MFA (F-06 da auditoria de segurança 2026-07-29) ───────────────────────
+  bool _mfaLoading = true;
+  bool _mfaEnrolled = false;
+  String? _mfaFactorId;
+  String? _mfaEnrollFactorId;
+  String? _mfaEnrollUri;
+  String? _mfaEnrollSecret;
+  final _mfaCodeCtrl = TextEditingController();
+  bool _mfaBusy = false;
+
   // ── Notificações/Integrações ──────────────────────────────────────────────
   bool _auditoriaAtiva   = true;
   bool _alertaGasto      = true;
@@ -93,6 +105,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
     _emailCtrl.dispose();    _emailRelCtrl.dispose(); _enderecoCtrl.dispose();
     _perfilNomeCtrl.dispose(); _perfilFoneCtrl.dispose();
     _senhaAtualCtrl.dispose(); _novaSenhaCtrl.dispose(); _confirmarCtrl.dispose();
+    _mfaCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -105,6 +118,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
 
     // Perfil pessoal — disponível para qualquer role
     _perfilNomeCtrl.text = auth.profile?.nome ?? '';
+
+    if (auth.can(AppPermission.manageMfa)) {
+      _carregarMfaStatus();
+    } else {
+      _mfaLoading = false;
+    }
 
     // Master não tem empresa — carrega só o perfil e libera a tela
     if (_isMaster && _empresaId == null) {
@@ -268,6 +287,11 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       setState(() => _uploadingLogo = true);
 
       final bytes = await picked.readAsBytes();
+      if (!isValidImageBytes(bytes)) {
+        setState(() => _uploadingLogo = false);
+        if (mounted) showError(context, 'Arquivo não é uma imagem válida.');
+        return;
+      }
       final ext = picked.name.split('.').last.toLowerCase();
       final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
       final path = '$_empresaId/logo.$ext';
@@ -760,6 +784,18 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         const SizedBox(height: 16),
         _saveBtn(label: 'Alterar Senha', saving: _savingSenha, onTap: _alterarSenha, color: _blue),
 
+        if (context.watch<AppAuthProvider>().can(AppPermission.manageMfa)) ...[
+          const SizedBox(height: 32),
+          _sectionTitle('Verificação em Duas Etapas'),
+          const SizedBox(height: 4),
+          const Text(
+            'Exige um código do seu aplicativo autenticador (Google Authenticator, Authy etc.) a cada login, além da senha.',
+            style: TextStyle(color: _sub, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          _buildMfaCard(),
+        ],
+
         const SizedBox(height: 32),
         _sectionTitle('Sessão'),
         const SizedBox(height: 12),
@@ -801,6 +837,233 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
         )),
       ]),
     );
+  }
+
+  // ── MFA (F-06 da auditoria de segurança 2026-07-29) ───────────────────────
+
+  Future<void> _carregarMfaStatus() async {
+    try {
+      final factors = await _supabase.auth.mfa.listFactors();
+      if (!mounted) return;
+      setState(() {
+        _mfaEnrolled = factors.totp.isNotEmpty;
+        _mfaFactorId = factors.totp.isNotEmpty ? factors.totp.first.id : null;
+        _mfaLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar status MFA: $e');
+      if (mounted) setState(() => _mfaLoading = false);
+    }
+  }
+
+  Future<void> _iniciarEnrollamentoMfa() async {
+    setState(() => _mfaBusy = true);
+    try {
+      final res = await _supabase.auth.mfa.enroll(
+        factorType: FactorType.totp,
+        issuer: 'FrotaCheck',
+        friendlyName: 'FrotaCheck-${DateTime.now().millisecondsSinceEpoch}',
+      );
+      if (!mounted) return;
+      setState(() {
+        _mfaEnrollFactorId = res.id;
+        _mfaEnrollUri = res.totp?.uri;
+        _mfaEnrollSecret = res.totp?.secret;
+      });
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _mfaBusy = false);
+    }
+  }
+
+  Future<void> _cancelarEnrollamentoMfa() async {
+    final factorId = _mfaEnrollFactorId;
+    setState(() {
+      _mfaEnrollFactorId = null;
+      _mfaEnrollUri = null;
+      _mfaEnrollSecret = null;
+      _mfaCodeCtrl.clear();
+    });
+    // Remove o fator não-verificado que ficou pra trás — best-effort, não
+    // bloqueia a UI se falhar (o fator órfão não verificado não conta pra
+    // AAL de ninguém, só polui a lista).
+    if (factorId != null) {
+      try {
+        await _supabase.auth.mfa.unenroll(factorId);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _confirmarEnrollamentoMfa() async {
+    final code = _mfaCodeCtrl.text.trim();
+    final factorId = _mfaEnrollFactorId;
+    if (factorId == null || code.length != 6) {
+      showError(context, 'Digite os 6 dígitos do código.');
+      return;
+    }
+    setState(() => _mfaBusy = true);
+    try {
+      await _supabase.auth.mfa.challengeAndVerify(factorId: factorId, code: code);
+      if (!mounted) return;
+      setState(() {
+        _mfaEnrolled = true;
+        _mfaFactorId = factorId;
+        _mfaEnrollFactorId = null;
+        _mfaEnrollUri = null;
+        _mfaEnrollSecret = null;
+        _mfaCodeCtrl.clear();
+      });
+      showSuccess(context, 'Verificação em duas etapas ativada!');
+    } catch (e) {
+      if (mounted) showError(context, 'Código inválido. Verifique o app autenticador e tente novamente.');
+    } finally {
+      if (mounted) setState(() => _mfaBusy = false);
+    }
+  }
+
+  Future<void> _desativarMfa() async {
+    final factorId = _mfaFactorId;
+    if (factorId == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _surface,
+        title: const Text('Desativar verificação em duas etapas?', style: TextStyle(color: _white)),
+        content: const Text(
+          'Sua conta passará a exigir apenas a senha para entrar. Isso reduz a proteção contra acesso indevido.',
+          style: TextStyle(color: _sub),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar', style: TextStyle(color: _muted))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Desativar', style: TextStyle(color: _red))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    setState(() => _mfaBusy = true);
+    try {
+      await _supabase.auth.mfa.unenroll(factorId);
+      if (!mounted) return;
+      setState(() {
+        _mfaEnrolled = false;
+        _mfaFactorId = null;
+      });
+      showSuccess(context, 'Verificação em duas etapas desativada.');
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _mfaBusy = false);
+    }
+  }
+
+  Widget _buildMfaCard() {
+    if (_mfaLoading) {
+      return _card(const Padding(
+        padding: EdgeInsets.all(20),
+        child: Center(child: CircularProgressIndicator(color: _blue)),
+      ));
+    }
+
+    // Meio de um novo cadastro: mostra QR + secret + campo de código.
+    if (_mfaEnrollUri != null) {
+      return _card(Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('1. Escaneie o QR code no seu app autenticador',
+              style: TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 14),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+              child: QrImageView(data: _mfaEnrollUri!, version: QrVersions.auto, size: 180),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text('Ou digite manualmente esta chave:',
+              style: TextStyle(color: _sub, fontSize: 12)),
+          const SizedBox(height: 4),
+          SelectableText(_mfaEnrollSecret ?? '',
+              style: const TextStyle(color: _blue, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1)),
+          const SizedBox(height: 20),
+          const Text('2. Digite o código de 6 dígitos gerado pelo app',
+              style: TextStyle(color: _white, fontSize: 13, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _mfaCodeCtrl,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: _white, fontSize: 20, letterSpacing: 6),
+            decoration: const InputDecoration(
+              counterText: '',
+              hintText: '000000',
+              hintStyle: TextStyle(color: _muted, letterSpacing: 6),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _mfaBusy ? null : _cancelarEnrollamentoMfa,
+                style: OutlinedButton.styleFrom(foregroundColor: _muted, side: const BorderSide(color: _border)),
+                child: const Text('Cancelar'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _mfaBusy ? null : _confirmarEnrollamentoMfa,
+                style: ElevatedButton.styleFrom(backgroundColor: _blue, foregroundColor: _white),
+                child: _mfaBusy
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _white))
+                    : const Text('Confirmar'),
+              ),
+            ),
+          ]),
+        ]),
+      ));
+    }
+
+    if (_mfaEnrolled) {
+      return _card(ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(color: _green.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(Icons.verified_user_rounded, color: _green, size: 18),
+        ),
+        title: const Text('Ativada', style: TextStyle(color: _green, fontWeight: FontWeight.w600, fontSize: 14)),
+        subtitle: const Text('Sua conta exige um código de verificação a cada login.',
+            style: TextStyle(color: _sub, fontSize: 12)),
+        trailing: TextButton(
+          onPressed: _mfaBusy ? null : _desativarMfa,
+          child: _mfaBusy
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: _red))
+              : const Text('Desativar', style: TextStyle(color: _red)),
+        ),
+      ));
+    }
+
+    return _card(ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(color: _blue.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+        child: const Icon(Icons.shield_outlined, color: _blue, size: 18),
+      ),
+      title: const Text('Desativada', style: TextStyle(color: _white, fontWeight: FontWeight.w600, fontSize: 14)),
+      subtitle: const Text('Recomendado para contas com acesso total à empresa.',
+          style: TextStyle(color: _sub, fontSize: 12)),
+      trailing: TextButton(
+        onPressed: _mfaBusy ? null : _iniciarEnrollamentoMfa,
+        child: _mfaBusy
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: _blue))
+            : const Text('Ativar', style: TextStyle(color: _blue)),
+      ),
+    ));
   }
 
   // ── Tab: Notificações ─────────────────────────────────────────────────────

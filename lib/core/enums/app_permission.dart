@@ -67,4 +67,10 @@ enum AppPermission {
   viewFiscalDocs,
   manageFiscalDocs, // emitir/cancelar CT-e, MDF-e, CIOT
   manageFiscalSettings, // certificado/CNPJ/IE/ambiente — não vai para GESTOR
+
+  // Segurança da própria conta (MFA/TOTP) — MASTER e ADMIN_EMPRESA apenas
+  // (F-06 da auditoria de segurança de 2026-07-29): são os papéis com maior
+  // raio de impacto se a conta for comprometida, então só eles têm a tela
+  // de habilitar/desabilitar MFA. GESTOR e MOTORISTA não têm.
+  manageMfa,
 }

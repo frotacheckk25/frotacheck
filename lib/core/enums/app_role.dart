@@ -68,6 +68,7 @@ enum AppRole {
           AppPermission.viewAppDistribution,
           AppPermission.viewFiscalDocs,  AppPermission.manageFiscalDocs,
           AppPermission.manageFiscalSettings,
+          AppPermission.manageMfa,
         ];
 
       // ── GESTOR: administra a operação — sem gestão de usuários, plano ou config ─

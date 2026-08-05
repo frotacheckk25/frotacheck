@@ -5,8 +5,14 @@
 // canal nativo antigo em vez da implementação Web) — e mesmo quando
 // funciona, a chave de criptografia fica salva no próprio localStorage ao
 // lado do valor cifrado, então não há ganho real de segurança sobre
-// localStorage puro nesse cenário. A prioridade aqui é apenas conveniência
-// (não redigitar email/senha), não um cofre à prova de XSS.
+// localStorage puro nesse cenário.
+//
+// F-02 (auditoria de segurança 2026-07-29): no Web NÃO guardamos mais a
+// senha em si — só o email, por conveniência de preencher o formulário.
+// Um XSS ou extensão de navegador maliciosa lendo localStorage não deve
+// conseguir extrair a senha em texto plano. "Continuar logado" já é
+// resolvido pelo persistSession do próprio Supabase (token de sessão, não
+// a senha); isto aqui é só preenchimento automático do campo de email.
 import 'dart:js_interop';
 
 @JS('window.localStorage.getItem')
@@ -19,12 +25,14 @@ external void _setItem(JSString key, JSString value);
 external void _removeItem(JSString key);
 
 const _kEmail = 'frotacheck_saved_email';
-const _kSenha = 'frotacheck_saved_password';
+const _kSenhaLegado = 'frotacheck_saved_password';
 
 Future<void> salvarCredenciais({required String email, required String senha}) async {
   try {
     _setItem(_kEmail.toJS, email.toJS);
-    _setItem(_kSenha.toJS, senha.toJS);
+    // Remove qualquer senha em texto plano salva por uma versão anterior
+    // do app neste navegador.
+    _removeItem(_kSenhaLegado.toJS);
   } catch (_) {
     // localStorage indisponível (ex.: modo privado) — segue sem salvar.
   }
@@ -33,16 +41,18 @@ Future<void> salvarCredenciais({required String email, required String senha}) a
 Future<void> limparCredenciaisSalvas() async {
   try {
     _removeItem(_kEmail.toJS);
-    _removeItem(_kSenha.toJS);
+    _removeItem(_kSenhaLegado.toJS);
   } catch (_) {}
 }
 
 Future<Map<String, String>?> lerCredenciaisSalvas() async {
   try {
     final email = _getItem(_kEmail.toJS)?.toDart;
-    final senha = _getItem(_kSenha.toJS)?.toDart;
-    if (email == null || senha == null) return null;
-    return {'email': email, 'senha': senha};
+    // Limpeza best-effort de instalações antigas que ainda tenham a senha
+    // em texto plano salva neste navegador.
+    _removeItem(_kSenhaLegado.toJS);
+    if (email == null) return null;
+    return {'email': email};
   } catch (_) {
     return null;
   }

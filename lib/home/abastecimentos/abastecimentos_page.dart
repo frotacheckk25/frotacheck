@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/image_validation.dart';
 
 class AbastecimentosPage extends StatefulWidget {
   const AbastecimentosPage({super.key});
@@ -661,6 +662,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
     if (img == null) return null;
     final nome = '$pastaEmpresa/${DateTime.now().millisecondsSinceEpoch}_${p.basename(img.path)}';
     final bytes = await img.readAsBytes();
+    if (!isValidImageBytes(bytes)) return null;
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
         await supabase.storage

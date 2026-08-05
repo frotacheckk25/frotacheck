@@ -7,6 +7,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/image_validation.dart';
 
 class ChecklistSaidaPage extends StatefulWidget {
   final String veiculoId;
@@ -71,6 +72,10 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
       if (img != null) {
         final bytes = await img.readAsBytes();
         if (!mounted) return;
+        if (!isValidImageBytes(bytes)) {
+          showError(context, 'Arquivo não é uma imagem válida.');
+          return;
+        }
         setState(() => fotosCapturadas.add({'bytes': bytes, 'label': label}));
       }
     } catch (e) {
