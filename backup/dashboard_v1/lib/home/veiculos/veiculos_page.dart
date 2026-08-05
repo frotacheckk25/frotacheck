@@ -537,11 +537,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
                       hint: '2024',
                       keyboardType: TextInputType.number,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty)
+                        if (v == null || v.trim().isEmpty) {
                           return 'Informe o ano';
+                        }
                         final ano = int.tryParse(v.trim());
-                        if (ano == null || ano < 1900 || ano > 2100)
+                        if (ano == null || ano < 1900 || ano > 2100) {
                           return 'Ano inválido';
+                        }
                         return null;
                       },
                     ),

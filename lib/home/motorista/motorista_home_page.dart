@@ -5,9 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/config/app_links.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/signed_storage_url.dart';
+import '../../core/utils/image_validation.dart';
 import '../abastecimentos/abastecimentos_page.dart';
 import '../checklists/selecionar_veiculo_checklist.dart';
 import '../checklists/historico_checklist_page.dart';
@@ -15,6 +17,7 @@ import '../documentos/documentos_page.dart';
 import '../manutencoes/manutencoes_page.dart';
 import '../multas/multas_page.dart';
 import '../pneus/pneus_page.dart';
+import '../veiculos/veiculo_tipo.dart';
 import '../viagens/viagens_page.dart';
 import '../../pages/lista_ocorrencias_page.dart';
 
@@ -33,6 +36,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
 
   bool _loadingVeiculo = true;
   Map<String, dynamic>? _veiculo;
+  String? _fotoVeiculoUrl;
+  bool _uploadingFotoVeiculo = false;
   int _ocorrenciasAbertas = 0;
   List<Map<String, dynamic>> _alertas = [];
   Map<String, dynamic>? _ultimoAbastecimento;
@@ -47,7 +52,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   // Resumo do dia
   int _viagensHoje = 0;
   double _distanciaHoje = 0;
-  int _tempoTransitoMin = 0;
 
   // Perfil — dados do driver record e avatar
   Map<String, dynamic>? _driverRecord;
@@ -123,7 +127,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       int abastecimentosHoje = 0;
       int viagensHoje = 0;
       double distanciaHoje = 0;
-      int tempoTransitoMin = 0;
       String manutencaoStatus = 'Verificar';
 
       // ── Queries que precisam de driverId + empresaId ──────────────────────
@@ -196,7 +199,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         try {
           final viaRes = await _supabase
               .from('viagens')
-              .select('quilometragem_percorrida, duracao_minutos, status')
+              .select('quilometragem_percorrida, status')
               .eq('motorista_id', driverId)
               .gte('data_inicio', inicioHoje)
               .neq('status', 'cancelada');
@@ -205,8 +208,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             if (v['status'] == 'concluida') {
               distanciaHoje +=
                   (v['quilometragem_percorrida'] as num?)?.toDouble() ?? 0;
-              tempoTransitoMin +=
-                  (v['duracao_minutos'] as num?)?.toInt() ?? 0;
             }
           }
         } catch (_) {}
@@ -254,13 +255,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         try {
           driverRec = await _supabase
               .from('drivers')
-              .select('name, cnh_number, cnh_expiration, cnh_category, phone')
+              .select('id, name, cnh_number, cnh_expiration, cnh_category, phone, foto_url')
               .eq('id', driverId)
               .maybeSingle();
         } catch (_) {}
       }
 
-      // ── Avatar URL (da coluna avatar_url em user_profiles) ────────────────
+      // ── Avatar URL: prioriza user_profiles.avatar_url (foto de conta,
+      // usada em qualquer papel); se o motorista ainda não tem uma, cai para
+      // drivers.foto_url (que o admin/gestor pode ter definido pelo cadastro).
       String? avatarUrl;
       if (userId != null) {
         try {
@@ -277,10 +280,29 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           }
         } catch (_) {}
       }
+      if (avatarUrl == null) {
+        final rawFotoMotorista = driverRec?['foto_url']?.toString();
+        if (rawFotoMotorista != null && rawFotoMotorista.isNotEmpty) {
+          try {
+            final signed = await toSignedStorageUrl(rawFotoMotorista);
+            avatarUrl = _addCacheBust(signed ?? rawFotoMotorista);
+          } catch (_) {}
+        }
+      }
+
+      String? fotoVeiculoUrl;
+      final rawFotoVeiculo = veiculo?['foto_url']?.toString();
+      if (rawFotoVeiculo != null && rawFotoVeiculo.isNotEmpty) {
+        try {
+          final signed = await toSignedStorageUrl(rawFotoVeiculo);
+          fotoVeiculoUrl = _addCacheBust(signed ?? rawFotoVeiculo);
+        } catch (_) {}
+      }
 
       if (!mounted) return;
       setState(() {
         _veiculo = veiculo;
+        _fotoVeiculoUrl = fotoVeiculoUrl;
         _alertas = alertas;
         _ultimoAbastecimento = abastRes;
         _ultimaManutencao = ultManut;
@@ -290,7 +312,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         _abastecimentosHoje = abastecimentosHoje;
         _viagensHoje = viagensHoje;
         _distanciaHoje = distanciaHoje;
-        _tempoTransitoMin = tempoTransitoMin;
         _manutencaoStatus = manutencaoStatus;
         _driverRecord = driverRec;
         _avatarUrl = avatarUrl;
@@ -554,11 +575,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(
-                    child: _resumoChip(Icons.schedule, 'Trânsito',
-                        _fmtTempo(_tempoTransitoMin),
-                        const Color(0xFF06B6D4))),
-                const SizedBox(width: 8),
                 Expanded(
                     child: _resumoChip(Icons.local_gas_station_rounded,
                         'Abastecimentos', '$_abastecimentosHoje',
@@ -1260,9 +1276,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           _resumoRow(Icons.directions_car_rounded, const Color(0xFF8B5CF6),
               'Distância',
               '${_distanciaHoje.toStringAsFixed(1)} km'),
-          const Divider(color: AppColors.border, height: 1),
-          _resumoRow(Icons.schedule, const Color(0xFF06B6D4),
-              'Tempo em trânsito', _fmtTempo(_tempoTransitoMin)),
           const Divider(color: AppColors.border, height: 1),
           _resumoRow(Icons.local_gas_station_rounded,
               const Color(0xFFF59E0B), 'Abastecimentos',
@@ -1994,7 +2007,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
     final email = _supabase.auth.currentUser?.email ?? '';
     if (email.isEmpty) return;
     try {
-      await _supabase.auth.resetPasswordForEmail(email);
+      await _supabase.auth.resetPasswordForEmail(email, redirectTo: kFrotaCheckPwaUrl);
       if (mounted) {
         showSuccess(context, 'Email de redefinição de senha enviado!');
       }
@@ -2101,6 +2114,11 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
       setState(() => _uploadingAvatar = true);
 
       final bytes = await picked.readAsBytes();
+      if (!isValidImageBytes(bytes)) {
+        setState(() => _uploadingAvatar = false);
+        if (mounted) showError(context, 'Arquivo não é uma imagem válida.');
+        return;
+      }
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
         setState(() => _uploadingAvatar = false);
@@ -2127,6 +2145,15 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
           .update({'avatar_url': rawUrl})
           .eq('user_id', userId);
 
+      // Também converge no cadastro do motorista (drivers.foto_url), para
+      // que a mesma foto apareça na tela de Motoristas do admin/gestor.
+      final driverId = _driverRecord?['id']?.toString();
+      if (driverId != null) {
+        try {
+          await _supabase.from('drivers').update({'foto_url': rawUrl}).eq('id', driverId);
+        } catch (_) {}
+      }
+
       final signedUrl = await toSignedStorageUrl(rawUrl);
       final urlComBust = _addCacheBust(signedUrl ?? rawUrl);
       if (mounted) {
@@ -2142,6 +2169,87 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         setState(() => _uploadingAvatar = false);
         showError(context,
             'Erro ao enviar foto. Verifique se o bucket "avatars" existe no Supabase Storage.');
+      }
+    }
+  }
+
+  Future<void> _pickFotoVeiculo() async {
+    final veiculoId = _veiculo?['id']?.toString();
+    if (veiculoId == null) return;
+
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(children: [
+          Icon(Icons.add_a_photo_rounded, color: Color(0xFF1AA251), size: 20),
+          SizedBox(width: 10),
+          Text('Foto do veículo', style: TextStyle(color: Colors.white, fontSize: 15)),
+        ]),
+        content: const Text('Escolha a origem da foto.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.camera),
+            icon: const Icon(Icons.camera_alt_rounded, size: 16),
+            label: const Text('Câmera'),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF1AA251)),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_rounded, size: 16),
+            label: const Text('Galeria'),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF3B82F6)),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+      if (picked == null || !mounted) return;
+
+      setState(() => _uploadingFotoVeiculo = true);
+
+      final pastaEmpresa = context.read<AppAuthProvider>().effectiveEmpresaId ?? 'sem-empresa';
+      final bytes = await picked.readAsBytes();
+      if (!isValidImageBytes(bytes)) {
+        setState(() => _uploadingFotoVeiculo = false);
+        if (mounted) showError(context, 'Arquivo não é uma imagem válida.');
+        return;
+      }
+      final ext = picked.name.split('.').last.toLowerCase();
+      final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
+      final path = '$pastaEmpresa/$veiculoId.$ext';
+
+      await _supabase.storage.from('veiculos').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: mime, upsert: true),
+          );
+
+      final rawUrl = _supabase.storage.from('veiculos').getPublicUrl(path);
+      await _supabase.from('vehicles').update({'foto_url': rawUrl}).eq('id', veiculoId);
+
+      final signedUrl = await toSignedStorageUrl(rawUrl);
+      if (mounted) {
+        setState(() {
+          _fotoVeiculoUrl = _addCacheBust(signedUrl ?? rawUrl);
+          _uploadingFotoVeiculo = false;
+        });
+        showSuccess(context, 'Foto do veículo atualizada!');
+      }
+    } catch (e) {
+      debugPrint('Foto veículo upload: $e');
+      if (mounted) {
+        setState(() => _uploadingFotoVeiculo = false);
+        showError(context, 'Erro ao enviar foto do veículo.');
       }
     }
   }
@@ -2264,7 +2372,19 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         child: Row(
         children: [
-          Icon(Icons.directions_car, color: cor, size: 18),
+          if (_fotoVeiculoUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                _fotoVeiculoUrl!,
+                width: 24,
+                height: 24,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Icon(iconeParaTipoVeiculo(_veiculo!['tipo']?.toString()), color: cor, size: 18),
+              ),
+            )
+          else
+            Icon(iconeParaTipoVeiculo(_veiculo!['tipo']?.toString()), color: cor, size: 18),
           const SizedBox(width: 12),
           Expanded(
             child: Row(
@@ -2366,14 +2486,42 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         padding: const EdgeInsets.all(18),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: cor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
+            GestureDetector(
+              onTap: _uploadingFotoVeiculo ? null : _pickFotoVeiculo,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: cor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (_uploadingFotoVeiculo)
+                      const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1AA251)))
+                    else if (_fotoVeiculoUrl != null)
+                      Image.network(
+                        _fotoVeiculoUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Icon(iconeParaTipoVeiculo(_veiculo?['tipo']?.toString()), color: cor, size: 26),
+                      )
+                    else
+                      Icon(iconeParaTipoVeiculo(_veiculo?['tipo']?.toString()), color: cor, size: 26),
+                    if (!_uploadingFotoVeiculo)
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle),
+                          child: const Icon(Icons.camera_alt_rounded, size: 10, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              child:
-                  Icon(Icons.directions_car, color: cor, size: 28),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -2636,12 +2784,6 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             style: const TextStyle(
                 color: AppColors.textSecondary, fontSize: 12)),
       );
-
-  String _fmtTempo(int minutos) {
-    final h = minutos ~/ 60;
-    final m = minutos % 60;
-    return '${h}h ${m.toString().padLeft(2, '0')}m';
-  }
 
   String _placaLabel(Map<String, dynamic> r) {
     final v = r['vehicles'];

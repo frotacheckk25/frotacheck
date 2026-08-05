@@ -1,11 +1,18 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/enums/app_permission.dart';
 import 'package:frotacheck/core/guards/permission_guard.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
+import 'package:frotacheck/core/utils/image_validation.dart';
+import 'package:frotacheck/core/utils/signed_storage_url.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
+import 'veiculo_historico_page.dart';
+import 'veiculo_tipo.dart';
 
 class VeiculosPage extends StatelessWidget {
   const VeiculosPage({super.key});
@@ -43,11 +50,18 @@ class _VeiculosPageState extends State<_VeiculosView> {
   List<Map<String, dynamic>> motoristas = [];
   Map<String, Map<String, dynamic>> _motoristasPorId = {};
   List<Map<String, dynamic>> veiculos = [];
+  Map<String, String> _fotosAssinadas = {};
   String? motoristaSelecionado;
+  String tipoSelecionado = 'carro';
   bool isSaving = false;
   bool carregandoVeiculos = true;
   String? erroMsg;
   String? editingId;
+
+  Uint8List? _novaFotoBytes;
+  String? _novaFotoExt;
+  String? _fotoAtualPreview;
+  bool _uploadingFoto = false;
 
   @override
   void initState() {
@@ -66,7 +80,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
       final eid = auth.effectiveEmpresaId;
       var veicQ = supabase
           .from('vehicles')
-          .select('id, plate, brand, model, year, color, odometer, driver_id');
+          .select('id, plate, brand, model, year, color, odometer, driver_id, tipo, foto_url');
       var drivQ = supabase.from('drivers').select('id, name');
       if (eid != null) {
         veicQ = veicQ.eq('empresa_id', eid);
@@ -90,6 +104,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
         erroMsg = null;
         carregandoVeiculos = false;
       });
+      unawaited(_resolverFotos());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -102,6 +117,21 @@ class _VeiculosPageState extends State<_VeiculosView> {
   Future<void> carregarMotoristas() async => _carregarTudo();
   Future<void> carregarVeiculos() async => _carregarTudo();
 
+  /// Resolve as URLs assinadas das fotos dos veículos (o bucket é privado,
+  /// então a URL salva no banco só vira acessível na hora de exibir).
+  Future<void> _resolverFotos() async {
+    final comFoto = veiculos.where((v) => (v['foto_url'] as String?)?.isNotEmpty == true).toList();
+    if (comFoto.isEmpty) return;
+    final entradas = await Future.wait(comFoto.map((v) async {
+      final signed = await toSignedStorageUrl(v['foto_url'] as String?);
+      return MapEntry(v['id'].toString(), signed ?? '');
+    }));
+    if (!mounted) return;
+    setState(() {
+      _fotosAssinadas = {for (final e in entradas) if (e.value.isNotEmpty) e.key: e.value};
+    });
+  }
+
   String _nomeMotorista(Map<String, dynamic> veiculo) {
     final id = veiculo['driver_id']?.toString();
     if (id == null) return 'Sem motorista';
@@ -110,6 +140,18 @@ class _VeiculosPageState extends State<_VeiculosView> {
 
   Future<void> salvarVeiculo() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    // Captura o motorista ANTERIOR deste veículo antes de qualquer alteração,
+    // para saber se a atribuição realmente mudou (histórico em atribuicoes_veiculo).
+    final isNewVeiculo = editingId == null;
+    String? driverIdAntigo;
+    if (!isNewVeiculo) {
+      final atual = veiculos.firstWhere(
+        (x) => x['id']?.toString() == editingId,
+        orElse: () => {},
+      );
+      driverIdAntigo = atual['driver_id']?.toString();
+    }
 
     setState(() => isSaving = true);
 
@@ -121,12 +163,14 @@ class _VeiculosPageState extends State<_VeiculosView> {
       'color': corController.text.trim(),
       'odometer': int.tryParse(kmController.text.trim()) ?? 0,
       'driver_id': motoristaSelecionado,
+      'tipo': tipoSelecionado,
     };
 
-    final injected = context.read<AppAuthProvider>().inject(payload);
+    final auth = context.read<AppAuthProvider>();
+    final injected = auth.inject(payload);
 
     try {
-      final isNew = editingId == null;
+      final isNew = isNewVeiculo;
       String? savedVehicleId = editingId;
 
       if (isNew) {
@@ -157,6 +201,36 @@ class _VeiculosPageState extends State<_VeiculosView> {
         });
       }
 
+      // Envia a foto (se uma nova foi escolhida) só agora que já temos o id
+      // real do veículo — necessário sobretudo para veículo recém-criado.
+      if (_novaFotoBytes != null && savedVehicleId != null) {
+        try {
+          setState(() => _uploadingFoto = true);
+          final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
+          final ext = _novaFotoExt ?? 'jpg';
+          final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
+          final path = '$pastaEmpresa/$savedVehicleId.$ext';
+          await supabase.storage.from('veiculos').uploadBinary(
+                path,
+                _novaFotoBytes!,
+                fileOptions: FileOptions(contentType: mime, upsert: true),
+              );
+          final rawUrl = supabase.storage.from('veiculos').getPublicUrl(path);
+          await supabase.from('vehicles').update({'foto_url': rawUrl}).eq('id', savedVehicleId);
+          if (mounted) {
+            setState(() {
+              final idx = veiculos.indexWhere((v) => v['id']?.toString() == savedVehicleId);
+              if (idx >= 0) veiculos[idx] = {...veiculos[idx], 'foto_url': rawUrl};
+            });
+            unawaited(_resolverFotos());
+          }
+        } catch (_) {
+          if (mounted) showError(context, 'Veículo salvo, mas a foto não pôde ser enviada.');
+        } finally {
+          if (mounted) setState(() => _uploadingFoto = false);
+        }
+      }
+
       // Sincroniza driver_id quando um motorista é vinculado a este veículo.
       final newDriverId = motoristaSelecionado;
       if (newDriverId != null) {
@@ -185,6 +259,38 @@ class _VeiculosPageState extends State<_VeiculosView> {
         } catch (_) {}
       }
 
+      // Histórico de atribuição veículo↔motorista (independente de driver_id
+      // em vehicles, que só guarda o atual): fecha atribuições abertas que
+      // mudaram e abre uma nova quando um motorista é vinculado.
+      try {
+        if (newDriverId != null) {
+          // Fecha qualquer atribuição aberta desse motorista em OUTRO veículo
+          // (reflete o desvincular acima).
+          await supabase
+              .from('atribuicoes_veiculo')
+              .update({'data_fim': DateTime.now().toIso8601String()})
+              .eq('motorista_id', newDriverId)
+              .neq('veiculo_id', savedVehicleId ?? '')
+              .isFilter('data_fim', null);
+        }
+        if (driverIdAntigo != newDriverId && savedVehicleId != null) {
+          // Fecha a atribuição aberta deste veículo (motorista mudou/foi removido)
+          await supabase
+              .from('atribuicoes_veiculo')
+              .update({'data_fim': DateTime.now().toIso8601String()})
+              .eq('veiculo_id', savedVehicleId)
+              .isFilter('data_fim', null);
+          if (newDriverId != null) {
+            await supabase.from('atribuicoes_veiculo').insert(
+                  auth.inject({
+                    'veiculo_id': savedVehicleId,
+                    'motorista_id': newDriverId,
+                  }),
+                );
+          }
+        }
+      } catch (_) {}
+
       if (!mounted) return;
       showSuccess(context, isNew ? 'Veículo cadastrado com sucesso!' : 'Veículo atualizado!');
       _limparFormulario();
@@ -205,7 +311,11 @@ class _VeiculosPageState extends State<_VeiculosView> {
     kmController.clear();
     setState(() {
       motoristaSelecionado = null;
+      tipoSelecionado = 'carro';
       editingId = null;
+      _novaFotoBytes = null;
+      _novaFotoExt = null;
+      _fotoAtualPreview = null;
     });
     _formKey.currentState?.reset();
   }
@@ -220,12 +330,66 @@ class _VeiculosPageState extends State<_VeiculosView> {
       corController.text = v['color']?.toString() ?? '';
       kmController.text = v['odometer']?.toString() ?? '';
       motoristaSelecionado = v['driver_id']?.toString();
+      tipoSelecionado = v['tipo']?.toString() ?? 'carro';
+      _novaFotoBytes = null;
+      _novaFotoExt = null;
+      _fotoAtualPreview = _fotosAssinadas[editingId];
     });
     _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOut,
     );
+  }
+
+  Future<void> _pickFoto() async {
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(children: [
+          Icon(Icons.add_a_photo_rounded, color: AppColors.secondary, size: 20),
+          SizedBox(width: 10),
+          Text('Foto do veículo', style: TextStyle(color: Colors.white, fontSize: 15)),
+        ]),
+        content: const Text('Escolha a origem da foto.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.camera),
+            icon: const Icon(Icons.camera_alt_rounded, size: 16),
+            label: const Text('Câmera'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_rounded, size: 16),
+            label: const Text('Galeria'),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (!isValidImageBytes(bytes)) {
+        if (mounted) showError(context, 'Arquivo não é uma imagem válida.');
+        return;
+      }
+      setState(() {
+        _novaFotoBytes = bytes;
+        _novaFotoExt = picked.name.split('.').last.toLowerCase();
+      });
+    } catch (_) {
+      if (mounted) showError(context, 'Não foi possível abrir a câmera/galeria.');
+    }
   }
 
   Future<void> deletarVeiculo(String id, String placa) async {
@@ -445,6 +609,24 @@ class _VeiculosPageState extends State<_VeiculosView> {
                 ],
               ),
               const SizedBox(height: 18),
+              _campoFoto(),
+              const SizedBox(height: 16),
+              Text('Tipo de veículo', style: TextStyle(color: AppColors.textSecondary.withOpacity(0.85), fontSize: 12)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: veiculoTipos.entries.map((e) {
+                  final selecionado = tipoSelecionado == e.key;
+                  return ChoiceChip(
+                    label: Text(e.value),
+                    avatar: Icon(iconeParaTipoVeiculo(e.key), size: 16),
+                    selected: selecionado,
+                    onSelected: (_) => setState(() => tipoSelecionado = e.key),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
               _campo(
                 controller: placaController,
                 label: 'Placa *',
@@ -538,7 +720,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
               SizedBox(
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: isSaving ? null : salvarVeiculo,
+                  onPressed: (isSaving || _uploadingFoto) ? null : salvarVeiculo,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: editingId != null ? AppColors.warning : AppColors.success,
                     foregroundColor: Colors.white,
@@ -546,14 +728,14 @@ class _VeiculosPageState extends State<_VeiculosView> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 3,
                   ),
-                  icon: isSaving
+                  icon: (isSaving || _uploadingFoto)
                       ? const SizedBox(
                           width: 20, height: 20,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                         )
                       : Icon(editingId != null ? Icons.save : Icons.save_alt_rounded, size: 20),
                   label: Text(
-                    isSaving ? 'Salvando...' : (editingId != null ? 'ATUALIZAR VEÍCULO' : 'SALVAR VEÍCULO'),
+                    _uploadingFoto ? 'Enviando foto...' : (isSaving ? 'Salvando...' : (editingId != null ? 'ATUALIZAR VEÍCULO' : 'SALVAR VEÍCULO')),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                   ),
                 ),
@@ -608,6 +790,61 @@ class _VeiculosPageState extends State<_VeiculosView> {
         errorStyle: const TextStyle(fontSize: 11),
       ),
       validator: validator,
+    );
+  }
+
+  Widget _campoFoto() {
+    final temNovaFoto = _novaFotoBytes != null;
+    final temFotoAtual = _fotoAtualPreview != null;
+    return GestureDetector(
+      onTap: isSaving ? null : _pickFoto,
+      child: Container(
+        height: 140,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.backgroundSoft,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: temNovaFoto
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(_novaFotoBytes!, fit: BoxFit.cover),
+                  _fotoOverlayEditar(),
+                ],
+              )
+            : temFotoAtual
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(_fotoAtualPreview!, fit: BoxFit.cover),
+                      _fotoOverlayEditar(),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(iconeParaTipoVeiculo(tipoSelecionado), size: 34, color: AppColors.textSecondary),
+                      const SizedBox(height: 8),
+                      const Text('Toque para adicionar uma foto do veículo',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  Widget _fotoOverlayEditar() {
+    return Positioned(
+      right: 8,
+      bottom: 8,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), borderRadius: BorderRadius.circular(20)),
+        child: const Icon(Icons.edit, size: 14, color: Colors.white),
+      ),
     );
   }
 
@@ -714,6 +951,26 @@ class _VeiculosPageState extends State<_VeiculosView> {
     );
   }
 
+  Widget _leadingVeiculo(Map<String, dynamic> v) {
+    final fotoUrl = _fotosAssinadas[v['id']?.toString()];
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.secondary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: fotoUrl != null
+          ? Image.network(
+              fotoUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Icon(iconeParaTipoVeiculo(v['tipo']?.toString()), color: AppColors.secondary, size: 22),
+            )
+          : Icon(iconeParaTipoVeiculo(v['tipo']?.toString()), color: AppColors.secondary, size: 22),
+    );
+  }
+
   Widget _buildVeiculoCard(Map<String, dynamic> v) {
     final nomeMotorista = _nomeMotorista(v);
     final temMotorista = v['driver_id'] != null;
@@ -730,15 +987,11 @@ class _VeiculosPageState extends State<_VeiculosView> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.secondary.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.directions_car, color: AppColors.secondary, size: 22),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => VeiculoHistoricoPage(veiculo: v)),
         ),
+        leading: _leadingVeiculo(v),
         title: Text(
           '${v['plate'] ?? '--'} • ${v['brand'] ?? ''} ${v['model'] ?? ''}',
           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),

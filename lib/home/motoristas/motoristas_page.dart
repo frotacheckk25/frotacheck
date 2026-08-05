@@ -1,12 +1,18 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/enums/app_permission.dart';
 import 'package:frotacheck/core/guards/permission_guard.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
+import 'package:frotacheck/core/utils/image_validation.dart';
+import 'package:frotacheck/core/utils/signed_storage_url.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
 import 'package:frotacheck/core/utils/driver_account_link.dart';
+import 'motorista_historico_page.dart';
 
 class MotoristasPage extends StatelessWidget {
   const MotoristasPage({super.key});
@@ -40,10 +46,17 @@ class _MotoristasPageState extends State<_MotoristasView> {
   final emailContaController = TextEditingController();
 
   List<Map<String, dynamic>> motoristas = [];
+  Map<String, String> _fotosAssinadas = {};
   bool carregando = true;
   bool isSaving = false;
   String? editingId;
   DateTime? cnhValidade;
+  String tipoVinculo = 'clt';
+
+  Uint8List? _novaFotoBytes;
+  String? _novaFotoExt;
+  String? _fotoAtualPreview;
+  bool _uploadingFoto = false;
 
   @override
   void initState() {
@@ -79,10 +92,25 @@ class _MotoristasPageState extends State<_MotoristasView> {
         );
         carregando = false;
       });
+      unawaited(_resolverFotos());
     } catch (e) {
       debugPrint('Erro motoristas: $e');
       if (mounted) setState(() => carregando = false);
     }
+  }
+
+  /// Resolve as URLs assinadas das fotos dos motoristas (bucket privado).
+  Future<void> _resolverFotos() async {
+    final comFoto = motoristas.where((m) => (m['foto_url'] as String?)?.isNotEmpty == true).toList();
+    if (comFoto.isEmpty) return;
+    final entradas = await Future.wait(comFoto.map((m) async {
+      final signed = await toSignedStorageUrl(m['foto_url'] as String?);
+      return MapEntry(m['id'].toString(), signed ?? '');
+    }));
+    if (!mounted) return;
+    setState(() {
+      _fotosAssinadas = {for (final e in entradas) if (e.value.isNotEmpty) e.key: e.value};
+    });
   }
 
   Future<void> salvarMotorista() async {
@@ -143,6 +171,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
       'name': nomeController.text.trim(),
       'cnh_number': cnhController.text.trim(),
       'cnh_expiration': cnhValidade!.toIso8601String().split('T')[0],
+      'tipo_vinculo': tipoVinculo,
     };
 
     // Campos opcionais — envia null explicitamente no update para permitir limpeza
@@ -152,12 +181,15 @@ class _MotoristasPageState extends State<_MotoristasView> {
     payload['cnh_category'] = categoria.isNotEmpty ? categoria : null;
     if (emailConta.isNotEmpty) payload['email'] = emailConta;
 
+    final auth = context.read<AppAuthProvider>();
+    String? savedDriverId = editingId;
+
     try {
       final isNew = editingId == null;
       if (isNew) {
         final result = await supabase
             .from('drivers')
-            .insert(context.read<AppAuthProvider>().inject(payload))
+            .insert(auth.inject(payload))
             .select();
         if (!mounted) return;
 
@@ -165,6 +197,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
         if (result.isNotEmpty) {
           final novo = Map<String, dynamic>.from(result.first as Map);
           driverId = novo['id']?.toString();
+          savedDriverId = driverId;
           setState(() {
             motoristas = [novo, ...motoristas];
             motoristas.sort((a, b) =>
@@ -227,6 +260,37 @@ class _MotoristasPageState extends State<_MotoristasView> {
           _snackSucesso('Motorista atualizado!');
         }
       }
+
+      // Envia a foto (se uma nova foi escolhida) só agora que já temos o id
+      // real do motorista — necessário sobretudo para motorista recém-criado.
+      if (_novaFotoBytes != null && savedDriverId != null) {
+        try {
+          setState(() => _uploadingFoto = true);
+          final pastaEmpresa = auth.effectiveEmpresaId ?? 'sem-empresa';
+          final ext = _novaFotoExt ?? 'jpg';
+          final mime = (ext == 'png') ? 'image/png' : 'image/jpeg';
+          final path = '$pastaEmpresa/motorista-$savedDriverId.$ext';
+          await supabase.storage.from('avatars').uploadBinary(
+                path,
+                _novaFotoBytes!,
+                fileOptions: FileOptions(contentType: mime, upsert: true),
+              );
+          final rawUrl = supabase.storage.from('avatars').getPublicUrl(path);
+          await supabase.from('drivers').update({'foto_url': rawUrl}).eq('id', savedDriverId);
+          if (mounted) {
+            setState(() {
+              final idx = motoristas.indexWhere((m) => m['id']?.toString() == savedDriverId);
+              if (idx >= 0) motoristas[idx] = {...motoristas[idx], 'foto_url': rawUrl};
+            });
+            unawaited(_resolverFotos());
+          }
+        } catch (_) {
+          if (mounted) showError(context, 'Motorista salvo, mas a foto não pôde ser enviada.');
+        } finally {
+          if (mounted) setState(() => _uploadingFoto = false);
+        }
+      }
+
       _limparFormulario();
     } catch (e) {
       if (!mounted) return;
@@ -286,6 +350,10 @@ class _MotoristasPageState extends State<_MotoristasView> {
       emailContaController.text = m['email']?.toString() ?? '';
       final raw = m['cnh_expiration']?.toString() ?? '';
       cnhValidade = DateTime.tryParse(raw);
+      tipoVinculo = m['tipo_vinculo']?.toString() ?? 'clt';
+      _novaFotoBytes = null;
+      _novaFotoExt = null;
+      _fotoAtualPreview = _fotosAssinadas[editingId];
     });
     _scrollController.animateTo(0,
         duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
@@ -301,7 +369,61 @@ class _MotoristasPageState extends State<_MotoristasView> {
     setState(() {
       editingId = null;
       cnhValidade = null;
+      tipoVinculo = 'clt';
+      _novaFotoBytes = null;
+      _novaFotoExt = null;
+      _fotoAtualPreview = null;
     });
+  }
+
+  Future<void> _pickFoto() async {
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(children: [
+          Icon(Icons.add_a_photo_rounded, color: AppColors.secondary, size: 20),
+          SizedBox(width: 10),
+          Text('Foto do motorista', style: TextStyle(color: Colors.white, fontSize: 15)),
+        ]),
+        content: const Text('Escolha a origem da foto.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.camera),
+            icon: const Icon(Icons.camera_alt_rounded, size: 16),
+            label: const Text('Câmera'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(ctx, ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_rounded, size: 16),
+            label: const Text('Galeria'),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (!isValidImageBytes(bytes)) {
+        if (mounted) showError(context, 'Arquivo não é uma imagem válida.');
+        return;
+      }
+      setState(() {
+        _novaFotoBytes = bytes;
+        _novaFotoExt = picked.name.split('.').last.toLowerCase();
+      });
+    } catch (_) {
+      if (mounted) showError(context, 'Não foi possível abrir a câmera/galeria.');
+    }
   }
 
   void _snackSucesso(String msg) => showSuccess(context, msg);
@@ -538,6 +660,8 @@ class _MotoristasPageState extends State<_MotoristasView> {
                 ],
               ),
               const SizedBox(height: 18),
+              Center(child: _campoFoto()),
+              const SizedBox(height: 18),
               _campo(
                 controller: nomeController,
                 label: 'Nome completo *',
@@ -603,6 +727,17 @@ class _MotoristasPageState extends State<_MotoristasView> {
                 ),
               ),
               const SizedBox(height: 12),
+              Text('Vínculo', style: TextStyle(color: AppColors.textSecondary.withOpacity(0.85), fontSize: 12)),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'clt', label: Text('CLT'), icon: Icon(Icons.badge_outlined, size: 16)),
+                  ButtonSegment(value: 'agregado', label: Text('Agregado'), icon: Icon(Icons.local_shipping_outlined, size: 16)),
+                ],
+                selected: {tipoVinculo},
+                onSelectionChanged: (s) => setState(() => tipoVinculo = s.first),
+              ),
+              const SizedBox(height: 12),
               _campo(
                 controller: telefoneController,
                 label: 'Telefone',
@@ -629,7 +764,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
               SizedBox(
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: isSaving ? null : salvarMotorista,
+                  onPressed: (isSaving || _uploadingFoto) ? null : salvarMotorista,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: editingId != null ? AppColors.warning : AppColors.success,
                     foregroundColor: Colors.white,
@@ -637,7 +772,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 3,
                   ),
-                  icon: isSaving
+                  icon: (isSaving || _uploadingFoto)
                       ? const SizedBox(
                           width: 20,
                           height: 20,
@@ -645,9 +780,9 @@ class _MotoristasPageState extends State<_MotoristasView> {
                         )
                       : Icon(editingId != null ? Icons.save : Icons.person_add, size: 20),
                   label: Text(
-                    isSaving
-                        ? 'Salvando...'
-                        : (editingId != null ? 'ATUALIZAR MOTORISTA' : 'CADASTRAR MOTORISTA'),
+                    _uploadingFoto
+                        ? 'Enviando foto...'
+                        : (isSaving ? 'Salvando...' : (editingId != null ? 'ATUALIZAR MOTORISTA' : 'CADASTRAR MOTORISTA')),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0.4),
                   ),
                 ),
@@ -674,6 +809,42 @@ class _MotoristasPageState extends State<_MotoristasView> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _campoFoto() {
+    final temNovaFoto = _novaFotoBytes != null;
+    final temFotoAtual = _fotoAtualPreview != null;
+    return GestureDetector(
+      onTap: isSaving ? null : _pickFoto,
+      child: Stack(
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: AppColors.backgroundSoft,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: temNovaFoto
+                ? Image.memory(_novaFotoBytes!, fit: BoxFit.cover)
+                : temFotoAtual
+                    ? Image.network(_fotoAtualPreview!, fit: BoxFit.cover)
+                    : const Icon(Icons.person, size: 40, color: AppColors.textSecondary),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(color: AppColors.secondary, shape: BoxShape.circle),
+              child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -795,8 +966,15 @@ class _MotoristasPageState extends State<_MotoristasView> {
     final cnhStatus = _cnhLabel(cnhExp);
     final cnhColor = _cnhColor(cnhExp);
     final isEditing = editingId == m['id']?.toString();
+    final isAgregado = m['tipo_vinculo']?.toString() == 'agregado';
 
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => MotoristaHistoricoPage(motorista: m)),
+      ),
+      child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isEditing ? AppColors.warning.withOpacity(0.08) : AppColors.surface,
@@ -811,20 +989,44 @@ class _MotoristasPageState extends State<_MotoristasView> {
           CircleAvatar(
             radius: 22,
             backgroundColor: AppColors.secondary.withOpacity(0.18),
-            child: Text(
-              _initials(nome),
-              style: const TextStyle(
-                  color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 15),
-            ),
+            backgroundImage: _fotosAssinadas[m['id']?.toString()] != null
+                ? NetworkImage(_fotosAssinadas[m['id']?.toString()]!)
+                : null,
+            child: _fotosAssinadas[m['id']?.toString()] == null
+                ? Text(
+                    _initials(nome),
+                    style: const TextStyle(
+                        color: AppColors.secondary, fontWeight: FontWeight.bold, fontSize: 15),
+                  )
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(nome,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(nome,
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                    if (isAgregado) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text('Agregado',
+                            style: TextStyle(color: AppColors.secondary, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 3),
                 Text(
                   'CNH: ${m['cnh_number'] ?? '-'}  ${m['cnh_category'] != null ? '• Cat. ${m['cnh_category']}' : ''}',
@@ -892,6 +1094,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
             ],
           ),
         ],
+      ),
       ),
     );
   }
