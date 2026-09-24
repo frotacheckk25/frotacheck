@@ -37,7 +37,10 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+# "/build/*" (e não "/build/"): com a pasta inteira ignorada, o "!/build/web/"
+# abaixo não consegue reincluir arquivos novos do build — fc_boot.js e outros
+# ficavam fora do git e o deploy via GitHub subia o app quebrado.
+/build/*
 /coverage/
 
 # Symbolication related
