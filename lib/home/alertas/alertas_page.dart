@@ -340,10 +340,17 @@ class _AlertasPageState extends State<AlertasPage> {
     });
 
     try {
-      await supabase
+      // .select() devolve as linhas realmente alteradas: se o banco recusar
+      // (sem permissão), vem vazio — antes a tela mostrava "sucesso" mesmo
+      // sem ter salvo nada.
+      final alterados = await supabase
           .from('alerts')
           .update({'status': 'resolvido'})
-          .eq('id', id);
+          .eq('id', id)
+          .select('id');
+      if ((alterados as List).isEmpty) {
+        throw Exception('permission denied');
+      }
 
       // Se o alerta tem ocorrência vinculada, resolve também
       final occId = alerta['occurrence_id']?.toString();
@@ -902,8 +909,12 @@ class _AlertasPageState extends State<AlertasPage> {
     final id = alerta['id']?.toString() ?? '';
     final titulo =
         alerta['title']?.toString() ?? alerta['titulo']?.toString() ?? 'Alerta';
-    final descricao =
-        alerta['subtitle']?.toString() ?? alerta['descricao']?.toString() ?? '';
+    final descricao = alerta['subtitle']?.toString() ??
+        alerta['description']?.toString() ??
+        alerta['descricao']?.toString() ??
+        '';
+    // Só a gestão resolve alertas (o banco também bloqueia para motorista).
+    final podeResolver = !context.read<AppAuthProvider>().isMotorista;
     final tipo = alerta['tipo']?.toString() ?? 'info';
     final status = alerta['status']?.toString() ?? 'ativo';
     final resolvido = status == 'resolvido';
@@ -1032,7 +1043,7 @@ class _AlertasPageState extends State<AlertasPage> {
                       color: AppColors.success,
                     ),
                   )
-                else
+                else if (podeResolver)
                   Tooltip(
                     message: 'Marcar como resolvido',
                     child: GestureDetector(

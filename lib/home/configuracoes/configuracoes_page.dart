@@ -1073,32 +1073,29 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Alertas e Notificações'),
         const SizedBox(height: 16),
+        // Os interruptores que existiam aqui ("Auditoria de combustível",
+        // "Alertas de gasto", "Notificações em tempo real") eram salvos mas
+        // nenhuma parte do sistema os lia — pareciam funcionar sem fazer nada.
+        // Esta aba agora descreve o que de fato acontece.
         _card(Column(children: [
-          _switchItem('Auditoria de combustível',
-              'Verificações automáticas de política de gasto.',
-              _auditoriaAtiva,
-              (v) => setState(() => _auditoriaAtiva = v)),
+          _infoItem(Icons.notifications_active_outlined,
+              'Notificações de atividade',
+              'Admin e gestor recebem aviso no sino (e push no app Android) quando um motorista registra abastecimento, ocorrência, multa, manutenção, viagem ou checklist.'),
           _divider(),
-          _switchItem('Alertas de gasto',
-              'Notifica quando consumo ultrapassar limites.',
-              _alertaGasto,
-              (v) => setState(() => _alertaGasto = v)),
-          _divider(),
-          _switchItem('Notificações em tempo real',
-              'Receba avisos e alertas instantâneos.',
-              _alertasPush,
-              (v) => setState(() => _alertasPush = v)),
+          _infoItem(Icons.event_busy_outlined,
+              'Alertas de vencimento',
+              'Todo dia às 06:00 o sistema verifica CNH, documentos e troca de óleo por km, e cria alertas para o que está vencido ou vence em até 30 dias (500 km para o óleo).'),
         ])),
-        const SizedBox(height: 20),
-        _saveBtn(
-          label: 'Salvar Notificações',
-          saving: _savingEmpresa,
-          onTap: _salvarEmpresa,
-          color: _blue,
-        ),
       ]),
     );
   }
+
+  Widget _infoItem(IconData icon, String titulo, String texto) => ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: Icon(icon, color: _blue, size: 20),
+        title: Text(titulo, style: const TextStyle(color: _white, fontSize: 14, fontWeight: FontWeight.w600)),
+        subtitle: Text(texto, style: const TextStyle(color: _sub, fontSize: 12)),
+      );
 
   // ── Tab: Aparência ─────────────────────────────────────────────────────────
   Widget _buildAparencia() {
@@ -1219,23 +1216,13 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Integrações Externas'),
         const SizedBox(height: 16),
+        // O interruptor "Integração com ERPs" e o item "API externa" não
+        // tinham nenhuma integração real por trás — removidos para não
+        // prometer o que o sistema não faz.
         _card(Column(children: [
-          _switchItem('Integração com ERPs',
-              'Habilite conexões externas e exportações.',
-              _apiIntegration,
-              (v) => setState(() => _apiIntegration = v)),
-          _divider(),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: const Icon(Icons.settings_rounded, color: _blue, size: 20),
-            title: const Text('API externa', style: TextStyle(color: _white, fontSize: 14)),
-            subtitle: const Text('Configure webhooks e integrações via API.', style: TextStyle(color: _sub, fontSize: 12)),
-            trailing: const Icon(Icons.chevron_right, color: _muted, size: 18),
-            onTap: () => _snack('API externa — em breve.'),
-          ),
+          _infoItem(Icons.hub_outlined, 'Integrações ainda não disponíveis',
+              'Integração com ERP e API externa estão no planejamento. Para exportar dados hoje, use Relatórios → Exportar PDF.'),
         ])),
-        const SizedBox(height: 20),
-        _saveBtn(label: 'Salvar Integrações', saving: _savingEmpresa, onTap: _salvarEmpresa, color: _blue),
       ]),
     );
   }
@@ -1310,18 +1297,6 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage>
             ),
           ),
         ]),
-      );
-
-  Widget _switchItem(String title, String subtitle, bool value, ValueChanged<bool> onChanged) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: SwitchListTile(
-          value: value,
-          title: Text(title, style: const TextStyle(color: _white, fontSize: 14, fontWeight: FontWeight.w500)),
-          subtitle: Text(subtitle, style: const TextStyle(color: _sub, fontSize: 12)),
-          onChanged: onChanged,
-          activeColor: _blue,
-        ),
       );
 
   Widget _saveBtn({

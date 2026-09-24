@@ -5,7 +5,26 @@ import '../theme/app_theme.dart';
 /// em mensagens curtas e compreensíveis para o usuário final, evitando vazar
 /// detalhes de schema/SQL/stack em snackbars.
 String friendlyError(Object e, {String fallback = 'Não foi possível concluir a operação. Tente novamente.'}) {
-  final raw = e.toString().toLowerCase();
+  final original = e.toString();
+  final raw = original.toLowerCase();
+
+  // Regras de negócio aplicadas pelo banco (docs/FASE2_01_SEGURANCA_E_INTEGRIDADE.sql).
+  final limite = RegExp(r'LIMITE_PLANO:\s*([^"\n]+)').firstMatch(original);
+  if (limite != null) return 'Limite do plano atingido: ${limite.group(1)!.trim()}';
+  if (raw.contains('vehicles_empresa_placa_unique')) return 'Já existe um veículo com esta placa na empresa.';
+  if (raw.contains('drivers_empresa_cnh_unique')) return 'Já existe um motorista com esta CNH na empresa.';
+  if (raw.contains('fuelings_valores_validos_ck')) {
+    return 'Valores inválidos: confira litros e valor (preço por litro entre R\$ 0,50 e R\$ 100).';
+  }
+  if (raw.contains('conta_nao_encontrada')) {
+    return 'Nenhuma conta encontrada com esse e-mail. Peça para a pessoa se cadastrar no app primeiro.';
+  }
+  if (raw.contains('conta_outra_empresa')) return 'Esta conta já está vinculada a outra empresa.';
+  if (raw.contains('motorista inválido para esta empresa')) return 'Motorista inválido para esta empresa.';
+  if (raw.contains('sem permissão') || raw.contains('motorista não pode excluir') || raw.contains('papel não permitido')) {
+    return 'Você não tem permissão para realizar esta ação.';
+  }
+
   if (raw.contains('violates row-level security') || raw.contains('rls') || raw.contains('permission denied')) {
     return 'Você não tem permissão para realizar esta ação.';
   }

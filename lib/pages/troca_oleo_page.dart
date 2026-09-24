@@ -220,6 +220,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
           'oil_change_date': dataStr,
           'next_change_km' : proximoKm,
           'manutencao_id'  : manutencaoId,
+          if (placa.isNotEmpty) 'vehicle_plate': placa,
         };
         if (observacoesController.text.trim().isNotEmpty) {
           payload['notes'] = observacoesController.text.trim();
@@ -234,6 +235,14 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       } catch (e) {
         oilChangeSecundarioOk = false;
         debugPrint('ERRO TROCA DE ÓLEO (oil_changes secundário): $e');
+        // Desfaz a manutenção criada acima para não deixar um registro
+        // "Aberto" órfão no dashboard (motorista não tem DELETE — nesse caso
+        // o aviso abaixo orienta refazer e a gestão remove o registro).
+        if (manutencaoId != null) {
+          try {
+            await supabase.from('manutencoes').delete().eq('id', manutencaoId);
+          } catch (_) {}
+        }
       }
 
       // Atualiza o odômetro do veículo se este for maior que o registrado
@@ -247,13 +256,10 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
         } catch (_) {}
       }
 
-      // ── Alerta de próxima troca (silencioso se falhar) ──────────────────────
-      try {
-        await supabase.from('alerts').insert(injetar({
-          'title'      : 'Próxima Troca de Óleo: $placa',
-          'description': '$selectedServiceType — próxima em $proximoKm km',
-        }));
-      } catch (_) {}
+      // O lembrete de próxima troca NÃO é mais gravado como alerta aqui: ele
+      // nascia "ativo" no mesmo dia (meses antes de vencer), sem veículo, e
+      // gerava um 2º push. Agora o alerta é criado pelo banco só quando o
+      // hodômetro chega perto do km da próxima troca (docs/FASE2_02).
 
       if (oilChangeSecundarioOk) {
         _snackSucesso('Troca registrada! Próxima em $proximoKm km');

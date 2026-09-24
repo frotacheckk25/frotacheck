@@ -125,7 +125,10 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => isSaving = true);
-    final injetar = context.read<AppAuthProvider>().inject;
+    final auth = context.read<AppAuthProvider>();
+    final injetar = auth.inject;
+    // Motorista sempre registra em nome próprio (o banco exige isso).
+    if (auth.isMotorista && auth.driverId != null) selectedDriverId = auth.driverId;
 
     // Monta payload apenas com colunas que existem na tabela occurrences
     final payload = <String, dynamic>{

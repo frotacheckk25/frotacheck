@@ -79,8 +79,27 @@ function getFirebaseApp() {
   return initializeApp({ credential: cert(serviceAccount) });
 }
 
+// Só o gatilho do banco (notify_new_event, que envia a service_role key do
+// Vault) pode disparar push. Antes qualquer usuário logado conseguia chamar
+// esta função e mandar notificação com texto livre para gestores de qualquer
+// empresa. PUSH_TRIGGER_SECRET é opcional (caso o Vault guarde outra chave).
+function chamadorAutorizado(req: Request): boolean {
+  const header = req.headers.get("Authorization") ?? "";
+  const token = header.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+  const aceitos = [
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+    Deno.env.get("PUSH_TRIGGER_SECRET"),
+  ].filter((v): v is string => !!v);
+  return aceitos.includes(token);
+}
+
 Deno.serve(async (req) => {
   try {
+    if (!chamadorAutorizado(req)) {
+      return new Response(JSON.stringify({ error: "não autorizado" }), { status: 401 });
+    }
+
     const { table, record } = await req.json();
     if (!table || !record?.empresa_id) {
       return new Response(JSON.stringify({ skipped: "sem tabela ou empresa_id" }), { status: 200 });
@@ -96,6 +115,7 @@ Deno.serve(async (req) => {
       .from("user_profiles")
       .select("user_id")
       .eq("empresa_id", record.empresa_id)
+      .eq("status", "ativo")
       .in("role", ["ADMIN_EMPRESA", "GESTOR"]);
 
     if (perfisError) throw perfisError;
@@ -163,6 +183,21 @@ Deno.serve(async (req) => {
     );
 
     const falhas = resultados.filter((r) => r.status === "rejected").length;
+
+    // Remove tokens de aparelhos que desinstalaram o app / trocaram de conta,
+    // para não acumular lixo nem mandar push para o aparelho errado.
+    const tokensInvalidos = tokens
+      .filter((_, i) => {
+        const r = resultados[i];
+        // deno-lint-ignore no-explicit-any
+        const code = r.status === "rejected" ? (r.reason as any)?.code ?? (r.reason as any)?.errorInfo?.code : null;
+        return code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token";
+      })
+      .map((t) => t.fcm_token);
+    if (tokensInvalidos.length > 0) {
+      await supabase.from("device_tokens").delete().in("fcm_token", tokensInvalidos);
+    }
 
     return new Response(
       JSON.stringify({ enviados: tokens.length - falhas, falhas }),

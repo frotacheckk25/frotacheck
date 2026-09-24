@@ -325,6 +325,7 @@ pw.Widget _headerBanner({
   required DateTime generatedAt,
   required DateTime periodoInicio,
   required DateTime periodoFim,
+  pw.ImageProvider? companyLogo,
 }) {
   return pw.ClipRRect(
     horizontalRadius: 14,
@@ -364,19 +365,32 @@ pw.Widget _headerBanner({
                     ]),
                   ],
                 ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
-                    pw.Text('RELATÓRIO EXECUTIVO DE FROTA',
-                        style: pw.TextStyle(
-                            fontSize: 16,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _navy,
-                            letterSpacing: 0.2)),
-                    pw.SizedBox(height: 3),
-                    pw.Text(companyName,
-                        style: pw.TextStyle(
-                            fontSize: 11, fontWeight: pw.FontWeight.bold, color: _blueBrand)),
+                    if (companyLogo != null) ...[
+                      pw.Container(
+                        width: 36,
+                        height: 36,
+                        child: pw.Image(companyLogo, fit: pw.BoxFit.contain),
+                      ),
+                      pw.SizedBox(width: 10),
+                    ],
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('RELATÓRIO EXECUTIVO DE FROTA',
+                            style: pw.TextStyle(
+                                fontSize: 16,
+                                fontWeight: pw.FontWeight.bold,
+                                color: _navy,
+                                letterSpacing: 0.2)),
+                        pw.SizedBox(height: 3),
+                        pw.Text(companyName,
+                            style: pw.TextStyle(
+                                fontSize: 11, fontWeight: pw.FontWeight.bold, color: _blueBrand)),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -821,11 +835,20 @@ Future<Uint8List> buildRelatorioPdfBytes({
   required List<Map<String, dynamic>> topMotoristas,
   required DateTime periodoInicio,
   required DateTime periodoFim,
+  Uint8List? companyLogoBytes,
 }) async {
   final headerBytes = await rootBundle.load('assets/images/Parte_cima_projeto.jpeg');
   final footerBytes = await rootBundle.load('assets/images/Parte_baixo_projeto.jpeg');
   final headerImg = pw.MemoryImage(headerBytes.buffer.asUint8List());
   final footerImg = pw.MemoryImage(footerBytes.buffer.asUint8List());
+  pw.ImageProvider? logoImg;
+  if (companyLogoBytes != null && companyLogoBytes.isNotEmpty) {
+    try {
+      logoImg = pw.MemoryImage(companyLogoBytes);
+    } catch (_) {
+      logoImg = null; // formato não suportado pelo PDF — segue sem logo
+    }
+  }
 
   final veiculosItems = topVeiculos
       .take(5)
@@ -851,6 +874,7 @@ Future<Uint8List> buildRelatorioPdfBytes({
           generatedAt: DateTime.now(),
           periodoInicio: periodoInicio,
           periodoFim: periodoFim,
+          companyLogo: logoImg,
         ),
         pw.SizedBox(height: 7),
         pw.Row(

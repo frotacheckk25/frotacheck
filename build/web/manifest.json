@@ -1,23 +1,29 @@
 {
-    "name": "frotacheck",
-    "short_name": "frotacheck",
-    "start_url": ".",
+    "name": "FrotaCheck",
+    "short_name": "FrotaCheck",
+    "description": "FrotaCheck - Gestão completa de frota: veículos, motoristas, abastecimentos, manutenções, checklists e relatórios.",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "display_override": ["standalone", "minimal-ui"],
     "orientation": "portrait-primary",
+    "background_color": "#0B1220",
+    "theme_color": "#2563EB",
     "prefer_related_applications": false,
+    "lang": "pt-BR",
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-maskable-192.png",

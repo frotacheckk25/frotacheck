@@ -35,14 +35,49 @@ export async function getCaller(req: Request): Promise<CallerInfo> {
   const service = getServiceClient();
   const { data: perfil, error: perfilError } = await service
     .from("user_profiles")
-    .select("empresa_id, role")
+    .select("empresa_id, role, status, empresas(status)")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (perfilError) throw new Error(`Erro ao buscar perfil: ${perfilError.message}`);
   if (!perfil) throw new Error("Perfil de usuário não encontrado");
 
+  // Mesma regra do banco (get_my_role): usuário bloqueado/inativo/pendente ou
+  // empresa suspensa/cancelada não opera documentos fiscais.
+  if (perfil.status !== "ativo") throw new Error("Usuário sem acesso ativo");
+  // deno-lint-ignore no-explicit-any
+  const empresaStatus = (perfil as any).empresas?.status;
+  if (perfil.empresa_id && empresaStatus !== "ativo") {
+    throw new Error("Empresa sem acesso ativo");
+  }
+
   return { userId: user.id, empresaId: perfil.empresa_id, role: perfil.role };
+}
+
+/**
+ * Chama o wrapper fiscal sem nunca lançar exceção: falha de rede, timeout ou
+ * resposta que não é JSON viram `{ status: "erro", erro }`. Assim o documento
+ * nunca fica preso em "enviando" quando o servidor fiscal cai no meio.
+ */
+// deno-lint-ignore no-explicit-any
+export async function chamarWrapper(path: string, payload: unknown): Promise<any> {
+  try {
+    const resp = await fetch(wrapperUrl(path), {
+      method: "POST",
+      headers: { ...wrapperAuthHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(90_000),
+    });
+    const texto = await resp.text();
+    try {
+      return JSON.parse(texto);
+    } catch {
+      return { status: "erro", erro: `Resposta inválida do servidor fiscal (HTTP ${resp.status})` };
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { status: "erro", erro: `Servidor fiscal indisponível: ${msg}` };
+  }
 }
 
 const ROLES_MANAGE_DOCS = ["MASTER", "ADMIN_EMPRESA", "GESTOR"];

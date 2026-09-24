@@ -30,6 +30,7 @@ import '../shared/widgets/frota_logo.dart';
 import '../shared/widgets/menu_card.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import '../core/utils/fetch_all.dart';
 import '../core/utils/signed_storage_url.dart';
 import 'package:provider/provider.dart';
 import '../core/auth/app_auth_provider.dart';
@@ -728,26 +729,11 @@ class _HomePageState extends State<HomePage> {
                   .limit(3),
           'fuelings-recent',
         ), // 9
-        _safeQueryDirect(
-          _empresaId != null
-              ? supabase.from('oil_changes').select('id,service_type,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
-              : supabase.from('oil_changes').select('id,service_type,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-          'oil_changes-alltime',
-        ), // 10
-        _safeQueryDirect(
-          _empresaId != null
-              ? supabase.from('occurrences').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
-              : supabase.from('occurrences').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-          'occurrences-alltime',
-        ), // 11
+        _safeSelect('oil_changes', cols: 'id,service_type,created_at'), // 10
+        _safeSelect('occurrences', cols: 'id,status,created_at'), // 11
         // 'ocorrencias' (PT) nunca existiu como tabela — sempre 404.
         Future.value(<Map<String, dynamic>>[]), // 12
-        _safeQueryDirect(
-          _empresaId != null
-              ? supabase.from('manutencoes').select('id,status,created_at').eq('empresa_id', _empresaId!).gte('created_at', '2020-01-01').order('created_at', ascending: false)
-              : supabase.from('manutencoes').select('id,status,created_at').gte('created_at', '2020-01-01').order('created_at', ascending: false),
-          'manutencoes-alltime',
-        ), // 13
+        _safeSelect('manutencoes', cols: 'id,status,created_at,vehicle_id'), // 13
       ]);
 
       final veiculos = results[0];
@@ -764,9 +750,9 @@ class _HomePageState extends State<HomePage> {
       final recents = results[9]
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
-      final allTimeOilChanges  = results[10];
       final allTimeOccurrences = results[11];
       final allTimeOcorrencias = results[12];
+      final allTimeManutencoes = results[13];
 
 
       // Período filtrado — gráficos e custo
@@ -775,10 +761,21 @@ class _HomePageState extends State<HomePage> {
       // All-time — KPI cards (sem recorte de data)
       final allTimeAllOcorrencias = [...allTimeOccurrences, ...allTimeOcorrencias];
 
+      // Pneus são carregados sem filtro de período (a lista completa alimenta
+      // o painel de pneus); para CUSTO do período, só os instalados no período.
+      final pneusNoPeriodo = pneus.where((p) {
+        final raw = (p['data_instalacao'] ?? p['created_at'])?.toString() ?? '';
+        final dt = DateTime.tryParse(raw)?.toLocal();
+        if (dt == null) return false;
+        final d = DateTime(dt.year, dt.month, dt.day);
+        return !d.isBefore(DateTime(_filterStart.year, _filterStart.month, _filterStart.day)) &&
+            !d.isAfter(DateTime(_filterEnd.year, _filterEnd.month, _filterEnd.day));
+      }).toList();
+
       final dashboardTotalGasto = _calculateTotalCost(
         abastecimentos,
         manutencoes,
-        pneus,
+        pneusNoPeriodo,
         multas,
       );
 
@@ -789,15 +786,22 @@ class _HomePageState extends State<HomePage> {
       final costByCategory = _buildCostByCategory(
         abastecimentos,
         manutencoes,
-        pneus,
+        pneusNoPeriodo,
         multas,
       );
-      // Ocorrências não resolvidas — base do card "Em Manutenção" e badge
+      // Ocorrências não resolvidas — badge de ocorrências abertas
       final openOcorrenciasCount = allTimeAllOcorrencias
           .where((e) => _isOpenStatus(e))
           .length;
-      // "Em Manutenção": total de registros em oil_changes (fonte real dos dados de manutenção)
-      final activeMaintenanceCount = allTimeOilChanges.length;
+      // "Em Manutenção": veículos com ao menos uma manutenção ainda em aberto.
+      // (Antes era o total histórico de trocas de óleo — número sem relação
+      // com veículos parados.)
+      final activeMaintenanceCount = allTimeManutencoes
+          .where(_isOpenStatus)
+          .map((m) => m['vehicle_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .length;
       final alerts = await _loadAlertas(
         occurrences: occurrences,
         ocorrencias: ocorrencias,
@@ -811,8 +815,9 @@ class _HomePageState extends State<HomePage> {
         var critQ = supabase
             .from('occurrences')
             .select('id, problem_type, priority, status, location, vehicle_id, created_at')
-            .neq('status', 'Resolvido')
-            .eq('priority', 'Alta');
+            .not('status', 'in',
+                '(Resolvido,resolvido,Resolved,resolved,Concluído,concluído,Concluido,concluido,Fechado,fechado,Cancelado,cancelado)')
+            .ilike('priority', 'alta');
         if (_empresaId != null) critQ = critQ.eq('empresa_id', _empresaId!);
         final critRes = await critQ
             .order('created_at', ascending: false)
@@ -883,14 +888,23 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _safeSelect(String table) async {
+  /// Início/fim do período em UTC para colunas timestamptz (created_at).
+  /// Antes o filtro usava "AAAA-MM-DDT23:59:59" sem fuso — interpretado como
+  /// UTC pelo banco — e registros das últimas 3h do mês caíam no mês errado.
+  static String _inicioDiaUtc(String data) =>
+      DateTime.parse(data).toUtc().toIso8601String();
+  static String _inicioDiaSeguinteUtc(String data) {
+    final d = DateTime.parse(data);
+    return DateTime(d.year, d.month, d.day + 1).toUtc().toIso8601String();
+  }
+
+  Future<List<Map<String, dynamic>>> _safeSelect(String table, {String cols = '*'}) async {
     try {
-      var q = supabase.from(table).select();
-      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
-      final response = await q as List;
-      return response
-          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
-          .toList();
+      return await fetchAllRows((from, to) {
+        var q = supabase.from(table).select(cols);
+        if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+        return q.order('id').range(from, to);
+      });
     } catch (e) {
       debugPrint('Falha ao carregar $table: $e');
     }
@@ -912,30 +926,21 @@ class _HomePageState extends State<HomePage> {
     String dateStart,
     String dateEnd,
   ) async {
+    // Sem fallback "sem filtro de data": se a consulta falhar, o dashboard
+    // mostra zero — nunca dados de todos os tempos como se fossem do período.
     try {
-      var q = supabase
-          .from('fuelings')
-          .select('*, vehicles (plate), drivers (name)')
-          .gte('fuel_date', dateStart)
-          .lte('fuel_date', dateEnd);
-      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
-      final response = await q as List;
-      return response
-          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      try {
+      return await fetchAllRows((from, to) {
         var q = supabase
             .from('fuelings')
-            .select('*, vehicles (plate), drivers (name)');
+            .select('*, vehicles (plate), drivers (name)')
+            .gte('fuel_date', dateStart)
+            .lte('fuel_date', dateEnd);
         if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
-        final response = await q as List;
-        return response
-            .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
-            .toList();
-      } catch (_) {
-        return [];
-      }
+        return q.order('id').range(from, to);
+      });
+    } catch (e) {
+      debugPrint('Falha ao carregar abastecimentos do período: $e');
+      return [];
     }
   }
 
@@ -946,18 +951,18 @@ class _HomePageState extends State<HomePage> {
     String dateCol = 'created_at',
   }) async {
     try {
-      var q = supabase
-          .from(table)
-          .select()
-          .gte(dateCol, dateStart)
-          .lte(dateCol, '${dateEnd}T23:59:59');
-      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
-      final response = await q as List;
-      return response
-          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return _safeSelect(table);
+      return await fetchAllRows((from, to) {
+        var q = supabase
+            .from(table)
+            .select()
+            .gte(dateCol, _inicioDiaUtc(dateStart))
+            .lt(dateCol, _inicioDiaSeguinteUtc(dateEnd));
+        if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+        return q.order('id').range(from, to);
+      });
+    } catch (e) {
+      debugPrint('Falha ao carregar $table do período: $e');
+      return [];
     }
   }
 
@@ -1014,15 +1019,18 @@ class _HomePageState extends State<HomePage> {
     String dateCol = 'created_at',
     String cols = 'created_at',
   }) async {
+    // fuel_date é coluna DATE (compara direto); as demais são timestamptz.
+    final isDate = dateCol == 'fuel_date';
     try {
-      var q = supabase
-          .from(table)
-          .select(cols)
-          .gte(dateCol, start)
-          .lte(dateCol, '${end}T23:59:59');
-      if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
-      final r = await q as List;
-      return r.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      return await fetchAllRows((from, to) {
+        var q = supabase
+            .from(table)
+            .select(cols)
+            .gte(dateCol, isDate ? start : _inicioDiaUtc(start));
+        q = isDate ? q.lte(dateCol, end) : q.lt(dateCol, _inicioDiaSeguinteUtc(end));
+        if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+        return q.order('id').range(from, to);
+      });
     } catch (_) {
       return [];
     }
@@ -1040,7 +1048,7 @@ class _HomePageState extends State<HomePage> {
         _sparkSelect('fuelings', start, end,
             dateCol: 'fuel_date',
             cols: 'fuel_date,total_value,vehicle_id,driver_id'),
-        _sparkSelect('manutencoes', start, end, cols: 'created_at,cost,valor'),
+        _sparkSelect('manutencoes', start, end, cols: 'created_at,cost,valor,vehicle_id'),
         _sparkSelect('occurrences', start, end, cols: 'created_at'),
         _sparkSelect('multas', start, end, cols: 'created_at,valor'),
       ]);
@@ -1076,12 +1084,18 @@ class _HomePageState extends State<HomePage> {
       final multCost  = _monthCostBins(mult,  costFields: ['valor']);
       final gastoBins = List<double>.generate(6, (i) => fuelCost[i] + maintCost[i] + multCost[i]);
 
-      // Fleet index = (total_vehicles - vehicles_in_maintenance_that_month) / total * 100
+      // Fleet index = (total - veículos DISTINTOS com manutenção no mês) / total.
+      // (Antes usava a quantidade de registros de manutenção como se fosse
+      // quantidade de veículos parados.)
       final vTotal = veiculos.length;
       final fleetBins = List<double>.generate(6, (i) {
         if (vTotal == 0) return 0.0;
-        final inMaint = maintBins[i].clamp(0, vTotal.toDouble());
-        return ((vTotal - inMaint) / vTotal * 100).clamp(0.0, 100.0);
+        final mo2 = _mOff(5 - i);
+        final inMaint = maint.where((m) {
+          final dt = DateTime.tryParse(m['created_at']?.toString() ?? '')?.toLocal();
+          return dt != null && dt.year == mo2.year && dt.month == mo2.month;
+        }).map((m) => m['vehicle_id']).whereType<Object>().toSet().length;
+        return ((vTotal - inMaint.clamp(0, vTotal)) / vTotal * 100).clamp(0.0, 100.0);
       });
 
       if (!mounted) return;
@@ -1135,6 +1149,12 @@ class _HomePageState extends State<HomePage> {
     required List<Map<String, dynamic>> documentos,
     required List<Map<String, dynamic>> motoristas,
   }) async {
+    // Alertas gravados (manuais + automáticos do banco) e alertas calculados
+    // aqui (CNH/documentos) são COMBINADOS. Antes, bastava existir 1 alerta
+    // na tabela para os de CNH/documento sumirem — e CNH/documento já vencidos
+    // nunca apareciam (só "vencendo").
+    final built = <Map<String, String>>[];
+    var temAlertasAutomaticos = false;
     try {
       var alertsQ = supabase
           .from('alerts')
@@ -1143,90 +1163,79 @@ class _HomePageState extends State<HomePage> {
       if (_empresaId != null) alertsQ = alertsQ.eq('empresa_id', _empresaId!);
       final supAlerts = await alertsQ
           .order('created_at', ascending: false)
-          .limit(8);
-      final supAlertsList = supAlerts as List;
-      if (supAlertsList.isNotEmpty) {
-        // Ordena: error (crítico) primeiro, depois warning, depois info
-        final sorted = List<Map<String, dynamic>>.from(
-          supAlertsList.map((e) => Map<String, dynamic>.from(e as Map)),
-        );
-        const ordemTipo = {'error': 0, 'warning': 1, 'info': 2};
-        sorted.sort((a, b) {
-          final ta = ordemTipo[a['tipo'] ?? 'info'] ?? 2;
-          final tb = ordemTipo[b['tipo'] ?? 'info'] ?? 2;
-          return ta.compareTo(tb);
+          .limit(20);
+      for (final e in supAlerts as List) {
+        final a = Map<String, dynamic>.from(e as Map);
+        if (a['chave'] != null) temAlertasAutomaticos = true;
+        built.add({
+          'title': (a['title'] ?? a['titulo'] ?? '').toString(),
+          'subtitle': (a['subtitle'] ?? a['description'] ?? a['descricao'] ?? a['detail'] ?? '').toString(),
+          'tipo': (a['tipo'] ?? 'info').toString(),
+          'time': (a['created_at'] ?? '').toString(),
         });
-        return sorted.map<Map<String, String>>((a) {
-          return {
-            'title': (a['title'] ?? a['titulo'] ?? '').toString(),
-            'subtitle': (a['subtitle'] ?? a['descricao'] ?? a['detail'] ?? '').toString(),
-            'tipo': (a['tipo'] ?? 'info').toString(),
-            'time': (a['created_at'] ?? '').toString(),
-          };
-        }).toList();
       }
     } catch (e) {
       debugPrint('Falha ao carregar alertas diretos: $e');
     }
 
-    final built = <Map<String, String>>[];
-    final combinedOccurrences = [...occurrences, ...ocorrencias];
-
-    for (final o in combinedOccurrences.where(_isOpenStatus).take(5)) {
-      final tipo =
-          o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
-      built.add({
-        'title': 'Ocorrência: ${tipo.toString()}',
-        'subtitle': '${o['vehicles']?['plate'] ?? ''} - ${o['status'] ?? ''}',
-        'time': (o['created_at'] ?? '').toString(),
-        'tipo': 'warning',
-      });
-    }
-
-    final now = DateTime.now();
-    for (final doc in documentos) {
-      final raw =
-          doc['data_vencimento']?.toString() ??
-          doc['vencimento']?.toString() ??
-          '';
-      final dt = _parseDate(raw) ?? DateTime.tryParse(raw);
-      if (dt != null) {
-        final diff = dt.difference(now).inDays;
-        if (diff <= 30 && diff >= 0) {
-          built.add({
-            'title':
-                'Documento vencendo: ${doc['tipo'] ?? doc['name'] ?? 'Documento'}',
-            'subtitle': 'Vence em $diff dias',
-          });
-        }
-      }
-    }
-
-    for (final m in motoristas) {
-      final raw =
-          m['cnh_vencimento'] ??
-          m['cnh_expiration'] ??
-          m['cnh_due'] ??
-          m['cnh_validade'];
-      final dt = raw != null
-          ? _parseDate(raw.toString()) ?? DateTime.tryParse(raw.toString())
-          : null;
-      if (dt != null) {
-        final diff = dt.difference(now).inDays;
-        if (diff <= 30 && diff >= 0) {
-          built.add({
-            'title': 'CNH vencendo: ${m['name'] ?? m['nome'] ?? 'Motorista'}',
-            'subtitle': 'Vence em $diff dias',
-          });
-        }
-      }
-    }
-
     if (built.isEmpty) {
-      return built;
+      final combinedOccurrences = [...occurrences, ...ocorrencias];
+      for (final o in combinedOccurrences.where(_isOpenStatus).take(5)) {
+        final tipo =
+            o['problem_type'] ?? o['type'] ?? o['category'] ?? 'Ocorrência';
+        built.add({
+          'title': 'Ocorrência: ${tipo.toString()}',
+          'subtitle': '${o['vehicles']?['plate'] ?? ''} - ${o['status'] ?? ''}',
+          'time': (o['created_at'] ?? '').toString(),
+          'tipo': 'warning',
+        });
+      }
     }
 
-    return built.take(6).toList();
+    // Se o job diário de vencimentos (FASE2_02) já está gerando alertas, não
+    // duplica aqui. Senão, calcula na hora — incluindo os JÁ vencidos.
+    if (!temAlertasAutomaticos) {
+      final hoje = DateTime.now();
+      final hojeDia = DateTime(hoje.year, hoje.month, hoje.day);
+      void avaliar(DateTime? dt, String rotuloVencido, String rotuloVencendo) {
+        if (dt == null) return;
+        final diff = DateTime(dt.year, dt.month, dt.day).difference(hojeDia).inDays;
+        if (diff < 0) {
+          built.add({
+            'title': rotuloVencido,
+            'subtitle': 'Venceu há ${-diff} dia(s)',
+            'tipo': 'error',
+          });
+        } else if (diff <= 30) {
+          built.add({
+            'title': rotuloVencendo,
+            'subtitle': diff == 0 ? 'Vence hoje' : 'Vence em $diff dia(s)',
+            'tipo': 'warning',
+          });
+        }
+      }
+
+      for (final doc in documentos) {
+        if (doc['ativo'] == false) continue;
+        final raw = doc['data_vencimento']?.toString() ?? doc['vencimento']?.toString() ?? '';
+        final nome = doc['tipo'] ?? doc['name'] ?? 'Documento';
+        avaliar(_parseDate(raw) ?? DateTime.tryParse(raw),
+            'Documento vencido: $nome', 'Documento vencendo: $nome');
+      }
+
+      for (final m in motoristas) {
+        final raw = m['cnh_vencimento'] ?? m['cnh_expiration'] ?? m['cnh_due'] ?? m['cnh_validade'];
+        final nome = m['name'] ?? m['nome'] ?? 'Motorista';
+        avaliar(raw != null ? _parseDate(raw.toString()) ?? DateTime.tryParse(raw.toString()) : null,
+            'CNH vencida: $nome', 'CNH vencendo: $nome');
+      }
+    }
+
+    // Críticos primeiro (error > warning > info).
+    const ordemTipo = {'error': 0, 'warning': 1, 'info': 2};
+    built.sort((a, b) =>
+        (ordemTipo[a['tipo'] ?? 'info'] ?? 2).compareTo(ordemTipo[b['tipo'] ?? 'info'] ?? 2));
+    return built.take(8).toList();
   }
 
   List<FlSpot> _buildMonthlyFuelSpots(List<dynamic> abastecimentos) {

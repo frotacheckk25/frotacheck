@@ -208,20 +208,15 @@ class _MotoristasPageState extends State<_MotoristasView> {
         // Vínculo automático com conta do motorista pelo e-mail
         if (emailConta.isNotEmpty && driverId != null) {
           try {
-            final userProfile = await supabase
-                .from('user_profiles')
-                .select('user_id')
-                .eq('email', emailConta)
-                .maybeSingle();
-            if (userProfile != null) {
-              final uId = userProfile['user_id'].toString();
+            final uId = await _localizarContaMotorista(emailConta, auth.isMaster);
+            if (uId != null) {
               await linkUserToDriver(supabase, userId: uId, driverId: driverId);
               _snackSucesso('Motorista cadastrado e vinculado à conta $emailConta!');
             } else {
               _snackSucesso('Motorista cadastrado! Conta "$emailConta" não encontrada ainda — vínculo pendente.');
             }
-          } catch (_) {
-            _snackSucesso('Motorista cadastrado com sucesso!');
+          } catch (e) {
+            _snackErro('Motorista cadastrado, mas a conta não foi vinculada: ${friendlyError(e)}');
           }
         } else {
           _snackSucesso('Motorista cadastrado com sucesso!');
@@ -239,20 +234,20 @@ class _MotoristasPageState extends State<_MotoristasView> {
         // Ao editar, re-vincular conta se email foi preenchido
         if (emailConta.isNotEmpty) {
           bool vinculoOk = false;
+          String? erroVinculo;
           try {
-            final userProfile = await supabase
-                .from('user_profiles')
-                .select('user_id')
-                .eq('email', emailConta)
-                .maybeSingle();
-            if (userProfile != null) {
-              final uId = userProfile['user_id'].toString();
+            final uId = await _localizarContaMotorista(emailConta, auth.isMaster);
+            if (uId != null) {
               await linkUserToDriver(supabase, userId: uId, driverId: editingId!);
               vinculoOk = true;
             }
-          } catch (_) {}
+          } catch (e) {
+            erroVinculo = friendlyError(e);
+          }
           if (vinculoOk) {
             _snackSucesso('Motorista atualizado e vinculado à conta $emailConta!');
+          } else if (erroVinculo != null) {
+            _snackErro('Motorista atualizado, mas a conta não foi vinculada: $erroVinculo');
           } else {
             _snackSucesso('Motorista atualizado! Conta "$emailConta" não encontrada — vínculo pendente.');
           }
@@ -305,6 +300,31 @@ class _MotoristasPageState extends State<_MotoristasView> {
     }
   }
 
+  /// Acha a conta (user_id) do motorista pelo e-mail. Admin/gestor não
+  /// enxergam contas ainda pendentes (sem empresa) — a função do banco
+  /// vincular_usuario_empresa localiza, vincula à empresa como MOTORISTA e
+  /// recusa conta de outra empresa. Devolve null se a conta não existe.
+  Future<String?> _localizarContaMotorista(String email, bool isMaster) async {
+    if (isMaster) {
+      final perfil = await supabase
+          .from('user_profiles')
+          .select('user_id')
+          .eq('email', email)
+          .maybeSingle();
+      return perfil?['user_id']?.toString();
+    }
+    try {
+      final res = await supabase.rpc('vincular_usuario_empresa', params: {
+        'p_email': email,
+        'p_role': 'MOTORISTA',
+      });
+      return res?.toString();
+    } on PostgrestException catch (e) {
+      if (e.message.contains('CONTA_NAO_ENCONTRADA')) return null;
+      rethrow;
+    }
+  }
+
   Future<void> excluirMotorista(String id, String nome) async {
     final conf = await showDialog<bool>(
       context: context,
@@ -312,7 +332,8 @@ class _MotoristasPageState extends State<_MotoristasView> {
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Excluir motorista', style: TextStyle(color: Colors.white)),
-        content: Text('Excluir $nome permanentemente?',
+        content: Text(
+            'Excluir $nome permanentemente?\n\nO histórico (abastecimentos, viagens, checklists, multas) é mantido, mas deixa de aparecer vinculado a este motorista.',
             style: const TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(

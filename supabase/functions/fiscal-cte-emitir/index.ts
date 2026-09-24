@@ -26,14 +26,13 @@
 //   FISCAL_WRAPPER_URL, FISCAL_WRAPPER_TOKEN
 
 import {
+  chamarWrapper,
   errorResponse,
   getCaller,
   getServiceClient,
   jsonResponse,
   requireManageDocs,
   resolveEmpresaId,
-  wrapperAuthHeader,
-  wrapperUrl,
 } from "../_shared/fiscal.ts";
 
 Deno.serve(async (req) => {
@@ -74,6 +73,34 @@ Deno.serve(async (req) => {
     }
 
     const ambienteNum = settings.ambiente_fiscal === "producao" ? 1 : 2;
+
+    // Só reaproveita registro que ainda não virou documento fiscal válido —
+    // nunca sobrescreve um CT-e autorizado/cancelado/em envio.
+    if (body.cte_documento_id) {
+      const { data: existente, error: existenteError } = await service
+        .from("cte_documentos")
+        .select("status")
+        .eq("id", body.cte_documento_id)
+        .eq("empresa_id", empresaId)
+        .maybeSingle();
+      if (existenteError) throw existenteError;
+      if (!existente) return jsonResponse({ ok: false, erro: "CT-e não encontrado para esta empresa" }, 404);
+      if (!["rascunho", "erro", "rejeitado"].includes(existente.status)) {
+        return jsonResponse({ ok: false, erro: `Este CT-e não pode ser reemitido (status atual: ${existente.status})` }, 409);
+      }
+    }
+
+    // Veículo/motorista/viagem informados precisam ser da mesma empresa.
+    const vinculos: Array<[string, string | undefined]> = [
+      ["vehicles", body.veiculo_id],
+      ["drivers", body.motorista_id],
+      ["viagens", body.viagem_id],
+    ];
+    for (const [tabela, id] of vinculos) {
+      if (!id) continue;
+      const { data: ref } = await service.from(tabela).select("id").eq("id", id).eq("empresa_id", empresaId).maybeSingle();
+      if (!ref) return jsonResponse({ ok: false, erro: `Vínculo inválido (${tabela}) para esta empresa` }, 400);
+    }
 
     const { data: numeroCte, error: numeroError } = await service.rpc("fiscal_proximo_numero", {
       p_empresa_id: empresaId,
@@ -159,12 +186,7 @@ Deno.serve(async (req) => {
       icms: body.icms,
     };
 
-    const wrapperResp = await fetch(wrapperUrl(`/cte/${empresaId}/emitir`), {
-      method: "POST",
-      headers: { ...wrapperAuthHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(wrapperPayload),
-    });
-    const resultado = await wrapperResp.json();
+    const resultado = await chamarWrapper(`/cte/${empresaId}/emitir`, wrapperPayload);
 
     if (resultado.status === "autorizado") {
       let xmlUrl: string | null = null;

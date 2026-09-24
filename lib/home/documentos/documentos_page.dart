@@ -839,7 +839,10 @@ class _NovoDocumentoFormState extends State<_NovoDocumentoForm> {
         }
       }
 
-      final motoristaId = motoristaAutoId ?? motoristaManualId;
+      // Motorista sempre registra em nome próprio (o banco exige isso).
+      final motoristaId = (auth.isMotorista && auth.driverId != null)
+          ? auth.driverId
+          : (motoristaAutoId ?? motoristaManualId);
 
       final payload = <String, dynamic>{
         'tipo': tipoSelecionado,

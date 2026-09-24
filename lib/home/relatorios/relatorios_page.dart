@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
+import 'package:frotacheck/core/enums/app_permission.dart';
+import 'package:frotacheck/core/utils/fetch_all.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
 import 'package:printing/printing.dart';
 import 'relatorio_pdf_layout.dart';
@@ -31,7 +33,6 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
   double totalMultasTotal = 0; // abertas + pagas (exclui contestadas) — usado no Total Geral
 
   // ── Manutenção ───────────────────────────────────────────────────────────────
-  int qtdTrocasOleo = 0;
   double totalGastoManutencao = 0;
 
   // ── Total Geral ──────────────────────────────────────────────────────────────
@@ -85,46 +86,101 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
   }
 
   // ── Carregamento ─────────────────────────────────────────────────────────────
+  // ── Período do relatório ─────────────────────────────────────────────────────
+  // Antes não havia filtro nenhum: combustível eram os últimos 1000 registros
+  // e multas/manutenção 1000 linhas quaisquer de todos os tempos — o "Total
+  // Geral" somava janelas de tempo diferentes.
+  static const _periodos = <String, String>{
+    'mes': 'Este mês',
+    '3m': 'Últimos 3 meses',
+    '6m': 'Últimos 6 meses',
+    'ano': 'Este ano',
+    'tudo': 'Todo o período',
+  };
+  String _periodo = 'mes';
+  int qtdManutencoes = 0;
+  Uint8List? _logoEmpresa;
+
+  DateTime? _inicioDoPeriodo(DateTime now) => switch (_periodo) {
+        'mes' => DateTime(now.year, now.month, 1),
+        '3m' => DateTime(now.year, now.month - 2, 1),
+        '6m' => DateTime(now.year, now.month - 5, 1),
+        'ano' => DateTime(now.year, 1, 1),
+        _ => null,
+      };
+
+  static String _dataIso(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Logo da empresa para o cabeçalho do PDF (só PNG/JPEG — o gerador de PDF
+  /// não lê WebP). Qualquer falha: PDF sai sem logo, nunca quebra.
+  Future<Uint8List?> _carregarLogoEmpresa(String? eid) async {
+    if (eid == null) return null;
+    try {
+      final emp = await supabase.from('empresas').select('logo_url').eq('id', eid).maybeSingle();
+      final url = emp?['logo_url']?.toString() ?? '';
+      const marker = '/storage/v1/object/public/logos/';
+      final idx = url.indexOf(marker);
+      if (idx == -1) return null;
+      final bytes = await supabase.storage.from('logos').download(url.substring(idx + marker.length));
+      final png = bytes.length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50;
+      final jpg = bytes.length > 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
+      return (png || jpg) ? bytes : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _carregarRelatorio() async {
     setState(() => carregando = true);
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
       visaoAgregada = eid == null && auth.isMaster;
-      var fuelQ = supabase
-          .from('fuelings')
-          .select('liters, total_value, fuel_date, vehicles(plate), drivers(name)');
-      var multaQ = supabase.from('multas').select('valor, status');
-      var oilQ = supabase.from('oil_changes').select('id');
-      var manutQ = supabase.from('manutencoes').select('cost, valor');
-      if (eid != null) {
-        fuelQ  = fuelQ.eq('empresa_id', eid);
-        multaQ = multaQ.eq('empresa_id', eid);
-        oilQ   = oilQ.eq('empresa_id', eid);
-        manutQ = manutQ.eq('empresa_id', eid);
-      }
+
+      final now = DateTime.now();
+      final inicio = _inicioDoPeriodo(now);
+      final inicioData = inicio != null ? _dataIso(inicio) : null;
+      final inicioUtc = inicio?.toUtc().toIso8601String();
+
+      final logoFuture = _carregarLogoEmpresa(eid);
       final results = await Future.wait([
-        // Mais recentes primeiro: se o limite truncar, descarta os mais antigos,
-        // não os mais recentes (bug anterior fazia o oposto).
-        fuelQ.order('fuel_date', ascending: false).limit(1000),
-        multaQ.limit(1000),
-        oilQ.limit(1000),
-        manutQ.limit(1000),
+        fetchAllRows((from, to) {
+          var q = supabase
+              .from('fuelings')
+              .select('id, liters, total_value, fuel_date, vehicle_id, driver_id, vehicles(plate), drivers(name)');
+          if (eid != null) q = q.eq('empresa_id', eid);
+          if (inicioData != null) q = q.gte('fuel_date', inicioData);
+          return q.order('id').range(from, to);
+        }),
+        fetchAllRows((from, to) {
+          var q = supabase.from('multas').select('id, valor, status, data');
+          if (eid != null) q = q.eq('empresa_id', eid);
+          if (inicioData != null) q = q.gte('data', inicioData);
+          return q.order('id').range(from, to);
+        }),
+        fetchAllRows((from, to) {
+          var q = supabase.from('manutencoes').select('id, cost, valor, created_at');
+          if (eid != null) q = q.eq('empresa_id', eid);
+          if (inicioUtc != null) q = q.gte('created_at', inicioUtc);
+          return q.order('id').range(from, to);
+        }),
       ]);
 
-      final fuelings = List<Map<String, dynamic>>.from(results[0]);
-      final multas = List<Map<String, dynamic>>.from(results[1]);
-      final oilChanges = List<Map<String, dynamic>>.from(results[2]);
-      final manutencoes = List<Map<String, dynamic>>.from(results[3]);
+      final fuelings = results[0];
+      final multas = results[1];
+      final manutencoes = results[2];
+      _logoEmpresa = await logoFuture;
 
       // ── Fuel KPIs ────────────────────────────────────────────────────────────
       double gasto = 0;
       double litros = 0;
-      final Map<String, double> spendByVehicle = {};
-      final Map<String, double> spendByDriver = {};
+      // Agrupado por ID (antes era por placa/nome: dois motoristas com o
+      // mesmo nome viravam um só no ranking).
+      final Map<String, Map<String, dynamic>> spendByVehicle = {};
+      final Map<String, Map<String, dynamic>> spendByDriver = {};
       final Map<String, double> monthlySpend = {};
 
-      final now = DateTime.now();
       months = List.generate(6, (i) {
         final d = DateTime(now.year, now.month - 5 + i);
         return '${_shortMonth(d.month)} ${d.year.toString().substring(2)}';
@@ -137,10 +193,14 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         gasto += v;
         litros += l;
 
+        final vid = item['vehicle_id']?.toString() ?? '_sem';
         final plate = item['vehicles']?['plate']?.toString() ?? 'Sem placa';
+        final did = item['driver_id']?.toString() ?? '_sem';
         final driver = item['drivers']?['name']?.toString() ?? 'Sem motorista';
-        spendByVehicle[plate] = (spendByVehicle[plate] ?? 0) + v;
-        spendByDriver[driver] = (spendByDriver[driver] ?? 0) + v;
+        final ve = spendByVehicle.putIfAbsent(vid, () => {'plate': plate, 'value': 0.0});
+        ve['value'] = (ve['value'] as double) + v;
+        final dr = spendByDriver.putIfAbsent(did, () => {'name': driver, 'value': 0.0});
+        dr['value'] = (dr['value'] as double) + v;
 
         final dt = DateTime.tryParse(item['fuel_date']?.toString() ?? '');
         if (dt != null) {
@@ -165,15 +225,11 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
       chartMaxY = maxVal > 0 ? maxVal * 1.3 : 100;
 
       // Rankings
-      topVeiculos = spendByVehicle.entries
-          .map((e) => {'plate': e.key, 'value': e.value})
-          .toList()
+      topVeiculos = spendByVehicle.values.toList()
         ..sort((a, b) =>
             (b['value'] as double).compareTo(a['value'] as double));
 
-      topMotoristas = spendByDriver.entries
-          .map((e) => {'name': e.key, 'value': e.value})
-          .toList()
+      topMotoristas = spendByDriver.values.toList()
         ..sort((a, b) =>
             (b['value'] as double).compareTo(a['value'] as double));
 
@@ -212,10 +268,10 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
           totalMultasAbertas = multasAbertas;
           qtdMultasAbertas = qtdAbertas;
           totalMultasTotal = multasTotal;
-          qtdTrocasOleo = oilChanges.length;
+          qtdManutencoes = manutencoes.length;
           totalGastoManutencao = gastoManutencao;
           totalGeral = gasto + multasTotal + gastoManutencao;
-          periodoInicio = menorDataAbastecimento ?? DateTime(now.year, now.month, 1);
+          periodoInicio = inicio ?? menorDataAbastecimento ?? DateTime(now.year, now.month, 1);
           periodoFim = now;
           carregando = false;
         });
@@ -248,13 +304,14 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
       precoMedioLitro: precoMedioLitro,
       qtdMultasAbertas: qtdMultasAbertas,
       totalMultasAbertas: totalMultasAbertas,
-      qtdManutencoes: qtdTrocasOleo,
+      qtdManutencoes: qtdManutencoes,
       months: months,
       monthlyValues: monthlyValues.map((s) => s.y).toList(),
       topVeiculos: topVeiculos,
       topMotoristas: topMotoristas,
       periodoInicio: periodoInicio,
       periodoFim: periodoFim,
+      companyLogoBytes: _logoEmpresa,
     );
   }
 
@@ -375,6 +432,31 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                   ),
                   const SizedBox(height: 16),
 
+                  // ── Período ─────────────────────────────────────────────────
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _periodos.entries.map((p) {
+                      final sel = p.key == _periodo;
+                      return ChoiceChip(
+                        label: Text(p.value),
+                        selected: sel,
+                        onSelected: (_) {
+                          if (sel) return;
+                          setState(() => _periodo = p.key);
+                          _carregarRelatorio();
+                        },
+                        selectedColor: AppColors.secondary,
+                        backgroundColor: AppColors.surface,
+                        labelStyle: TextStyle(
+                            color: sel ? Colors.white : AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
                   // ── Total Geral (combustível + multas + manutenção) ──────────
                   Container(
                     width: double.infinity,
@@ -453,7 +535,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                         AppColors.danger,
                         Icons.gavel),
                     const SizedBox(width: 10),
-                    _kpi('Manutenção', '$qtdTrocasOleo registro(s) · ${_fmtR(totalGastoManutencao)}',
+                    _kpi('Manutenção', '$qtdManutencoes registro(s) · ${_fmtR(totalGastoManutencao)}',
                         AppColors.warning, Icons.oil_barrel),
                   ]),
                   const SizedBox(height: 16),
@@ -483,7 +565,8 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                     const SizedBox(height: 16),
                   ],
 
-                  // ── Botões PDF / Share ────────────────────────────────────────
+                  // ── Botões PDF / Share (só quem tem permissão de exportar) ────
+                  if (context.watch<AppAuthProvider>().can(AppPermission.exportReports)) ...[
                   _sectionTitle(
                       'Exportar', Icons.download, AppColors.textSecondary),
                   const SizedBox(height: 10),
@@ -526,6 +609,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                       ),
                     ],
                   ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),

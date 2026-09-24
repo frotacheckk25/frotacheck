@@ -78,21 +78,17 @@ class _DetalheOcorrenciaPageState extends State<DetalheOcorrenciaPage> {
     if (proximo == null) return;
     setState(() => salvando = true);
     try {
-      await supabase
+      final alterados = await supabase
           .from('occurrences')
           .update({'status': proximo})
-          .eq('id', ocorrencia['id']);
-
-      if (proximo == 'Resolvido') {
-        try {
-          await supabase
-              .from('alerts')
-              .update({'status': 'resolvido'})
-              .eq('occurrence_id', ocorrencia['id']);
-        } catch (e) {
-          debugPrint('Falha ao sincronizar alerta da ocorrência ${ocorrencia['id']}: $e');
-        }
+          .eq('id', ocorrencia['id'])
+          .select('id');
+      // Update recusado pelo banco volta vazio (sem erro) — não finge sucesso.
+      if ((alterados as List).isEmpty) {
+        throw Exception('permission denied');
       }
+      // O alerta vinculado é resolvido automaticamente pelo banco
+      // (trigger trg_sync_alerta_ocorrencia — docs/FASE2_01).
 
       setState(() => ocorrencia['status'] = proximo);
       widget.onStatusChanged?.call();

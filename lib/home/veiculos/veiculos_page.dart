@@ -424,7 +424,15 @@ class _VeiculosPageState extends State<_VeiculosView> {
       showSuccess(context, 'Veículo $placa excluído');
     } catch (e) {
       if (!mounted) return;
-      showError(context, friendlyError(e));
+      final raw = e.toString().toLowerCase();
+      if (raw.contains('foreign key') || raw.contains('23503')) {
+        // O banco protege o histórico: veículo com abastecimentos, viagens,
+        // checklists etc. não pode ser apagado.
+        showError(context,
+            'Não é possível excluir $placa: o veículo possui histórico (abastecimentos, viagens, checklists, multas ou manutenções). Desvincule o motorista em vez de excluir.');
+      } else {
+        showError(context, friendlyError(e));
+      }
     }
   }
 

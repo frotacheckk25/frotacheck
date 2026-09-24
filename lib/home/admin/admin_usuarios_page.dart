@@ -12,6 +12,7 @@ import '../../core/guards/permission_guard.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/driver_account_link.dart';
+import '../../core/utils/fetch_all.dart';
 import '../../core/widgets/signed_network_image.dart';
 
 class AdminUsuariosPage extends StatelessWidget {
@@ -125,11 +126,13 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
       // Defense-in-depth: filtra por empresa_id para não-MASTER (RLS é fallback, não única camada)
       List<Map<String, dynamic>> res;
       if (auth.isMaster) {
-        res = await _supabase
+        // .limit(5000) não adiantava: o servidor corta em 1000 por requisição.
+        res = await fetchAllRows((f, t) => _supabase
             .from('user_profiles')
             .select('*, empresas(nome)')
             .order('created_at', ascending: false)
-            .limit(5000);
+            .order('user_id')
+            .range(f, t));
       } else {
         final minhaEmpresa = auth.empresaId;
         if (minhaEmpresa != null) {
@@ -969,7 +972,6 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                             final signUpRes = await tmpClient.auth.signUp(email: email, password: tempPassword);
                             userId = signUpRes.user?.id;
                             if (userId == null) {
-                              await tmpClient.dispose();
                               setS(() { saving = false; error = 'Falha ao criar conta. Verifique se o e-mail já está cadastrado.'; });
                               return;
                             }
@@ -979,31 +981,50 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                           } finally {
                             await tmpClient.dispose();
                           }
+                        }
 
-                          await _supabase.from('user_profiles').upsert({
-                            'user_id': userId,
-                            'email': email,
-                            'nome': nome,
-                            'role': papel.label,
-                            'empresa_id': empresaId,
-                            'status': 'ativo',
-                          }, onConflict: 'user_id');
+                        if (auth.isMaster) {
+                          // MASTER tem acesso total a user_profiles.
+                          if (criarConta) {
+                            await _supabase.from('user_profiles').upsert({
+                              'user_id': userId,
+                              'email': email,
+                              'nome': nome,
+                              'role': papel.label,
+                              'empresa_id': empresaId,
+                              'status': 'ativo',
+                            }, onConflict: 'user_id');
+                          } else {
+                            final existing = await _supabase
+                                .from('user_profiles')
+                                .select('user_id')
+                                .eq('email', email)
+                                .maybeSingle();
+                            if (existing == null) {
+                              setS(() { saving = false; error = 'Conta não encontrada para esse e-mail.'; });
+                              return;
+                            }
+                            userId = existing['user_id']?.toString();
+                            await _supabase.from('user_profiles').update({
+                              'role': papel.label,
+                              'empresa_id': empresaId,
+                              'nome': nome,
+                            }).eq('user_id', userId!);
+                          }
                         } else {
-                          final existing = await _supabase
-                              .from('user_profiles')
-                              .select('user_id')
-                              .eq('email', email)
-                              .maybeSingle();
-                          if (existing == null) {
-                            setS(() { saving = false; error = 'Conta não encontrada para esse e-mail.'; });
+                          // ADMIN_EMPRESA/GESTOR: o upsert direto era recusado pelo
+                          // banco (sem permissão de INSERT e sem acesso a contas
+                          // pendentes). A função do banco valida papel e empresa.
+                          final vinculado = await _supabase.rpc('vincular_usuario_empresa', params: {
+                            'p_email': email,
+                            'p_role': papel.label,
+                            'p_nome': nome,
+                          });
+                          userId = vinculado?.toString();
+                          if (userId == null || userId.isEmpty) {
+                            setS(() { saving = false; error = 'Não foi possível vincular a conta.'; });
                             return;
                           }
-                          userId = existing['user_id']?.toString();
-                          await _supabase.from('user_profiles').update({
-                            'role': papel.label,
-                            'empresa_id': empresaId,
-                            'nome': nome,
-                          }).eq('user_id', userId!);
                         }
 
                         if (papel == AppRole.motorista) {
@@ -1016,7 +1037,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                           driverPayload['user_id'] = userId;
                           final driverRes = await _supabase.from('drivers').insert(driverPayload).select('id').single();
                           final driverId = driverRes['id']?.toString();
-                          if (driverId != null) {
+                          if (driverId != null && userId != null) {
                             await linkUserToDriver(_supabase, userId: userId, driverId: driverId);
                           }
                         }
@@ -2199,14 +2220,28 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     );
     emailCtrl.dispose();
     setState(() => _isEditing = false);
-    if (email == null || email.isEmpty) return;
+    if (email == null || email.isEmpty || !mounted) return;
+    final isMaster = context.read<AppAuthProvider>().isMaster;
     try {
-      final perfil = await _supabase.from('user_profiles').select('user_id').eq('email', email).maybeSingle();
-      if (perfil == null) {
-        if (mounted) showError(context, 'Nenhuma conta encontrada com esse e-mail. Peça para a pessoa se cadastrar no app primeiro.');
-        return;
+      String userIdConta;
+      if (isMaster) {
+        final perfil = await _supabase.from('user_profiles').select('user_id').eq('email', email).maybeSingle();
+        if (perfil == null) {
+          if (mounted) showError(context, 'Nenhuma conta encontrada com esse e-mail. Peça para a pessoa se cadastrar no app primeiro.');
+          return;
+        }
+        userIdConta = perfil['user_id'].toString();
+      } else {
+        // Admin/gestor não enxergam contas pendentes (sem empresa): a função
+        // do banco localiza a conta, vincula à empresa como MOTORISTA e
+        // recusa conta que já pertence a outra empresa.
+        final res = await _supabase.rpc('vincular_usuario_empresa', params: {
+          'p_email': email,
+          'p_role': 'MOTORISTA',
+        });
+        userIdConta = res.toString();
       }
-      await linkUserToDriver(_supabase, userId: perfil['user_id'].toString(), driverId: driverId);
+      await linkUserToDriver(_supabase, userId: userIdConta, driverId: driverId);
       await _carregar();
       if (mounted) showSuccess(context, 'Conta vinculada com sucesso!');
     } catch (e) {

@@ -10,6 +10,7 @@ import '../../core/config/app_links.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/driver_account_link.dart';
+import '../../core/utils/fetch_all.dart';
 import '../../core/utils/plano_financeiro.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../admin/admin_usuarios_page.dart';
@@ -183,6 +184,16 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
   }
 
   // ── Helper: query segura (nunca derruba o Future.wait) ────────────────────
+  Future<List<Map<String, dynamic>>> _safeAll(
+      Future<List<dynamic>> Function(int from, int to) page) async {
+    try {
+      return await fetchAllRows(page);
+    } catch (e) {
+      debugPrint('Dashboard query error: $e');
+      return [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _safeQ(Future<dynamic> query) async {
     try {
       final r = await query;
@@ -218,35 +229,40 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
       // Cada query é independente — falha isolada não derruba as demais
       final results = await Future.wait([
+        // Todas paginadas (fetchAllRows): antes paravam em 1000 linhas e os
+        // totais da plataforma ficavam errados sem aviso.
         // 0: empresas completas
-        _safeQ(_supabase.from('empresas').select()),
+        _safeAll((f, t) => _supabase.from('empresas').select().order('id').range(f, t)),
         // 1: user_profiles
-        _safeQ(_supabase.from('user_profiles').select('user_id, last_access, empresa_id, created_at')),
+        _safeAll((f, t) => _supabase.from('user_profiles')
+            .select('user_id, last_access, empresa_id, created_at').order('user_id').range(f, t)),
         // 2: veículos
-        _safeQ(_supabase.from('vehicles').select('id, empresa_id, created_at, odometer')),
+        _safeAll((f, t) => _supabase.from('vehicles')
+            .select('id, empresa_id, created_at, odometer').order('id').range(f, t)),
         // 3: motoristas
-        _safeQ(_supabase.from('drivers').select('id, empresa_id, cnh_expiration, created_at')),
+        _safeAll((f, t) => _supabase.from('drivers')
+            .select('id, empresa_id, cnh_expiration, created_at').order('id').range(f, t)),
         // 4: abastecimentos últimos 6 meses
-        _safeQ(_supabase.from('fuelings')
+        _safeAll((f, t) => _supabase.from('fuelings')
             .select('id, empresa_id, total_value, fuel_date, vehicle_id, created_at')
             .gte('fuel_date', sixMonthsAgo.toIso8601String().split('T')[0])
-            .order('created_at', ascending: false)),
+            .order('id').range(f, t)),
         // 5: checklists — só os últimos 2 meses (suficiente para a tendência
         // mês-a-mês; total real vem de uma contagem separada, abaixo)
-        _safeQ(_supabase.from('checklists')
+        _safeAll((f, t) => _supabase.from('checklists')
             .select('id, empresa_id, tipo, veiculo_id, motorista_id, criado_em')
             .gte('criado_em', lastMonth.toIso8601String())
-            .order('criado_em', ascending: false)),
+            .order('id').range(f, t)),
         // 6: ocorrências — últimos 2 meses (idem; abertas antigas são cobertas
         // pela contagem separada de "ocorrências abertas", abaixo)
-        _safeQ(_supabase.from('occurrences')
+        _safeAll((f, t) => _supabase.from('occurrences')
             .select('id, empresa_id, status, created_at')
             .gte('created_at', lastMonth.toIso8601String())
-            .order('created_at', ascending: false)),
+            .order('id').range(f, t)),
         // 7: oil_changes (manutenções)
-        _safeQ(_supabase.from('oil_changes')
+        _safeAll((f, t) => _supabase.from('oil_changes')
             .select('id, vehicle_id, created_at, next_change_km')
-            .order('created_at', ascending: false)),
+            .order('id').range(f, t)),
         // 8: usuários online (last_access recente)
         _safeQ(_supabase.from('user_profiles')
             .select('empresa_id')
@@ -278,10 +294,14 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
       final profiles = results[1];
       final veiculos = results[2];
       final motoristas = results[3];
-      final fuelings = results[4];
-      final checklists = results[5];
-      final ocorrencias = results[6];
-      final oilChanges = results[7];
+      // A paginação busca por id; as seções abaixo ("recentes", "troca de
+      // óleo mais recente por veículo") esperam o mais novo primeiro.
+      int maisRecente(Map<String, dynamic> a, Map<String, dynamic> b, String col) =>
+          (b[col] ?? '').toString().compareTo((a[col] ?? '').toString());
+      final fuelings = results[4]..sort((a, b) => maisRecente(a, b, 'created_at'));
+      final checklists = results[5]..sort((a, b) => maisRecente(a, b, 'criado_em'));
+      final ocorrencias = results[6]..sort((a, b) => maisRecente(a, b, 'created_at'));
+      final oilChanges = results[7]..sort((a, b) => maisRecente(a, b, 'created_at'));
       final online = results[8];
       // manutencoes (results[9]) e oil_changes são gravadas juntas por
       // troca_oleo_page.dart para o mesmo evento — somar as duas contaria

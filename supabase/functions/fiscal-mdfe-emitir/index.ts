@@ -19,14 +19,13 @@
 // }
 
 import {
+  chamarWrapper,
   errorResponse,
   getCaller,
   getServiceClient,
   jsonResponse,
   requireManageDocs,
   resolveEmpresaId,
-  wrapperAuthHeader,
-  wrapperUrl,
 } from "../_shared/fiscal.ts";
 
 Deno.serve(async (req) => {
@@ -113,7 +112,13 @@ Deno.serve(async (req) => {
     const { error: juncaoError } = await service
       .from("mdfe_cte")
       .insert(cteIds.map((cteId) => ({ mdfe_id: mdfeId, cte_id: cteId })));
-    if (juncaoError) throw juncaoError;
+    if (juncaoError) {
+      // Não deixa o MDF-e preso em "enviando" sem os CT-e vinculados.
+      await service.from("mdfe_documentos")
+        .update({ status: "erro", motivo_rejeicao: "Falha ao vincular os CT-e ao MDF-e" })
+        .eq("id", mdfeId);
+      throw juncaoError;
+    }
 
     const wrapperPayload = {
       ambiente: ambienteNum,
@@ -148,12 +153,7 @@ Deno.serve(async (req) => {
       contratante: body.contratante,
     };
 
-    const wrapperResp = await fetch(wrapperUrl(`/mdfe/${empresaId}/emitir`), {
-      method: "POST",
-      headers: { ...wrapperAuthHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(wrapperPayload),
-    });
-    const resultado = await wrapperResp.json();
+    const resultado = await chamarWrapper(`/mdfe/${empresaId}/emitir`, wrapperPayload);
 
     if (resultado.status === "autorizado") {
       let xmlUrl: string | null = null;

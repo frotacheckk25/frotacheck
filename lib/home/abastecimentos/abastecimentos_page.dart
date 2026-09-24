@@ -7,6 +7,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/image_validation.dart';
+import '../../core/utils/fetch_all.dart';
 
 class AbastecimentosPage extends StatefulWidget {
   const AbastecimentosPage({super.key});
@@ -117,9 +118,12 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        // Filtrado por período (+ motorista/placa opcionais) — sem cap
-        // artificial de 50, já que agora o filtro de data controla o volume.
-        fuelingsQ.order('fuel_date', ascending: false).limit(500),
+        // Filtrado por período (+ motorista/placa opcionais). Paginado: antes
+        // parava em 500 e o total do período saía menor que o real.
+        fetchAllRows((from, to) => fuelingsQ
+            .order('fuel_date', ascending: false)
+            .order('id')
+            .range(from, to)),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);
@@ -424,6 +428,8 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                                   ],
                                 ),
                               ),
+                              // Só a gestão exclui (o banco também bloqueia motorista).
+                              if (!auth.isMotorista)
                               IconButton(
                                 icon: const Icon(Icons.delete_outline, color: AppColors.danger, size: 20),
                                 tooltip: 'Excluir',
@@ -660,14 +666,22 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
 
   Future<String?> _upload(XFile? img, String bucket, String pastaEmpresa) async {
     if (img == null) return null;
-    final nome = '$pastaEmpresa/${DateTime.now().millisecondsSinceEpoch}_${p.basename(img.path)}';
     final bytes = await img.readAsBytes();
     if (!isValidImageBytes(bytes)) return null;
+    // Tipo decidido pelos bytes, não pelo caminho: no navegador/PWA o
+    // img.path é "blob:..." (sem extensão) e o upload ia como
+    // application/octet-stream — recusado pelo bucket (só aceita imagem).
+    final isPng = bytes.length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50;
+    final isWebp = bytes.length > 12 && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
+    final ext = isPng ? 'png' : (isWebp ? 'webp' : 'jpg');
+    final mime = isPng ? 'image/png' : (isWebp ? 'image/webp' : 'image/jpeg');
+    final base = p.basenameWithoutExtension(img.name).replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final nome = '$pastaEmpresa/${DateTime.now().millisecondsSinceEpoch}_$base.$ext';
     for (int attempt = 1; attempt <= 3; attempt++) {
       try {
         await supabase.storage
             .from(bucket)
-            .uploadBinary(nome, bytes, fileOptions: const FileOptions(upsert: true));
+            .uploadBinary(nome, bytes, fileOptions: FileOptions(contentType: mime, upsert: true));
         return supabase.storage.from(bucket).getPublicUrl(nome);
       } catch (e) {
         debugPrint('Erro no upload (tentativa $attempt): $e');
@@ -821,6 +835,15 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                    final parsed = double.tryParse(v.replaceAll(',', '.'));
                    if (parsed == null) return 'Valor inválido';
                    if (parsed <= 0) return 'Valor deve ser maior que zero';
+                   // Mesma regra do banco (fuelings_valores_validos_ck): pega
+                   // erro de digitação tipo "1 litro por R$ 500".
+                   final litros = double.tryParse(litrosController.text.replaceAll(',', '.'));
+                   if (litros != null && litros > 0) {
+                     final porLitro = parsed / litros;
+                     if (porLitro < 0.5 || porLitro > 100) {
+                       return 'Preço por litro fora do normal (R\$ ${porLitro.toStringAsFixed(2)}/L). Confira litros e valor.';
+                     }
+                   }
                    return null;
                  },
                ),

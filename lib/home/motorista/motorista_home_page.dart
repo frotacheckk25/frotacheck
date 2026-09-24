@@ -164,7 +164,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               .select('id')
               .eq('empresa_id', empresaId)
               .eq('driver_id', driverId)
-              .eq('status', 'Aberto')
+              .not('status', 'in', '(Resolvido,resolvido,Concluído,concluído,Concluido,concluido,Fechado,fechado,Cancelado,cancelado)')
               .count();
           ocorrenciasAbertas = res.count;
         } catch (_) {}

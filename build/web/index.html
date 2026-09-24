@@ -3,77 +3,90 @@
 <head>
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="FrotaCheck - Gestão de frota">
   <base href="/">
+
+  <!-- PWA / theme -->
+  <meta name="theme-color" content="#2563EB">
+  <meta name="background-color" content="#0B1220">
+  <meta name="color-scheme" content="dark light">
+
+  <!-- Android / Chrome / Edge installability -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="frotacheck">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="application-name" content="FrotaCheck">
+
+  <!-- iOS / Safari "Add to Home Screen" -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FrotaCheck">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>FrotaCheck</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #0B1220;
+    }
+    /* O <flutter-view> é posicionado com "position: absolute; inset: 0"
+       relativo ao viewport inteiro (não ao body) — por isso um padding no
+       body não reserva espaço nenhum para a área de gestos do Android.
+       Forçamos aqui via "bottom" (que tem prioridade sobre o inset inline
+       que o próprio engine aplica), para a barra de navegação do app nunca
+       ficar desenhada sob a faixa de gesto do sistema, onde o toque é
+       interceptado pelo Android antes de chegar à página. */
+    flutter-view {
+      bottom: env(safe-area-inset-bottom, 0px) !important;
+      /* O engine também fixa "height" inline (em px) a cada resize — com
+         "top", "height" e "bottom" todos definidos, a especificação CSS
+         ignora "bottom" no cálculo do layout (over-constrained) e a altura
+         renderizada nunca muda. "height: auto" remove esse conflito, para
+         o navegador recalcular a altura de fato a partir de top+bottom. */
+      height: auto !important;
+    }
+    #fc-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0B1220;
+      transition: opacity 0.35s ease;
+    }
+    #fc-splash.fc-splash-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #fc-splash img {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      animation: fc-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes fc-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(0.94); opacity: 0.75; }
+    }
+  </style>
 </head>
 <body>
-  <script>
-    // Stub for PasskeyAuthenticator (required by passkeys_web, a transitive dependency of
-    // supabase_flutter). Without it, window.PasskeyAuthenticator.init() throws a TypeError
-    // during Flutter plugin registration and the app never renders (white screen).
-    window.PasskeyAuthenticator = {
-      init: function() {},
-      register: function() { return Promise.reject('Passkeys not configured'); },
-      login: function() { return Promise.reject('Passkeys not configured'); },
-      cancelCurrentAuthenticatorOperation: function() {},
-      isUserVerifyingPlatformAuthenticatorAvailable: function() { return Promise.resolve(false); },
-      isConditionalMediationAvailable: function() { return Promise.resolve(false); },
-      hasPasskeySupport: function() { return false; }
-    };
-  </script>
-  <script>
-    // Flutter's generated flutter_bootstrap.js registers a service worker (SW) that
-    // caches main.dart.js in CacheStorage — bypassing Cache-Control headers from Vercel.
-    // After a deploy the old SW keeps serving the previous JS build until all tabs close.
-    //
-    // Fix: (1) clear any stale SW + caches BEFORE loading flutter_bootstrap.js so the
-    //          browser fetches fresh assets on the very first visit after a deploy;
-    //      (2) override navigator.serviceWorker.register to block re-registration so
-    //          subsequent visits also get fresh assets directly from the network.
-    (function () {
-      function loadApp() {
-        // Block Flutter from re-registering a service worker after cleanup.
-        // flutter_bootstrap.js catches the rejection and logs a warning — app boots fine.
-        if ('serviceWorker' in navigator) {
-          try {
-            navigator.serviceWorker.register = function () {
-              return Promise.reject(new Error('Service worker disabled for fresh deploys'));
-            };
-          } catch (_) {}
-        }
+  <!-- Splash screen shown while the Flutter engine boots. Removed by the
+       script at the bottom once the first frame paints (or after a safety
+       timeout, in case the 'flutter-first-frame' hook ever changes). -->
+  <div id="fc-splash">
+    <img src="icons/Icon-512.png" alt="FrotaCheck">
+  </div>
 
-        var s = document.createElement('script');
-        s.type = 'module';
-        s.src = 'flutter_bootstrap.js';
-        document.body.appendChild(s);
-      }
+  <!-- Externalizado em fc_boot.js (em vez de inline) para que o CSP em
+       vercel.json possa usar script-src 'self' sem 'unsafe-inline'. -->
+  <script src="fc_boot.js"></script>
 
-      if (!('serviceWorker' in navigator)) {
-        loadApp();
-        return;
-      }
-
-      // Unregister all SWs and clear all caches, then load the app.
-      navigator.serviceWorker.getRegistrations().then(function (registrations) {
-        if (registrations.length === 0) {
-          loadApp();
-          return;
-        }
-        Promise.all([
-          Promise.all(registrations.map(function (r) { return r.unregister(); })),
-          caches.keys().then(function (keys) {
-            return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-          })
-        ]).then(loadApp);
-      }).catch(loadApp); // On any error just load the app anyway
-    })();
-  </script>
+  <script type="module" src="flutter_bootstrap.js"></script>
 </body>
 </html>

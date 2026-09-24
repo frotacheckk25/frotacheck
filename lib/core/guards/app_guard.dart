@@ -28,6 +28,7 @@ class AppGuard extends StatelessWidget {
     if (auth.isInactive)  return const _InactiveScreen();
     if (!auth.isAuthenticated) return unauthenticated;
     if (auth.needsMfaChallenge) return const _MfaChallengeScreen();
+    if (auth.isEmpresaSuspensa) return const _EmpresaSuspensaScreen();
 
     // Key garante que toda a subárvore é recriada do zero quando
     // um usuário diferente faz login (userId muda → dispose + initState completo).
@@ -167,6 +168,56 @@ class _InactiveScreen extends StatelessWidget {
                   'Sair',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmpresaSuspensaScreen extends StatelessWidget {
+  const _EmpresaSuspensaScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.read<AppAuthProvider>();
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.business_outlined, color: AppColors.warning, size: 64),
+              const SizedBox(height: 24),
+              const Text(
+                'Acesso da empresa suspenso',
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'O acesso da sua empresa ao FrotaCheck está suspenso.\nO responsável pela empresa deve entrar em contato com o suporte.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              OutlinedButton.icon(
+                onPressed: auth.reload,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Verificar novamente'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.secondary,
+                  side: const BorderSide(color: AppColors.secondary),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: auth.signOut,
+                child: const Text('Sair', style: TextStyle(color: AppColors.textSecondary)),
               ),
             ],
           ),

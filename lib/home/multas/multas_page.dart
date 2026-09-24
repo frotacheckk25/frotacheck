@@ -824,7 +824,11 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         'descricao': descricaoController.text.trim(),
         'status': 'aberta',
         'data': (dataMulta ?? DateTime.now()).toIso8601String().split('T')[0],
-        if (selectedDriver != null) 'driver_id': selectedDriver,
+        // Motorista sempre registra em nome próprio (o banco exige isso).
+        if (auth.isMotorista && auth.driverId != null)
+          'driver_id': auth.driverId
+        else if (selectedDriver != null)
+          'driver_id': selectedDriver,
         // ignore: use_null_aware_elements
         if (fotoUrl != null) 'foto_url': fotoUrl,
       };

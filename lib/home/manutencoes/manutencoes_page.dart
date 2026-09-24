@@ -53,7 +53,8 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
       final eid = auth.effectiveEmpresaId;
 
       var oilQ  = supabase.from('oil_changes').select('id, vehicle_id, next_change_km, created_at');
-      var ocorrAbertasQ = supabase.from('occurrences').select('id').eq('status', 'Aberto');
+      var ocorrAbertasQ = supabase.from('occurrences').select('id')
+          .not('status', 'in', '(Resolvido,resolvido,Concluído,concluído,Concluido,concluido,Fechado,fechado,Cancelado,cancelado)');
       var veicQ  = supabase.from('vehicles').select('id, odometer');
 
       if (isMotorista) {

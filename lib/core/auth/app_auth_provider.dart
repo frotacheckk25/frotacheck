@@ -54,6 +54,13 @@ class AppAuthProvider extends ChangeNotifier {
   bool get isBlocked         => _profile?.isBlocked ?? false;
   bool get isInactive        => _profile?.isInactive ?? false;
 
+  // Status da empresa lido do servidor (RPC get_my_access). O banco já
+  // bloqueia todo acesso a dados de empresa não-ativa; isto só serve para o
+  // AppGuard mostrar a tela certa em vez de um app "vazio".
+  String? _empresaStatus;
+  bool get isEmpresaSuspensa =>
+      _profile?.empresaId != null && _empresaStatus != null && _empresaStatus != 'ativo';
+
   String? get empresaId      => _profile?.empresaId;
   String? get empresaNome    => _profile?.empresaNome;
   AppRole? get role          => _profile?.role;
@@ -179,6 +186,8 @@ class AppAuthProvider extends ChangeNotifier {
         );
       } else {
         _profile = UserProfile.fromMap(res);
+        _empresaStatus = await _carregarStatusEmpresa();
+        if (gen != _loadGen) return;
         // Atualiza last_access em background, sem bloquear a UI
         _supabase
             .from('user_profiles')
@@ -200,6 +209,17 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> _carregarStatusEmpresa() async {
+    try {
+      final res = await _supabase.rpc('get_my_access');
+      final row = (res is List && res.isNotEmpty) ? res.first : res;
+      if (row is Map) return row['empresa_status']?.toString();
+    } catch (e) {
+      debugPrint('AppAuthProvider: get_my_access indisponível: $e');
+    }
+    return null;
+  }
+
   Future<void> reload() => _loadProfile();
 
   Future<void> signOut() async {
@@ -215,6 +235,7 @@ class AppAuthProvider extends ChangeNotifier {
     }
     await _supabase.auth.signOut();
     _profile = null;
+    _empresaStatus = null;
     _mfaPending = false;
     notifyListeners();
   }
