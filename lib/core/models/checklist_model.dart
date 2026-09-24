@@ -76,11 +76,15 @@ class Checklist {
     'Documentação',
   ];
 
+  // Mesmas posições (e ordem) da ficha de vistoria usada pelos clientes:
+  // lateral esquerda, vista de cima, lateral direita, frente e traseira.
+  // "Painel Interno" é do FrotaCheck — registra km e nível de combustível.
   static final List<String> fotosObrigatorias = [
+    'Lateral Esquerda',
+    'Vista de Cima',
+    'Lateral Direita',
     'Frente',
     'Traseira',
-    'Lateral Esquerda',
-    'Lateral Direita',
     'Painel Interno',
   ];
 }

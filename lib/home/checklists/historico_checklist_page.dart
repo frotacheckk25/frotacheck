@@ -326,24 +326,62 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                   childAspectRatio: 1,
                 ),
                 itemCount: fotos.length,
-                itemBuilder: (_, idx) => ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SignedNetworkImage(
-                    url: fotos[idx],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stack) => Container(
-                      color: AppColors.backgroundSoft,
-                      child: const Icon(Icons.broken_image,
-                          color: AppColors.textSecondary),
+                itemBuilder: (_, idx) {
+                  final posicao = _posicaoDaFoto(fotos[idx]);
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        SignedNetworkImage(
+                          url: fotos[idx],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stack) => Container(
+                            color: AppColors.backgroundSoft,
+                            child: const Icon(Icons.broken_image,
+                                color: AppColors.textSecondary),
+                          ),
+                        ),
+                        if (posicao != null)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
+                              color: Colors.black.withOpacity(0.55),
+                              child: Text(posicao,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ],
         ),
       ),
     );
+  }
+
+  /// Posição da foto (ex.: "Vista de Cima") lida do nome do arquivo, que o
+  /// checklist grava como `tipo_veiculoId_posicao_timestamp.jpg`.
+  static String? _posicaoDaFoto(String url) {
+    final nome = Uri.decodeFull(url.split('?').first.split('/').last);
+    final semExt = nome.contains('.') ? nome.substring(0, nome.lastIndexOf('.')) : nome;
+    for (final posicao in Checklist.fotosObrigatorias) {
+      final chave = posicao.toLowerCase().replaceAll(' ', '_');
+      if (semExt.contains('_${chave}_')) return posicao;
+    }
+    return null;
   }
 
   Widget _detalheRow(String label, String value) => Padding(

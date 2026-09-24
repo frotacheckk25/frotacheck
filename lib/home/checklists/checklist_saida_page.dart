@@ -383,7 +383,7 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+        crossAxisCount: 3,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
         childAspectRatio: 0.85,
