@@ -6,6 +6,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/signed_network_image.dart';
+import 'vistoria_widgets.dart';
 
 class HistoricoChecklistPage extends StatefulWidget {
   const HistoricoChecklistPage({super.key});
@@ -150,6 +151,13 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
         : <String>[];
     final obs = r['observacoes']?.toString();
     final kmFinal = r['km_final'];
+    final kmInicial = r['km_inicial'];
+    final nivel = r['nivel_combustivel']?.toString();
+    final destino = r['destino']?.toString();
+    final finalidade = r['finalidade']?.toString();
+    final avarias = r['avarias'] is Map
+        ? Map<String, dynamic>.from(r['avarias'] as Map)
+        : <String, dynamic>{};
 
     showModalBottomSheet(
       context: context,
@@ -231,8 +239,73 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
             ),
             const SizedBox(height: 16),
 
+            if (kmInicial != null) ...[
+              _detalheRow('KM de saída', kmInicial.toString()),
+              const SizedBox(height: 8),
+            ],
             if (kmFinal != null) ...[
               _detalheRow('KM Final', kmFinal.toString()),
+              const SizedBox(height: 8),
+            ],
+            if (nivel != null && nivel.isNotEmpty) ...[
+              _detalheRow('Nível do tanque', nivel),
+              const SizedBox(height: 8),
+            ],
+            if (destino != null && destino.isNotEmpty) ...[
+              _detalheRow('Destino', destino),
+              const SizedBox(height: 8),
+            ],
+            if (finalidade != null && finalidade.isNotEmpty) ...[
+              _detalheRow('Finalidade', finalidade),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 4),
+
+            // Avarias por posição (ficha de vistoria)
+            if (avarias.isNotEmpty) ...[
+              const Text('Avarias encontradas',
+                  style: TextStyle(color: AppColors.warning, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ...avarias.entries.map((e) {
+                final info = e.value is Map ? Map<String, dynamic>.from(e.value as Map) : <String, dynamic>{};
+                final tipos = ((info['tipos'] as List?) ?? const []).map((t) => t.toString()).toList();
+                final obsAv = info['obs']?.toString() ?? '';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(e.key,
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: tipos
+                            .map((t) => Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                      color: corAvaria(t), borderRadius: BorderRadius.circular(6)),
+                                  child: Text('$t · ${kTiposAvaria[t] ?? t}',
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                                ))
+                            .toList(),
+                      ),
+                      if (obsAv.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(obsAv, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ],
+                  ),
+                );
+              }),
               const SizedBox(height: 12),
             ],
 

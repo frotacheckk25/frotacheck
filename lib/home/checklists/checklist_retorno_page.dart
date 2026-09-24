@@ -8,6 +8,7 @@ import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/image_validation.dart';
+import 'vistoria_widgets.dart';
 
 class ChecklistRetornoPage extends StatefulWidget {
   final String veiculoId;
@@ -33,6 +34,9 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
 
   late Map<String, bool> itensVerificados;
   final List<Map<String, dynamic>> fotosCapturadas = [];
+  // Avarias por posição de foto (ficha de vistoria): {'Frente': {'tipos': ['R'], 'obs': '...'}}
+  final Map<String, Map<String, dynamic>> avarias = {};
+  String? nivelTanque;
   bool isLoading = false;
 
   @override
@@ -55,8 +59,26 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
 
   Future<void> _capturarFoto(String label) async {
     if (fotosCapturadas.any((f) => f['label'] == label)) {
-      setState(() => fotosCapturadas.removeWhere((f) => f['label'] == label));
-      return;
+      // Já tem foto: marcar avarias, refazer ou remover.
+      final acao = await escolherAcaoFoto(context, label, avarias[label] != null);
+      if (!mounted || acao == null) return;
+      if (acao == AcaoFoto.avarias) {
+        final r = await editarAvarias(context, label, avarias[label]);
+        if (!mounted || r == null) return;
+        setState(() {
+          if ((r['tipos'] as List).isEmpty) {
+            avarias.remove(label);
+          } else {
+            avarias[label] = r;
+          }
+        });
+        return;
+      }
+      setState(() {
+        fotosCapturadas.removeWhere((f) => f['label'] == label);
+        if (acao == AcaoFoto.remover) avarias.remove(label);
+      });
+      if (acao == AcaoFoto.remover) return;
     }
 
     try {
@@ -120,6 +142,10 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
       showError(context, 'Informe um KM final válido (somente números)');
       return;
     }
+    if (nivelTanque == null) {
+      showError(context, 'Informe o nível do tanque');
+      return;
+    }
 
     try {
       final veiculo = await supabase
@@ -169,6 +195,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         fotoUrls.add(url);
       }
 
+      final avariasFinal = avariasParaSalvar(avarias);
       await supabase.from('checklists').insert(injetar({
         'veiculo_id': widget.veiculoId,
         'motorista_id': widget.motoristaId,
@@ -176,8 +203,11 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         'data': DateTime.now().toIso8601String().split('T')[0],
         'itens': itensVerificados,
         'foto_urls': fotoUrls,
-        'aprovado': _totalMarcados == Checklist.itensChecklist.length,
+        // Reprovado se faltou item OU se alguma avaria foi marcada.
+        'aprovado': _totalMarcados == Checklist.itensChecklist.length && avariasFinal.isEmpty,
         'km_final': kmFinal,
+        'nivel_combustivel': nivelTanque,
+        'avarias': avariasFinal,
         if (observacoesController.text.trim().isNotEmpty)
           'observacoes': observacoesController.text.trim(),
       }));
@@ -242,6 +272,11 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            NivelTanqueSelector(
+              valor: nivelTanque,
+              onChanged: (v) => setState(() => nivelTanque = v),
+            ),
             const SizedBox(height: 14),
 
             // Itens do checklist
@@ -252,11 +287,13 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
             _checklistGrid(),
             const SizedBox(height: 14),
 
-            // Fotos obrigatórias
-            _sectionTitle('Fotos Obrigatórias',
+            // Fotos obrigatórias + avarias
+            _sectionTitle('Vistoria do Veículo',
                 '${fotosCapturadas.length}/$_totalFotos', AppColors.warning),
             const SizedBox(height: 8),
             _fotosGrid(),
+            const SizedBox(height: 8),
+            const LegendaAvarias(),
             const SizedBox(height: 14),
 
             // Observações
@@ -482,106 +519,12 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
   }
 
   Widget _fotosGrid() {
-    final labels = Checklist.fotosObrigatorias;
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: labels.length,
-      itemBuilder: (context, i) {
-        final label = labels[i];
-        final foto =
-            fotosCapturadas.where((f) => f['label'] == label).firstOrNull;
-        final temFoto = foto != null;
-
-        return GestureDetector(
-          onTap: () => _capturarFoto(label),
-          child: Container(
-            decoration: BoxDecoration(
-              color: temFoto
-                  ? AppColors.success.withOpacity(0.1)
-                  : AppColors.backgroundSoft,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: temFoto ? AppColors.success : AppColors.border,
-                width: temFoto ? 1.5 : 1,
-              ),
-            ),
-            child: temFoto
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(9),
-                        child: Image.memory(
-                          foto['bytes'] as Uint8List,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      Positioned(
-                        top: 3,
-                        right: 3,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: AppColors.danger,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close,
-                              color: Colors.white, size: 10),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 3, horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.55),
-                            borderRadius: const BorderRadius.vertical(
-                                bottom: Radius.circular(9)),
-                          ),
-                          child: Text(label,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.add_a_photo,
-                          color: AppColors.textSecondary, size: 20),
-                      const SizedBox(height: 4),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(label,
-                            style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w500),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis),
-                      ),
-                    ],
-                  ),
-          ),
-        );
+    return VistoriaFotosGrid(
+      fotos: {
+        for (final f in fotosCapturadas) f['label'] as String: f['bytes'] as Uint8List,
       },
+      avarias: avarias,
+      onTap: _capturarFoto,
     );
   }
 }
