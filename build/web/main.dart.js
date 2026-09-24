@@ -44144,7 +44144,7 @@ $S:4}
 A.btl.prototype={
 $1(a){var s=A.fY().b
 s=s==null?null:s.canvasKitBaseUrl
-return(s==null?"https://www.gstatic.com/flutter-canvaskit/a10d8ac38de835021c8d2f920dbf50a920ccc030/":s)+a},
+return(s==null?"canvaskit/":s)+a},
 $S:71}
 A.a3q.prototype={
 gA(a){var s=this.a
