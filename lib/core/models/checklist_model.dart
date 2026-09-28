@@ -64,16 +64,11 @@ class Checklist {
   };
 
   static final List<String> itensChecklist = [
-    'Pneus',
-    'Luzes',
-    'Setas',
-    'Freios',
-    'Retrovisores',
-    'Extintor',
+    'Extintor (caso tenha)',
     'Macaco',
     'Chave de roda',
     'Triângulo',
-    'Documentação',
+    'Pneus',
   ];
 
   // Mesmas posições (e ordem) da ficha de vistoria usada pelos clientes:

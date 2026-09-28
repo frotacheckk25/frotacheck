@@ -128669,7 +128669,7 @@ A.RV.prototype={
 ae(){var s,r
 this.aB()
 s=A.B(t.N,t.v)
-for(r=0;r<10;++r)s.m(0,$.a_7[r],!1)
+for(r=0;r<5;++r)s.m(0,$.a_7[r],!1)
 this.w=s},
 n(){var s=this.f,r=$.aq()
 s.P$=r
@@ -128876,7 +128876,7 @@ a8=m.w
 a8===$&&A.b()
 J.a8(a0,"itens",a8)
 J.a8(a0,"foto_urls",g)
-a8=m.gMd()===10&&a.a===0
+a8=m.gMd()===5&&a.a===0
 J.a8(a0,"aprovado",a8)
 J.a8(a0,"km_final",l)
 J.a8(a0,"nivel_combustivel",m.z)
@@ -128925,12 +128925,12 @@ case 11:case 1:return A.q(q,r)
 case 2:return A.p(o.at(-1),r)}})
 return A.r($async$vK,r)},
 F(a){var s,r,q,p,o,n=this,m=null,l=A.dW(m,m,B.E,m,m,m,m,m,A.m("Retorno \xb7 "+n.a.d,m,m,m,m,m,m,m,m),m),k=n.gMd(),j=n.x,i=j.length,h=A.n(12),g=A.ag(B.Y,1),f=t.p
-h=A.E(m,A.N(A.a([A.T(A.a([B.Hk,B.aa,B.Ft,A.m(""+n.gMd()+"/10",m,m,m,m,B.iP,m,m,m)],f),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,m,6,k/10,B.Cs),B.b6),B.aT,A.T(A.a([B.Hg,B.aa,B.Fs,A.m(""+j.length+"/6",m,m,m,m,B.iP,m,m,m)],f),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,m,6,i/6,B.Ct),B.b6)],f),B.u,B.q,B.r),B.t,m,m,new A.F(B.E,m,g,h,m,m,B.v),m,m,m,m,B.bG,m,m,m)
+h=A.E(m,A.N(A.a([A.T(A.a([B.Hk,B.aa,B.Ft,A.m(""+n.gMd()+"/5",m,m,m,m,B.iP,m,m,m)],f),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,m,6,k/5,B.Cs),B.b6),B.aT,A.T(A.a([B.Hg,B.aa,B.Fs,A.m(""+j.length+"/6",m,m,m,m,B.iP,m,m,m)],f),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,m,6,i/6,B.Ct),B.b6)],f),B.u,B.q,B.r),B.t,m,m,new A.F(B.E,m,g,h,m,m,B.v),m,m,m,m,B.bG,m,m,m)
 g=A.n(12)
 i=A.ag(B.Y,1)
 g=A.E(m,A.d6(m,B.aV,!1,m,!0,B.a3,m,A.d9(),n.r,m,m,m,m,m,2,B.ahu,B.Q,!0,m,!0,m,!1,m,B.aW,m,m,m,m,B.fl,m,m,m,1,m,m,!1,"\u2022",m,new A.aW3(n),m,m,m,!1,m,m,!1,m,!0,m,B.aq,m,m,m,m,m,m,m,m,m,m,m,B.a2,!0,B.aE,m,B.av,m,m,m,m),B.t,m,m,new A.F(B.E,m,i,g,m,m,B.v),m,m,m,m,B.wU,m,m,m)
 i=n.z
-k=n.a5t("Itens do Checklist",""+n.gMd()+"/10",B.H)
+k=n.a5t("Itens do Checklist",""+n.gMd()+"/5",B.H)
 s=n.azi()
 j=n.a5t("Vistoria do Ve\xedculo",""+j.length+"/6",B.R)
 r=n.aEr()
@@ -128943,7 +128943,7 @@ return A.d1(l,B.aR,A.cy(A.N(A.a([h,B.aH,g,B.aT,new A.Nd(i,new A.aW4(n),m),B.aH,k
 a5t(a,b,c){var s=null,r=A.m(a,s,s,s,s,B.eY,s,s,s),q=A.y(38,c.j()>>>16&255,c.j()>>>8&255,c.j()&255),p=A.n(20)
 return A.T(A.a([r,B.aa,A.E(s,A.m(b,s,s,s,s,A.au(s,s,c,s,s,s,s,s,s,s,s,11,s,s,B.a0,s,s,!0,s,s,s,s,s,s,s,s),s,s,s),B.t,s,s,new A.F(q,s,s,p,s,s,B.v),s,s,s,s,B.cC,s,s,s)],t.p),B.u,B.q,B.r,0)},
 azi(){var s=null,r=A.n(12),q=A.ag(B.Y,1)
-return A.E(s,A.N(A.jd(19,new A.aVX(this,$.a_7),!0,t.l7),B.u,B.q,B.r),B.t,s,s,new A.F(B.E,s,q,r,s,s,B.v),s,s,s,s,s,s,s,s)},
+return A.E(s,A.N(A.jd(9,new A.aVX(this,$.a_7),!0,t.l7),B.u,B.q,B.r),B.t,s,s,new A.F(B.E,s,q,r,s,s,B.v),s,s,s,s,s,s,s,s)},
 aEr(){var s,r,q,p,o=t.D,n=A.B(t.N,o)
 for(s=this.x,r=s.length,q=0;q<s.length;s.length===r||(0,A.J)(s),++q){p=s[q]
 n.m(0,A.br(p.h(0,"label")),o.a(p.h(0,"bytes")))}return new A.R7(n,this.y,this.gayN(),null)}}
@@ -129001,7 +129001,7 @@ q===$&&A.b()
 q=q.h(0,s)
 p=q===!0
 o=a===0
-n=a===18
+n=a===8
 q=o?B.iE:B.aI
 m=o?B.iE:B.aI
 l=n?B.iE:B.aI
@@ -129037,7 +129037,7 @@ A.RW.prototype={
 ae(){var s,r
 this.aB()
 s=A.B(t.N,t.v)
-for(r=0;r<10;++r)s.m(0,$.a_7[r],!1)
+for(r=0;r<5;++r)s.m(0,$.a_7[r],!1)
 this.f=s},
 n(){var s=this,r=s.y,q=r.P$=$.aq()
 r.N$=0
@@ -129245,7 +129245,7 @@ a7=m.f
 a7===$&&A.b()
 J.a8(a,"itens",a7)
 J.a8(a,"foto_urls",h)
-a7=m.gJh()===10&&b.a===0
+a7=m.gJh()===5&&b.a===0
 J.a8(a,"aprovado",a7)
 J.a8(a,"km_inicial",a8)
 J.a8(a,"nivel_combustivel",m.x)
@@ -129298,12 +129298,12 @@ case 11:case 1:return A.q(q,r)
 case 2:return A.p(o.at(-1),r)}})
 return A.r($async$vd,r)},
 F(a){var s,r,q,p,o,n,m,l=this,k=null,j=A.dW(k,k,B.E,k,k,k,k,k,A.m("Sa\xedda \xb7 "+l.a.d,k,k,k,k,k,k,k,k),k),i=l.gJh(),h=l.r,g=h.length,f=A.n(12),e=A.ag(B.Y,1),d=t.p
-f=A.E(k,A.N(A.a([A.T(A.a([B.Hk,B.aa,B.Ft,A.m(""+l.gJh()+"/10",k,k,k,k,B.iP,k,k,k)],d),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,k,6,i/10,B.Cs),B.b6),B.aT,A.T(A.a([B.Hg,B.aa,B.Fs,A.m(""+h.length+"/6",k,k,k,k,B.iP,k,k,k)],d),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,k,6,g/6,B.Ct),B.b6)],d),B.u,B.q,B.r),B.t,k,k,new A.F(B.E,k,e,f,k,k,B.v),k,k,k,k,B.bG,k,k,k)
+f=A.E(k,A.N(A.a([A.T(A.a([B.Hk,B.aa,B.Ft,A.m(""+l.gJh()+"/5",k,k,k,k,B.iP,k,k,k)],d),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,k,6,i/5,B.Cs),B.b6),B.aT,A.T(A.a([B.Hg,B.aa,B.Fs,A.m(""+h.length+"/6",k,k,k,k,B.iP,k,k,k)],d),B.u,B.q,B.r,0),B.b4,A.f9(A.n(4),A.Eu(B.aM,k,6,g/6,B.Ct),B.b6)],d),B.u,B.q,B.r),B.t,k,k,new A.F(B.E,k,e,f,k,k,B.v),k,k,k,k,B.bG,k,k,k)
 e=A.aoZ(l.y,k,B.nb,B.fl,"KM de sa\xedda do ve\xedculo *",1)
 g=l.x
 i=A.aoZ(l.z,"Ex.: Lambari / Concei\xe7\xe3o do Rio Verde",B.adn,k,"Destino (opcional)",1)
 s=A.aoZ(l.Q,"Ex.: troca de equipamentos de TI",B.ad7,k,"Finalidade (opcional)",1)
-r=l.a5u("Itens do Checklist",""+l.gJh()+"/10",B.H)
+r=l.a5u("Itens do Checklist",""+l.gJh()+"/5",B.H)
 q=l.azk()
 h=l.a5u("Vistoria do Ve\xedculo",""+h.length+"/6",B.R)
 p=l.azl()
@@ -129358,13 +129358,13 @@ $0(){return this.a.x=this.b},
 $S:0}
 A.aWc.prototype={
 $0(){var s,r,q,p,o,n,m,l,k,j,i=null,h=t.p,g=A.a([],h)
-for(s=this.a,r=this.b,q=0;q<10;++q){p=r[q]
+for(s=this.a,r=this.b,q=0;q<5;++q){p=r[q]
 o=s.f
 o===$&&A.b()
 o=o.h(0,p)
 n=o===!0
 if(q===0)o=12
-else o=q===9?12:0
+else o=q===4?12:0
 o=new A.bl(o,o)
 m=n?B.I:B.aM
 l=new A.bl(6,6)
@@ -129376,7 +129376,7 @@ j=n?B.am:B.at
 m=A.a([l,B.aU,new A.dM(1,B.bt,A.m(p,i,i,i,i,new A.A(!0,m,i,i,i,i,13,j,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i),i,i,i),i)],h)
 if(n)m.push(B.yj)
 g.push(A.dh(!1,new A.dJ(o,o,o,o),!0,new A.af(B.hF,A.T(m,B.u,B.q,B.r,0),i),i,!0,i,i,i,i,i,i,i,i,i,i,new A.aWb(s,n,p),i,i,i,i,i,i,i))
-if(q<9)g.push(B.ER)}return g},
+if(q<4)g.push(B.ER)}return g},
 $S:737}
 A.aWb.prototype={
 $0(){var s=this.a
@@ -129513,7 +129513,7 @@ j=t.f
 c=j.b(a1.h(a4,"avarias"))?A.bg(j.a(a1.h(a4,"avarias")),p,m):A.B(p,m)
 a1=b.c
 a1.toString
-A.nv(B.E,new A.b2N(b,o,r,q,a2===!0,a4,n,10,g,h,f,e,d,c,i,l,k),a1,!0,B.fO,m)},
+A.nv(B.E,new A.b2N(b,o,r,q,a2===!0,a4,n,5,g,h,f,e,d,c,i,l,k),a1,!0,B.fO,m)},
 vj(a,b){var s=null
 return new A.af(B.a9w,A.T(A.a([A.m(a+": ",s,s,s,s,B.ak,s,s,s),A.m(b,s,s,s,s,B.iP,s,s,s)],t.p),B.u,B.q,B.r,0),s)},
 adK(a,b){var s,r,q,p,o,n=null,m=a==="saida",l=b?10:7,k=b?5:3,j=m?B.H:B.I
@@ -129582,7 +129582,7 @@ else{i=q.h(0,"name")
 i=i==null?e:J.d(i)}i=A.T(A.a([B.afs,B.cd,A.m(i==null?"Motorista desconhecido":i,e,e,e,e,B.ak,e,e,e)],l),B.u,B.q,B.r,0)
 h=A.n(4)
 g=o?B.I:B.D
-g=A.a([A.a6(A.f9(h,A.Eu(B.aM,e,5,n/10,new A.mg(g,t.Jn)),B.b6),1),B.aa,A.m(""+n+"/10 itens",e,e,e,e,B.cx,e,e,e)],l)
+g=A.a([A.a6(A.f9(h,A.Eu(B.aM,e,5,n/5,new A.mg(g,t.Jn)),B.b6),1),B.aa,A.m(""+n+"/5 itens",e,e,e,e,B.cx,e,e,e)],l)
 if(m!=null)B.k.E(g,A.a([B.ag,B.aeg,B.oi,A.m(A.j(m)+" km",e,e,e,e,B.cx,e,e,e)],l))
 return A.d3(e,A.E(e,A.N(A.a([k,B.aT,j,B.b3,i,B.aT,A.T(g,B.u,B.q,B.r,0)],l),B.L,B.q,B.r),B.t,e,e,new A.F(B.E,e,c,d,e,e,B.v),e,e,e,B.df,B.bG,e,e,e),B.Q,!1,e,e,e,e,e,e,e,e,e,e,e,e,e,e,new A.b2O(f,a),e,e,e,e,e,e)}}
 A.b2Q.prototype={
@@ -129674,7 +129674,7 @@ B.k.E(q,A.a([j,B.b3,A.E(l,A.m(k,l,l,l,l,B.ug,l,l,l),B.t,l,l,new A.F(B.aM,l,l,i,l
 q.push(B.ao)
 k=A.n(12)
 j=A.ag(B.Y,1)
-q.push(A.E(l,A.N(A.jd(19,new A.b2K(m.ay),!0,t.l7),B.u,B.q,B.r),B.t,l,l,new A.F(B.aM,l,j,k,l,l,B.v),l,l,l,l,l,l,l,l))
+q.push(A.E(l,A.N(A.jd(9,new A.b2K(m.ay),!0,t.l7),B.u,B.q,B.r),B.t,l,l,new A.F(B.aM,l,j,k,l,l,B.v),l,l,l,l,l,l,l,l))
 k=m.ch
 j=k.length
 if(j!==0)B.k.E(q,A.a([B.ab,B.bxd,B.ao,A.avK(l,B.Q,B.bmv,new A.b2L(k),j,l,B.fK,!0)],r))
@@ -178573,7 +178573,7 @@ $.byO=-9007199254740992
 $.bAq=!0
 $.bAp=!1
 $.zX=A.a([],A.aE("G<rV>"))
-$.a_7=A.a(["Pneus","Luzes","Setas","Freios","Retrovisores","Extintor","Macaco","Chave de roda","Tri\xe2ngulo","Documenta\xe7\xe3o"],t.s)
+$.a_7=A.a(["Extintor (caso tenha)","Macaco","Chave de roda","Tri\xe2ngulo","Pneus"],t.s)
 $.bDJ=A.a(["Lateral Esquerda","Vista de Cima","Lateral Direita","Frente","Traseira","Painel Interno"],t.s)
 $.bAJ=null
 $.bIz=!1
