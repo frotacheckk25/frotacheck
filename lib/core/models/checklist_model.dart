@@ -70,6 +70,10 @@ class Checklist {
   /// Valor gravado em `itens` quando o item não se aplica ao veículo.
   static const String naoSeAplica = 'na';
 
+  /// Maior km aceito em checklist/abastecimento. Acima disso é erro de
+  /// digitação (e o banco nem aceita valores acima de ~2,1 bilhões).
+  static const int kmMaximo = 3000000;
+
   /// Item OK = verificado (true) ou não se aplica ("na").
   static bool itemOk(dynamic valor) => valor == true || valor == naoSeAplica;
 

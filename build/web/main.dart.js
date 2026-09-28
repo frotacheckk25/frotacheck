@@ -43044,6 +43044,8 @@ if(B.o.p(p,"conta_nao_encontrada"))return u.C
 if(B.o.p(p,"conta_outra_empresa"))return"Esta conta j\xe1 est\xe1 vinculada a outra empresa."
 if(B.o.p(p,"motorista inv\xe1lido para esta empresa"))return"Motorista inv\xe1lido para esta empresa."
 if(B.o.p(p,"sem permiss\xe3o")||B.o.p(p,"motorista n\xe3o pode excluir")||B.o.p(p,"papel n\xe3o permitido"))return r
+if(B.o.p(p,"out of range")||B.o.p(p,"22003"))return"N\xfamero fora do limite permitido. Confira os valores digitados (ex.: km)."
+if(B.o.p(p,"violates check constraint")||B.o.p(p,"23514"))return"Algum valor informado \xe9 inv\xe1lido. Confira os campos e tente novamente."
 if(B.o.p(p,"violates row-level security")||B.o.p(p,"rls")||B.o.p(p,"permission denied"))return r
 if(B.o.p(p,"duplicate key")||B.o.p(p,"23505")||B.o.p(p,"already exists"))return"Este registro j\xe1 existe."
 if(B.o.p(p,"foreign key")||B.o.p(p,"23503")||B.o.p(p,"violates foreign key constraint"))return"N\xe3o \xe9 poss\xedvel concluir: este registro est\xe1 vinculado a outro dado do sistema."
@@ -125931,6 +125933,7 @@ if(a==null||B.o.T(a).length===0)return"Informe o od\xf4metro"
 s=A.f2(a,null)
 if(s==null)return"Valor inv\xe1lido"
 if(s<0)return"Od\xf4metro n\xe3o pode ser negativo"
+if(s>3e6)return"Od\xf4metro inv\xe1lido. Confira o valor digitado."
 r=this.a
 q=A.e6(J.c(B.k.fM(r.a.c,new A.aPO(r),new A.aPP()),"odometer"))
 if(q!=null&&s<q)return"Menor que o \xfaltimo od\xf4metro registrado ("+A.j(q)+" km)"
@@ -128808,6 +128811,10 @@ if(l==null||l<0){a0=m.c
 a0.toString
 A.aH(a0,"Informe um KM final v\xe1lido (somente n\xfameros)")
 s=1
+break}if(l>3e6){a0=m.c
+a0.toString
+A.aH(a0,"KM final inv\xe1lido ("+A.j(l)+"). Confira o valor digitado.")
+s=1
 break}if(m.z==null){a0=m.c
 a0.toString
 A.aH(a0,"Informe o n\xedvel do tanque")
@@ -129192,6 +129199,10 @@ s=p}for(;;)switch(s){case 0:a9=A.f2(B.o.T(m.y.a.a),null)
 if(a9==null||a9<0){a=m.c
 a.toString
 A.aH(a,"Informe o KM de sa\xedda do ve\xedculo (somente n\xfameros)")
+s=1
+break}if(a9>3e6){a=m.c
+a.toString
+A.aH(a,"KM de sa\xedda inv\xe1lido ("+A.j(a9)+"). Confira o valor digitado.")
 s=1
 break}if(m.x==null){a=m.c
 a.toString

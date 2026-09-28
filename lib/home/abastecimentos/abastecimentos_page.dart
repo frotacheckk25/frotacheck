@@ -859,6 +859,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                    final parsed = int.tryParse(v);
                    if (parsed == null) return 'Valor inválido';
                    if (parsed < 0) return 'Odômetro não pode ser negativo';
+                   if (parsed > 3000000) return 'Odômetro inválido. Confira o valor digitado.';
                    final atual = widget.vehicles.firstWhere(
                      (v) => v['id']?.toString() == selectedVehicle,
                      orElse: () => {},

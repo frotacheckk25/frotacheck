@@ -153,6 +153,10 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
       showError(context, 'Informe o KM de saída do veículo (somente números)');
       return;
     }
+    if (kmSaida > Checklist.kmMaximo) {
+      showError(context, 'KM de saída inválido ($kmSaida). Confira o valor digitado.');
+      return;
+    }
     if (nivelTanque == null) {
       showError(context, 'Informe o nível do tanque');
       return;

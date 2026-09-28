@@ -153,6 +153,10 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
       showError(context, 'Informe um KM final válido (somente números)');
       return;
     }
+    if (kmFinal > Checklist.kmMaximo) {
+      showError(context, 'KM final inválido ($kmFinal). Confira o valor digitado.');
+      return;
+    }
     if (nivelTanque == null) {
       showError(context, 'Informe o nível do tanque');
       return;

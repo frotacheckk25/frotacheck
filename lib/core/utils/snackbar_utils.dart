@@ -25,6 +25,13 @@ String friendlyError(Object e, {String fallback = 'Não foi possível concluir a
     return 'Você não tem permissão para realizar esta ação.';
   }
 
+  if (raw.contains('out of range') || raw.contains('22003')) {
+    return 'Número fora do limite permitido. Confira os valores digitados (ex.: km).';
+  }
+  if (raw.contains('violates check constraint') || raw.contains('23514')) {
+    return 'Algum valor informado é inválido. Confira os campos e tente novamente.';
+  }
+
   if (raw.contains('violates row-level security') || raw.contains('rls') || raw.contains('permission denied')) {
     return 'Você não tem permissão para realizar esta ação.';
   }
