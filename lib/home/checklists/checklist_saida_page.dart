@@ -30,7 +30,7 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
   final supabase = Supabase.instance.client;
   final imagePicker = ImagePicker();
 
-  late Map<String, bool> itensVerificados;
+  late Map<String, Object> itensVerificados;
   // Each entry: {bytes, label}
   final List<Map<String, dynamic>> fotosCapturadas = [];
   // Avarias por posição de foto (ficha de vistoria): {'Frente': {'tipos': ['R'], 'obs': '...'}}
@@ -57,8 +57,18 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
     super.dispose();
   }
 
+  // Toque no item: pendente → verificado; itens opcionais (extintor) ainda
+  // passam por "não se aplica" antes de voltar a pendente.
+  Object _proximoValor(String item, Object valor) {
+    if (valor == Checklist.naoSeAplica) return false;
+    if (valor == true) {
+      return Checklist.itensOpcionais.contains(item) ? Checklist.naoSeAplica : false;
+    }
+    return true;
+  }
+
   int get _totalMarcados =>
-      itensVerificados.values.where((v) => v).length;
+      itensVerificados.values.where(Checklist.itemOk).length;
 
   int get _totalFotos => Checklist.fotosObrigatorias.length;
 
@@ -430,9 +440,11 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
           final result = <Widget>[];
           for (int i = 0; i < items.length; i++) {
             final item = items[i];
-            final checked = itensVerificados[item] ?? false;
+            final valor = itensVerificados[item] ?? false;
+            final na = valor == Checklist.naoSeAplica;
+            final checked = Checklist.itemOk(valor);
             result.add(InkWell(
-              onTap: () => setState(() => itensVerificados[item] = !checked),
+              onTap: () => setState(() => itensVerificados[item] = _proximoValor(item, valor)),
               borderRadius: BorderRadius.circular(i == 0
                   ? 12
                   : i == items.length - 1
@@ -456,14 +468,16 @@ class _ChecklistSaidaPageState extends State<ChecklistSaidaPage> {
                           color: checked ? AppColors.success : AppColors.border,
                         ),
                       ),
-                      child: checked
+                      child: na
+                          ? const Center(child: Text('N/A', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)))
+                          : checked
                           ? const Icon(Icons.check,
                               color: Colors.white, size: 14)
                           : null,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(item,
+                      child: Text(na ? '$item — não se aplica' : item,
                           style: TextStyle(
                               color: checked
                                   ? Colors.white

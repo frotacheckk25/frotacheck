@@ -120,7 +120,8 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
     final map = itens is Map
         ? Map<String, dynamic>.from(itens)
         : Map<String, dynamic>.from(json.decode(itens.toString()) as Map);
-    return map.values.where((v) => v == true).length;
+    // Conta só os itens atuais (verificados ou "não se aplica").
+    return Checklist.itensChecklist.where((i) => Checklist.itemOk(map[i])).length;
   }
 
   String _formatarData(Map<String, dynamic> r) {
@@ -347,24 +348,29 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                           height: 1, color: AppColors.border);
                     }
                     final item = Checklist.itensChecklist[i ~/ 2];
-                    final ok = itensMap[item] == true;
+                    final na = itensMap[item] == Checklist.naoSeAplica;
+                    final ok = Checklist.itemOk(itensMap[item]);
                     return Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
                       child: Row(
                         children: [
                           Icon(
-                            ok
-                                ? Icons.check_circle
-                                : Icons.cancel_outlined,
-                            color: ok
-                                ? AppColors.success
-                                : AppColors.danger,
+                            na
+                                ? Icons.remove_circle_outline
+                                : ok
+                                    ? Icons.check_circle
+                                    : Icons.cancel_outlined,
+                            color: na
+                                ? AppColors.textSecondary
+                                : ok
+                                    ? AppColors.success
+                                    : AppColors.danger,
                             size: 18,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Text(item,
+                            child: Text(na ? '$item — N/A' : item,
                                 style: TextStyle(
                                     color: ok
                                         ? Colors.white

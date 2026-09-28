@@ -32,7 +32,7 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
   final observacoesController = TextEditingController();
   final kmFinalController = TextEditingController();
 
-  late Map<String, bool> itensVerificados;
+  late Map<String, Object> itensVerificados;
   final List<Map<String, dynamic>> fotosCapturadas = [];
   // Avarias por posição de foto (ficha de vistoria): {'Frente': {'tipos': ['R'], 'obs': '...'}}
   final Map<String, Map<String, dynamic>> avarias = {};
@@ -52,8 +52,18 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
     super.dispose();
   }
 
+  // Toque no item: pendente → verificado; itens opcionais (extintor) ainda
+  // passam por "não se aplica" antes de voltar a pendente.
+  Object _proximoValor(String item, Object valor) {
+    if (valor == Checklist.naoSeAplica) return false;
+    if (valor == true) {
+      return Checklist.itensOpcionais.contains(item) ? Checklist.naoSeAplica : false;
+    }
+    return true;
+  }
+
   int get _totalMarcados =>
-      itensVerificados.values.where((v) => v).length;
+      itensVerificados.values.where(Checklist.itemOk).length;
 
   int get _totalFotos => Checklist.fotosObrigatorias.length;
 
@@ -464,11 +474,13 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
             return const Divider(height: 1, thickness: 1, color: AppColors.border);
           }
           final item = items[i ~/ 2];
-          final checked = itensVerificados[item] ?? false;
+          final valor = itensVerificados[item] ?? false;
+          final na = valor == Checklist.naoSeAplica;
+          final checked = Checklist.itemOk(valor);
           final isFirst = i == 0;
           final isLast = i == items.length * 2 - 2;
           return InkWell(
-            onTap: () => setState(() => itensVerificados[item] = !checked),
+            onTap: () => setState(() => itensVerificados[item] = _proximoValor(item, valor)),
             borderRadius: BorderRadius.only(
               topLeft: isFirst ? const Radius.circular(12) : Radius.zero,
               topRight: isFirst ? const Radius.circular(12) : Radius.zero,
@@ -491,13 +503,15 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
                       border: Border.all(
                           color: checked ? AppColors.success : AppColors.border),
                     ),
-                    child: checked
-                        ? const Icon(Icons.check, color: Colors.white, size: 14)
-                        : null,
+                    child: na
+                        ? const Center(child: Text('N/A', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)))
+                        : checked
+                            ? const Icon(Icons.check, color: Colors.white, size: 14)
+                            : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(item,
+                    child: Text(na ? '$item — não se aplica' : item,
                         style: TextStyle(
                             color: checked
                                 ? Colors.white

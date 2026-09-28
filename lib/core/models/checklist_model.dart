@@ -34,7 +34,7 @@ class Checklist {
       motoristaId: json['motorista_id'] as String,
       tipo: json['tipo'] as String,
       data: DateTime.parse(json['data'] as String),
-      itens: Map<String, bool>.from(json['itens'] as Map),
+      itens: (json['itens'] as Map).map((k, v) => MapEntry(k.toString(), itemOk(v))),
       fotoUrls: List<String>.from(json['foto_urls'] as List),
       assinaturaUrl: json['assinatura_url'] as String,
       aprovado: json['aprovado'] as bool,
@@ -62,6 +62,16 @@ class Checklist {
     'criado_em': criadoEm?.toIso8601String(),
     'atualizado_em': atualizadoEm?.toIso8601String(),
   };
+
+  /// Itens que o veículo pode não ter: aceitam "não se aplica" (gravado como
+  /// "na" em `itens`), que conta como verificado e não reprova o checklist.
+  static const Set<String> itensOpcionais = {'Extintor (caso tenha)'};
+
+  /// Valor gravado em `itens` quando o item não se aplica ao veículo.
+  static const String naoSeAplica = 'na';
+
+  /// Item OK = verificado (true) ou não se aplica ("na").
+  static bool itemOk(dynamic valor) => valor == true || valor == naoSeAplica;
 
   static final List<String> itensChecklist = [
     'Extintor (caso tenha)',
