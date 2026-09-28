@@ -108,7 +108,8 @@ class _ChecklistRetornoPageState extends State<ChecklistRetornoPage> {
         setState(() => fotosCapturadas.add({'bytes': bytes, 'label': label}));
       }
     } catch (e) {
-      if (mounted) showError(context, friendlyError(e));
+      debugPrint('Erro ao capturar foto ($label): $e');
+      if (mounted) showError(context, 'Não foi possível abrir a foto. Tente tirar de novo ou escolher outra imagem.');
     }
   }
 

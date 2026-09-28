@@ -195,8 +195,10 @@ class VistoriaFotosGrid extends StatelessWidget {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      // Largura máxima por foto: no celular ficam 3 por linha; no computador
+      // não viram quadros gigantes ocupando a tela inteira.
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 170,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
         childAspectRatio: 0.85,
