@@ -2951,10 +2951,9 @@ class _HomePageState extends State<HomePage> {
 
           // ── Bottom: profile + badge ────────────────────────────────────────
           Container(height: 1, color: const Color(0xFF0E1E33)),
-          _buildSairButton(),
-          Container(height: 1, color: const Color(0xFF0E1E33)),
           _buildProfileCard(),
           _buildProBadge(),
+          _buildSairButton(),
         ],
       ),
     );
@@ -3122,7 +3121,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildSairButton() {
-    return Material(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+      child: Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () async {
@@ -3148,23 +3149,30 @@ class _HomePageState extends State<HomePage> {
             await context.read<AppAuthProvider>().signOut();
           }
         },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: const [
-              Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
-              SizedBox(width: 10),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEF4444).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.35)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 16),
+              SizedBox(width: 8),
               Text(
-                'Sair',
+                'Sair da conta',
                 style: TextStyle(
                   color: Color(0xFFEF4444),
-                  fontSize: 13,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -3175,7 +3183,7 @@ class _HomePageState extends State<HomePage> {
     final isMaster = auth.isMaster;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF070D1A),
