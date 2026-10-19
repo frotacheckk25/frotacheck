@@ -10,6 +10,20 @@ import 'geolocation.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/utils/fetch_all.dart';
 
+/// Status da viagem para exibição (o banco guarda 'em_progresso' etc.).
+String rotuloStatusViagem(String status) {
+  switch (status) {
+    case 'em_progresso':
+      return 'Em Progresso';
+    case 'concluida':
+      return 'Concluída';
+    case 'cancelada':
+      return 'Cancelada';
+    default:
+      return status;
+  }
+}
+
 class ViagensPage extends StatefulWidget {
   const ViagensPage({super.key});
 
@@ -210,18 +224,7 @@ class _ViagensPageState extends State<ViagensPage> {
     }
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'em_progresso':
-        return 'Em Progresso';
-      case 'concluida':
-        return 'Concluída';
-      case 'cancelada':
-        return 'Cancelada';
-      default:
-        return status;
-    }
-  }
+  String _statusLabel(String status) => rotuloStatusViagem(status);
 
   @override
   Widget build(BuildContext context) {
@@ -985,7 +988,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
                         ),
                       ),
                       Chip(
-                        label: Text(status.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        label: Text(rotuloStatusViagem(status), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                         backgroundColor: _statusColor(status).withValues(alpha: 0.15),
                         labelStyle: TextStyle(color: _statusColor(status)),
                       ),

@@ -2274,7 +2274,7 @@ class _HomePageState extends State<HomePage> {
             compact: true,
             title: 'Gasto do Mês',
             value: _kpiGastoMensal,
-            unit: 'combustível + manutenção',
+            unit: 'combustível + manutenção + multas',
             icon: Icons.account_balance_wallet_rounded,
             color: const Color(0xFF7C3AED),
             trend: _sparkCostTrend(sparkGasto),
@@ -2338,7 +2338,7 @@ class _HomePageState extends State<HomePage> {
         Expanded(child: KpiCard(
           title: 'Gasto do Mês',
           value: _kpiGastoMensal,
-          unit: 'combustível + manutenção',
+          unit: 'combustível + manutenção + multas',
           icon: Icons.account_balance_wallet_rounded,
           color: const Color(0xFF7C3AED),
           trend: _sparkCostTrend(sparkGasto),

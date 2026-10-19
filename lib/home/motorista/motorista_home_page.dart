@@ -234,8 +234,10 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         try {
           ultManut = await _supabase
               .from('oil_changes')
-              .select('id, created_at, vehicle_id, next_change_km')
+              .select('id, created_at, oil_change_date, vehicle_id, next_change_km')
               .eq('vehicle_id', vehicleId)
+              // Mais recente pela data da troca (não pela data de lançamento).
+              .order('oil_change_date', ascending: false, nullsFirst: false)
               .order('created_at', ascending: false)
               .limit(1)
               .maybeSingle();
@@ -1351,7 +1353,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               titulo: 'Última troca de óleo',
               sub:
                   'Próxima troca: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
-              data: _ultimaManutencao!['created_at']?.toString(),
+              data: (_ultimaManutencao!['oil_change_date'] ?? _ultimaManutencao!['created_at'])?.toString(),
             )
           else
             _vazioSmall('Nenhuma manutenção registrada.'),
@@ -1515,7 +1517,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                 titulo: 'Última Troca de Óleo',
                 subtitulo:
                     'Próxima: ${_ultimaManutencao!['next_change_km'] ?? '—'} km',
-                data: _ultimaManutencao!['created_at']?.toString(),
+                data: (_ultimaManutencao!['oil_change_date'] ?? _ultimaManutencao!['created_at'])?.toString(),
                 isLast: true,
               )
             else
