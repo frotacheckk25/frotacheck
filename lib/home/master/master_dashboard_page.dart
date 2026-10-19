@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
-import '../../core/config/app_links.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/driver_account_link.dart';
@@ -1651,6 +1650,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
     final nomeCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final telefoneCtrl = TextEditingController();
+    final senhaCtrl = TextEditingController();
     AppRole papel = AppRole.motorista;
     bool criarConta = false;
     bool saving = false;
@@ -1712,7 +1712,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 _fieldLabel('E-mail da conta *'),
                 const SizedBox(height: 4),
                 const Text(
-                  'Use o e-mail com que a pessoa já criou conta no app. Se ainda não tem conta, marque a opção abaixo para criar uma e enviar o convite por e-mail.',
+                  'Use o e-mail com que a pessoa já criou conta no app. Se ainda não tem conta, marque a opção abaixo e defina uma senha inicial (o e-mail pode ser um login interno, ex.: paulo.motorista@empresa.com).',
                   style: TextStyle(color: Color(0xFF475569), fontSize: 11),
                 ),
                 const SizedBox(height: 6),
@@ -1779,7 +1779,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Criar conta nova (convite por e-mail — Master nunca define a senha do motorista)
+                // Criar conta nova com senha inicial definida aqui (sem depender de e-mail)
                 Container(
                   decoration: BoxDecoration(
                     color: const Color(0xFF0F1C30),
@@ -1794,11 +1794,16 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                     title: const Text('Criar conta de acesso',
                         style: TextStyle(color: Colors.white, fontSize: 13)),
                     subtitle: const Text(
-                      'Um e-mail com link para a pessoa definir a própria senha será enviado.',
+                      'Você define a senha inicial e entrega à pessoa junto com o e-mail.',
                       style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
                     ),
                   ),
                 ),
+                if (criarConta) ...[
+                  const SizedBox(height: 12),
+                  _formField('Senha inicial * (mínimo 6 caracteres)', senhaCtrl,
+                      hint: 'A pessoa pode trocar depois no Perfil'),
+                ],
               ]),
             ),
           ),
@@ -1815,6 +1820,11 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
                 if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
                 if (email.isEmpty) { setS(() => error = 'E-mail é obrigatório'); return; }
+                final senha = senhaCtrl.text;
+                if (criarConta && senha.length < 6) {
+                  setS(() => error = 'Defina uma senha inicial com pelo menos 6 caracteres');
+                  return;
+                }
 
                 setS(() { saving = true; error = null; successMsg = null; });
 
@@ -1823,26 +1833,23 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
                   if (criarConta) {
                     // ── Criar conta nova via cliente secundário ──────────────
-                    // A senha é aleatória e descartada: o motorista define a própria
-                    // senha pelo link enviado via resetPasswordForEmail (Master nunca a conhece).
+                    // Senha inicial definida por quem cadastra; a pessoa troca depois
+                    // em Perfil → Alterar senha. Nada depende de e-mail chegar.
                     final url = await SupabaseConfig.getUrl();
                     final key = await SupabaseConfig.getPublishableKey();
                     final tmpClient = SupabaseClient(url, key);
                     try {
-                      final tempPassword = '${DateTime.now().microsecondsSinceEpoch}${UniqueKey().hashCode}Aa1!';
                       final signUpRes = await tmpClient.auth.signUp(
                         email: email,
-                        password: tempPassword,
+                        password: senha,
                       );
                       userId = signUpRes.user?.id;
-                      if (userId == null) {
-                        await tmpClient.dispose();
-                        setS(() { saving = false; error = 'Falha ao criar conta. Verifique se o e-mail já está cadastrado.'; });
+                      // Usuário sem identities = e-mail que já tinha conta.
+                      final jaExiste = signUpRes.user?.identities?.isEmpty ?? false;
+                      if (userId == null || jaExiste) {
+                        setS(() { saving = false; error = 'Já existe uma conta com esse e-mail. Desmarque "Criar conta de acesso" para só vincular.'; });
                         return;
                       }
-                      try {
-                        await tmpClient.auth.resetPasswordForEmail(email, redirectTo: kFrotaCheckPwaUrl);
-                      } catch (_) {}
                     } finally {
                       await tmpClient.dispose();
                     }
@@ -1903,7 +1910,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
 
                   final papelLabel = papel.displayName;
                   final msg = criarConta
-                      ? '$papelLabel "$nome" cadastrado! Um e-mail para definir a senha foi enviado a $email.'
+                      ? '$papelLabel "$nome" cadastrado! Entregue o acesso: $email e a senha definida.'
                       : '$papelLabel "$nome" vinculado com sucesso à conta $email!';
 
                   if (ctx.mounted) {

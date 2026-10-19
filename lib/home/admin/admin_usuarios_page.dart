@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
-import '../../core/config/app_links.dart';
 import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
@@ -793,9 +792,10 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
   }
 
   // ── Criação de novo usuário (Gestor ou Motorista) ─────────────────────────
-  // Mesmo padrão já usado em master_dashboard_page.dart: cria a conta com uma
-  // senha aleatória descartada e envia convite por e-mail (resetPasswordForEmail)
-  // — quem administra nunca sabe/define a senha do novo usuário.
+  // Quem administra define a senha inicial e a entrega à pessoa; nada depende
+  // de e-mail chegar (a confirmação de e-mail fica desligada no Supabase e o
+  // e-mail pode ser um login interno, ex.: paulo.motorista@empresa.com). A
+  // pessoa troca a senha depois em Perfil → Alterar senha.
   Future<void> _showNovoUsuarioDialog(
     AppAuthProvider auth, {
     AppRole papelInicial = AppRole.motorista,
@@ -803,6 +803,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     final nomeCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final telefoneCtrl = TextEditingController();
+    final senhaCtrl = TextEditingController();
     AppRole papel = papelInicial;
     String? empresaId = auth.isMaster ? _empresaSelecionadaId : auth.effectiveEmpresaId;
     bool criarConta = true;
@@ -933,11 +934,16 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                       title: const Text('Criar conta de acesso',
                           style: TextStyle(color: Colors.white, fontSize: 13)),
                       subtitle: const Text(
-                        'Envia um e-mail para a pessoa definir a própria senha.',
+                        'Você define a senha inicial e entrega à pessoa junto com o e-mail.',
                         style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                       ),
                     ),
                   ),
+                  if (criarConta) ...[
+                    const SizedBox(height: 12),
+                    _dialogField('Senha inicial * (mínimo 6 caracteres)', senhaCtrl,
+                        hint: 'A pessoa pode trocar depois no Perfil'),
+                  ],
                 ],
               ),
             ),
@@ -956,6 +962,11 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
 
                       if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
                       if (email.isEmpty) { setS(() => error = 'E-mail é obrigatório'); return; }
+                      final senha = senhaCtrl.text;
+                      if (criarConta && senha.length < 6) {
+                        setS(() => error = 'Defina uma senha inicial com pelo menos 6 caracteres');
+                        return;
+                      }
                       if (auth.isMaster && empresaId == null) { setS(() => error = 'Selecione uma empresa'); return; }
 
                       setS(() { saving = true; error = null; });
@@ -968,16 +979,15 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                           final key = await SupabaseConfig.getPublishableKey();
                           final tmpClient = SupabaseClient(url, key);
                           try {
-                            final tempPassword = '${DateTime.now().microsecondsSinceEpoch}${UniqueKey().hashCode}Aa1!';
-                            final signUpRes = await tmpClient.auth.signUp(email: email, password: tempPassword);
+                            final signUpRes = await tmpClient.auth.signUp(email: email, password: senha);
                             userId = signUpRes.user?.id;
-                            if (userId == null) {
-                              setS(() { saving = false; error = 'Falha ao criar conta. Verifique se o e-mail já está cadastrado.'; });
+                            // Supabase devolve usuário "fantasma" (sem identities)
+                            // quando o e-mail já tem conta.
+                            final jaExiste = signUpRes.user?.identities?.isEmpty ?? false;
+                            if (userId == null || jaExiste) {
+                              setS(() { saving = false; error = 'Já existe uma conta com esse e-mail. Desmarque "Criar conta de acesso" para só vincular.'; });
                               return;
                             }
-                            try {
-                              await tmpClient.auth.resetPasswordForEmail(email, redirectTo: kFrotaCheckPwaUrl);
-                            } catch (_) {}
                           } finally {
                             await tmpClient.dispose();
                           }
@@ -1043,7 +1053,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                         }
 
                         final msg = criarConta
-                            ? '$nome cadastrado! Convite enviado para $email.'
+                            ? '$nome cadastrado! Entregue o acesso: $email e a senha definida.'
                             : '$nome vinculado com sucesso!';
 
                         if (ctx.mounted) {
@@ -1068,6 +1078,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
     nomeCtrl.dispose();
     emailCtrl.dispose();
     telefoneCtrl.dispose();
+    senhaCtrl.dispose();
     setState(() => _isEditing = false);
   }
 
@@ -2401,12 +2412,99 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                   },
                 ),
               ],
+              if (auth.isMaster || role != AppRole.adminEmpresa) ...[
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _redefinirSenha(userId, u['nome']?.toString() ?? u['email']?.toString() ?? '');
+                  },
+                  icon: const Icon(Icons.lock_reset_rounded, size: 18),
+                  label: const Text('Redefinir senha'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.warning,
+                    side: BorderSide(color: AppColors.warning.withOpacity(0.5)),
+                    minimumSize: const Size(double.infinity, 44),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
             ],
           ),
         );
       },
     );
+  }
+
+  /// Define uma nova senha para alguém da empresa (quem esqueceu a senha e
+  /// usa um e-mail interno, que não recebe o link de "Esqueceu a senha").
+  /// A validação de quem pode redefinir quem fica na Edge Function.
+  Future<void> _redefinirSenha(String userId, String nome) async {
+    final senhaCtrl = TextEditingController();
+    String? erro;
+    bool salvando = false;
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text('Redefinir senha de $nome', style: const TextStyle(color: Colors.white, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Defina a nova senha e entregue à pessoa. Ela pode trocar depois em Perfil → Alterar senha.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              const SizedBox(height: 12),
+              _dialogField('Nova senha * (mínimo 6 caracteres)', senhaCtrl),
+              if (erro != null) ...[
+                const SizedBox(height: 8),
+                Text(erro!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: salvando ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: salvando
+                  ? null
+                  : () async {
+                      final senha = senhaCtrl.text;
+                      if (senha.length < 6) {
+                        setS(() => erro = 'A senha precisa ter pelo menos 6 caracteres');
+                        return;
+                      }
+                      setS(() { salvando = true; erro = null; });
+                      try {
+                        final res = await _supabase.functions.invoke('admin-redefinir-senha',
+                            body: {'user_id': userId, 'nova_senha': senha});
+                        final data = res.data;
+                        if (data is Map && data['ok'] == true) {
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) showSuccess(context, 'Senha de $nome redefinida. Entregue a nova senha à pessoa.');
+                          return;
+                        }
+                        setS(() { salvando = false; erro = (data is Map ? data['erro'] : null)?.toString() ?? 'Não foi possível redefinir a senha'; });
+                      } on FunctionException catch (e) {
+                        final d = e.details;
+                        setS(() { salvando = false; erro = (d is Map ? d['erro'] : null)?.toString() ?? 'Não foi possível redefinir a senha'; });
+                      } catch (e) {
+                        setS(() { salvando = false; erro = friendlyError(e); });
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning, foregroundColor: Colors.white),
+              child: salvando
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Redefinir'),
+            ),
+          ],
+        ),
+      ),
+    );
+    senhaCtrl.dispose();
   }
 }
 

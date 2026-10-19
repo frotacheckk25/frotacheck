@@ -33,7 +33,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (response.user != null) {
         if (!mounted) return;
-        showSuccess(context, 'Conta criada. Verifique seu e-mail.');
+        showSuccess(context, 'Conta criada! Peça ao administrador da sua empresa para liberar seu acesso.');
         Navigator.pop(context);
       }
     } catch (e) {
