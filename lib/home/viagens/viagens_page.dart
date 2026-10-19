@@ -7,6 +7,8 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'geolocation.dart';
+import '../../core/models/checklist_model.dart';
+import '../../core/utils/fetch_all.dart';
 
 class ViagensPage extends StatefulWidget {
   const ViagensPage({super.key});
@@ -89,7 +91,17 @@ class _ViagensPageState extends State<ViagensPage> {
             vMap[row['id'].toString()] = row;
           }
         } catch (_) {}
-        // Motoristas: batch query ao invés de N+1
+        // Todos os motoristas cadastrados da empresa — antes só entravam os
+        // que tinham conta no app, e sem eles a lista ficava vazia e o gestor
+        // não conseguia registrar viagem (os outros módulos listam todos).
+        try {
+          final ds = await fetchAllRows((from, to) => supabase.from('drivers')
+              .select('id, name').eq('empresa_id', eid).order('name').order('id').range(from, to));
+          for (final row in ds) {
+            mMap[row['id'].toString()] = row;
+          }
+        } catch (_) {}
+        // Contas de motorista ainda sem cadastro em drivers: batch query ao invés de N+1
         try {
           final profiles = await supabase.from('user_profiles')
               .select('driver_id, nome, email')
@@ -487,7 +499,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
     }
 
     final kmInicio = double.tryParse(kmInicioCtrl.text.replaceAll(',', '.'));
-    if (kmInicio == null || kmInicio < 0) {
+    if (kmInicio == null || kmInicio < 0 || kmInicio > Checklist.kmMaximo) {
       showError(context, 'Quilometragem inicial inválida');
       return;
     }
@@ -800,7 +812,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       return;
     }
     final kmFim = double.tryParse(kmFimCtrl.text.replaceAll(',', '.'));
-    if (kmFim == null || kmFim < 0) {
+    if (kmFim == null || kmFim < 0 || kmFim > Checklist.kmMaximo) {
       showError(context, 'Quilometragem final inválida');
       return;
     }

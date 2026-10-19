@@ -6,6 +6,7 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/snackbar_utils.dart';
 import '../core/utils/fetch_all.dart';
 import '../core/utils/formato_br.dart';
+import '../core/models/checklist_model.dart';
 
 class TrocaOleoPage extends StatefulWidget {
   const TrocaOleoPage({super.key});
@@ -168,8 +169,8 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     }
 
     final kmAtual = int.tryParse(kmController.text.trim()) ?? 0;
-    if (kmAtual < 0) {
-      _snackErro('Informe um KM atual válido (não negativo)');
+    if (kmAtual < 0 || kmAtual > Checklist.kmMaximo) {
+      _snackErro('Informe um KM atual válido. Confira o valor digitado.');
       return;
     }
 
@@ -560,6 +561,9 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
                   if (v == null || v.trim().isEmpty) return 'Informe o KM atual';
                   final parsed = int.tryParse(v.trim());
                   if (parsed == null) return 'Somente números';
+                  // Sem teto, um KM digitado duas vezes (ex.: 236850236900)
+                  // estourava o limite do banco e a gravação falhava.
+                  if (parsed > Checklist.kmMaximo) return 'KM inválido. Confira o valor digitado.';
                   final atual = veiculos.firstWhere(
                     (veic) => veic['id']?.toString() == selectedVehicleId,
                     orElse: () => {},

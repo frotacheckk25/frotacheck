@@ -4,6 +4,7 @@ import 'package:frotacheck/home/abastecimentos/detalhe_abastecimento_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formato_br.dart';
 
 class ListaAbastecimentosPage extends StatefulWidget {
   const ListaAbastecimentosPage({super.key});
@@ -93,7 +94,7 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
   Widget _cardsResumo() {
     return Row(
       children: [
-        Expanded(child: _infoCard('Total de litros', '${totalLitros.toStringAsFixed(0)} L', AppColors.info)),
+        Expanded(child: _infoCard('Total de litros', '${numeroBr(totalLitros, casas: 0)} L', AppColors.info)),
         const SizedBox(width: 12),
         Expanded(child: _infoCard('Total gasto', 'R\$ ${totalValor.toStringAsFixed(2)}', AppColors.success)),
         const SizedBox(width: 12),
@@ -241,7 +242,7 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                '${item['liters']} L · R\$ ${item['total_value']}',
+                                                '${litrosBr(item['liters'])} · ${moedaBr(paraDouble(item['total_value']))}',
                                                 style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                                               ),
                                               const SizedBox(height: 4),

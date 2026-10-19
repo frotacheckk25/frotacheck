@@ -20,6 +20,7 @@ import '../pneus/pneus_page.dart';
 import '../veiculos/veiculo_tipo.dart';
 import '../viagens/viagens_page.dart';
 import '../../pages/lista_ocorrencias_page.dart';
+import '../../core/utils/formato_br.dart';
 
 class MotoristaHomePage extends StatefulWidget {
   const MotoristaHomePage({super.key});
@@ -1336,7 +1337,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
               titulo: 'Último abastecimento',
               sub: _placaLabel(_ultimoAbastecimento!),
               extra: _ultimoAbastecimento!['liters'] != null
-                  ? '${_ultimoAbastecimento!['liters']} L'
+                  ? litrosBr(_ultimoAbastecimento!['liters'])
                   : null,
               data: _ultimoAbastecimento!['created_at']?.toString(),
             )

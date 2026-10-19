@@ -13,6 +13,7 @@ import 'package:frotacheck/core/utils/signed_storage_url.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
 import 'veiculo_historico_page.dart';
 import 'veiculo_tipo.dart';
+import '../../core/models/checklist_model.dart';
 
 class VeiculosPage extends StatelessWidget {
   const VeiculosPage({super.key});
@@ -690,6 +691,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
                         final parsed = int.tryParse(v.trim());
                         if (parsed == null) return 'Km inválido — use apenas números';
                         if (parsed < 0) return 'Km não pode ser negativo';
+                        if (parsed > Checklist.kmMaximo) return 'Km inválido. Confira o valor digitado.';
                         return null;
                       },
                     ),

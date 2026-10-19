@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -111,6 +112,11 @@ class FrotaCheckApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'FrotaCheck',
         theme: AppTheme.darkTheme,
+        // Calendários, "Cancelar/OK", copiar/colar etc. em português —
+        // sem isso os seletores de data apareciam em inglês.
+        locale: const Locale('pt', 'BR'),
+        supportedLocales: const [Locale('pt', 'BR')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: AppGuard(
           authenticated: const _MasterAwareRouter(),
           unauthenticated: const LoginPage(),

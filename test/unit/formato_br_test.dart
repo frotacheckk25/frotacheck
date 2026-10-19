@@ -15,4 +15,11 @@ void main() {
     expect(paraDouble('12.5'), 12.5);
     expect(paraDouble(null), 0.0);
   });
+
+  test('litros sem zeros sobrando', () {
+    expect(litrosBr(312.5), '312,5 L');
+    expect(litrosBr('45.37'), '45,37 L');
+    expect(litrosBr(300), '300 L');
+    expect(litrosBr(182340.5), '182.340,5 L');
+  });
 }

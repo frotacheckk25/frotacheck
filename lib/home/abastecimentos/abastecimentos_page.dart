@@ -419,7 +419,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
                                       spacing: 8,
                                       runSpacing: 4,
                                       children: [
-                                        _badge('${litros ?? '-'} L', AppColors.secondary),
+                                        _badge(litros == null ? '- L' : litrosBr(litros), AppColors.secondary),
                                         _badge(_fmtValue(valor), AppColors.success),
                                         if (odometro != null) _badge('$odometro km', AppColors.warning),
                                         _badge(data, AppColors.textSecondary),

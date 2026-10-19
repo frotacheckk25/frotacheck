@@ -1049,6 +1049,32 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Como [_sparkSelect], mas pela data do fato (`data`, ou created_at quando
+  /// vazia). Cada linha ganha `_quando` com a data efetiva, usada nos bins.
+  Future<List<Map<String, dynamic>>> _sparkSelectDataDoFato(
+    String table,
+    String start,
+    String end, {
+    required String cols,
+  }) async {
+    try {
+      final filtro = 'and(data.gte.$start,data.lte.$end),'
+          'and(data.is.null,created_at.gte.${_inicioDiaUtc(start)},'
+          'created_at.lt.${_inicioDiaSeguinteUtc(end)})';
+      final rows = await fetchAllRows((from, to) {
+        var q = supabase.from(table).select(cols).or(filtro);
+        if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+        return q.order('id').range(from, to);
+      });
+      for (final r in rows) {
+        r['_quando'] = r['data'] ?? r['created_at'];
+      }
+      return rows;
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> _loadSparklines(List<Map<String, dynamic>> veiculos) async {
     final now = DateTime.now();
     final mo = _mOff(5);
@@ -1061,17 +1087,19 @@ class _HomePageState extends State<HomePage> {
         _sparkSelect('fuelings', start, end,
             dateCol: 'fuel_date',
             cols: 'fuel_date,total_value,vehicle_id,driver_id'),
-        _sparkSelect('manutencoes', start, end, cols: 'created_at,cost,valor,vehicle_id'),
+        _sparkSelectDataDoFato('manutencoes', start, end, cols: 'data,created_at,cost,valor,vehicle_id'),
         _sparkSelect('occurrences', start, end, cols: 'created_at'),
-        _sparkSelect('multas', start, end, cols: 'created_at,valor'),
+        _sparkSelectDataDoFato('multas', start, end, cols: 'data,created_at,valor'),
       ]);
 
       final fuel = rs[0], maint = rs[1], occ = rs[2], mult = rs[3];
 
+      // Manutenções e multas entram no mês do serviço/infração (`_quando`),
+      // como no cartão "Gasto do mês" — não no mês em que foram cadastradas.
       final fuelBins  = _monthCountBins(fuel, dateField: 'fuel_date');
-      final maintBins = _monthCountBins(maint);
+      final maintBins = _monthCountBins(maint, dateField: '_quando');
       final occBins   = _monthCountBins(occ);
-      final multBins  = _monthCountBins(mult);
+      final multBins  = _monthCountBins(mult, dateField: '_quando');
 
       // Unique active vehicles per month (vehicles with at least 1 fueling)
       final vBins = List<double>.generate(6, (i) {
@@ -1093,8 +1121,8 @@ class _HomePageState extends State<HomePage> {
 
       // Total monthly cost (fuel + maintenance + fines)
       final fuelCost  = _monthCostBins(fuel,  dateField: 'fuel_date', costFields: ['total_value']);
-      final maintCost = _monthCostBins(maint, costFields: ['cost', 'valor']);
-      final multCost  = _monthCostBins(mult,  costFields: ['valor']);
+      final maintCost = _monthCostBins(maint, dateField: '_quando', costFields: ['cost', 'valor']);
+      final multCost  = _monthCostBins(mult,  dateField: '_quando', costFields: ['valor']);
       final gastoBins = List<double>.generate(6, (i) => fuelCost[i] + maintCost[i] + multCost[i]);
 
       // Fleet index = (total - veículos DISTINTOS com manutenção no mês) / total.
@@ -1105,7 +1133,7 @@ class _HomePageState extends State<HomePage> {
         if (vTotal == 0) return 0.0;
         final mo2 = _mOff(5 - i);
         final inMaint = maint.where((m) {
-          final dt = DateTime.tryParse(m['created_at']?.toString() ?? '')?.toLocal();
+          final dt = DateTime.tryParse(m['_quando']?.toString() ?? '')?.toLocal();
           return dt != null && dt.year == mo2.year && dt.month == mo2.month;
         }).map((m) => m['vehicle_id']).whereType<Object>().toSet().length;
         return ((vTotal - inMaint.clamp(0, vTotal)) / vTotal * 100).clamp(0.0, 100.0);

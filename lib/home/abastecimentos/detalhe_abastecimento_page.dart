@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/signed_network_image.dart';
+import '../../core/utils/formato_br.dart';
 
 class DetalheAbastecimentoPage extends StatelessWidget {
   final Map<String, dynamic> abastecimento;
@@ -63,11 +64,11 @@ class DetalheAbastecimentoPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${_fmt(abastecimento['liters'])} L',
+                              litrosBr(abastecimento['liters']),
                               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                             Text(
-                              'R\$ ${_fmt(abastecimento['total_value'])}',
+                              moedaBr(paraDouble(abastecimento['total_value'])),
                               style: const TextStyle(fontSize: 16, color: AppColors.secondary),
                             ),
                           ],

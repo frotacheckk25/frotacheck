@@ -18,6 +18,14 @@ String numeroBr(num v, {int casas = 2}) {
 /// Valor em reais: "R$ 1.254.321,87".
 String moedaBr(num v) => 'R\$ ${numeroBr(v)}';
 
+/// Litros com até 2 casas, sem zeros sobrando: "312,5 L", "45,37 L", "300 L".
+String litrosBr(dynamic v) {
+  var s = numeroBr(paraDouble(v));
+  if (s.endsWith(',00')) return '${s.substring(0, s.length - 3)} L';
+  if (s.endsWith('0')) s = s.substring(0, s.length - 1);
+  return '$s L';
+}
+
 /// Aceita num, String ou null (valores vindos do banco).
 double paraDouble(dynamic v) =>
     v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
