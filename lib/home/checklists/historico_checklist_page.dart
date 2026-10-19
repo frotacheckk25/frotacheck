@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/fetch_all.dart';
 import '../../core/widgets/signed_network_image.dart';
 import 'vistoria_widgets.dart';
 
@@ -15,17 +17,39 @@ class HistoricoChecklistPage extends StatefulWidget {
   State<HistoricoChecklistPage> createState() => _HistoricoChecklistPageState();
 }
 
+/// Períodos do filtro do histórico (dias para trás; null = todo o período).
+const Map<String, int?> _kPeriodos = {
+  'Hoje': 0,
+  '7 dias': 7,
+  '30 dias': 30,
+  'Tudo': null,
+};
+
 class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
   final supabase = Supabase.instance.client;
+
+  /// Registros por página. Filtros (tipo, período, busca) rodam no banco, então
+  /// o histórico funciona para qualquer tamanho de frota — antes vinham só os
+  /// 500 mais recentes e a busca filtrava apenas dentro deles.
+  static const int _pageSize = 100;
+
+  /// Máximo de veículos/motoristas enviados no filtro da busca (limite de URL).
+  static const int _maxIdsBusca = 150;
 
   List<Map<String, dynamic>> _registros = [];
   Map<String, Map<String, dynamic>> _veicMap = {};
   Map<String, Map<String, dynamic>> _motMap = {};
   bool _carregando = true;
+  bool _carregandoMais = false;
+  bool _temMais = false;
+  int? _total;
   String _filtroTipo = 'todos';
+  String _periodo = '7 dias';
   String _busca = '';
+  bool _buscaAmpla = false;
   String? _erroCarregamento;
   final _buscaController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -35,60 +59,56 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _buscaController.dispose();
     super.dispose();
   }
 
+  void _onBusca(String v) {
+    setState(() => _busca = v);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () => _carregarPagina(reset: true));
+  }
+
+  void _setFiltro({String? tipo, String? periodo}) {
+    setState(() {
+      if (tipo != null) _filtroTipo = tipo;
+      if (periodo != null) _periodo = periodo;
+    });
+    _carregarPagina(reset: true);
+  }
+
+  /// Carrega veículos e motoristas (para nomes/placas e busca) e a 1ª página.
   Future<void> _carregar() async {
     if (!mounted) return;
     setState(() => _carregando = true);
     try {
       final auth = context.read<AppAuthProvider>();
       final eid = auth.effectiveEmpresaId;
-      var checkQ = supabase.from('checklists').select();
-      if (auth.isMotorista && auth.driverId != null) {
-        checkQ = checkQ.eq('motorista_id', auth.driverId!);
-      } else if (eid != null) {
-        checkQ = checkQ.eq('empresa_id', eid);
-      }
-
-      var veicQ = supabase.from('vehicles').select('id, plate, model, brand');
-      var drivQ = supabase.from('drivers').select('id, name');
-      if (auth.isMotorista && auth.driverId != null) {
-        veicQ = veicQ.eq('driver_id', auth.driverId!);
-        drivQ = drivQ.eq('id', auth.driverId!);
-      } else if (eid != null) {
-        veicQ = veicQ.eq('empresa_id', eid);
-        drivQ = drivQ.eq('empresa_id', eid);
-      }
       final results = await Future.wait([
-        checkQ.order('criado_em', ascending: false).limit(500),
-        veicQ,
-        drivQ,
+        fetchAllRows((from, to) {
+          var q = supabase.from('vehicles').select('id, plate, model, brand');
+          if (auth.isMotorista && auth.driverId != null) {
+            q = q.eq('driver_id', auth.driverId!);
+          } else if (eid != null) {
+            q = q.eq('empresa_id', eid);
+          }
+          return q.order('id').range(from, to);
+        }),
+        fetchAllRows((from, to) {
+          var q = supabase.from('drivers').select('id, name');
+          if (auth.isMotorista && auth.driverId != null) {
+            q = q.eq('id', auth.driverId!);
+          } else if (eid != null) {
+            q = q.eq('empresa_id', eid);
+          }
+          return q.order('id').range(from, to);
+        }),
       ]);
-
-      final veicMap = <String, Map<String, dynamic>>{};
-      for (final v in (results[1] as List)) {
-        final row = Map<String, dynamic>.from(v as Map);
-        veicMap[row['id'].toString()] = row;
-      }
-
-      final motMap = <String, Map<String, dynamic>>{};
-      for (final m in (results[2] as List)) {
-        final row = Map<String, dynamic>.from(m as Map);
-        motMap[row['id'].toString()] = row;
-      }
-
       if (!mounted) return;
-      setState(() {
-        _registros = List<Map<String, dynamic>>.from(
-          (results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)),
-        );
-        _veicMap = veicMap;
-        _motMap = motMap;
-        _carregando = false;
-        _erroCarregamento = null;
-      });
+      _veicMap = {for (final v in results[0]) v['id'].toString(): v};
+      _motMap = {for (final m in results[1]) m['id'].toString(): m};
+      await _carregarPagina(reset: true);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -99,19 +119,88 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
     }
   }
 
-  List<Map<String, dynamic>> get _filtrados {
-    return _registros.where((r) {
-      if (_filtroTipo != 'todos' && r['tipo'] != _filtroTipo) return false;
-      if (_busca.isNotEmpty) {
-        final vid = r['veiculo_id']?.toString() ?? '';
-        final mid = r['motorista_id']?.toString() ?? '';
-        final placa = (_veicMap[vid]?['plate'] ?? '').toString().toLowerCase();
-        final motor = (_motMap[mid]?['name'] ?? '').toString().toLowerCase();
-        final q = _busca.toLowerCase();
-        if (!placa.contains(q) && !motor.contains(q)) return false;
+  /// Busca uma página de checklists já filtrada no banco.
+  Future<void> _carregarPagina({bool reset = false}) async {
+    if (!mounted) return;
+    final auth = context.read<AppAuthProvider>();
+    final eid = auth.effectiveEmpresaId;
+    final offset = reset ? 0 : _registros.length;
+    setState(() => reset ? _carregando = true : _carregandoMais = true);
+
+    try {
+      var q = supabase.from('checklists').select();
+      if (auth.isMotorista && auth.driverId != null) {
+        q = q.eq('motorista_id', auth.driverId!);
+      } else if (eid != null) {
+        q = q.eq('empresa_id', eid);
       }
-      return true;
-    }).toList();
+      if (_filtroTipo != 'todos') q = q.eq('tipo', _filtroTipo);
+
+      final dias = _kPeriodos[_periodo];
+      if (dias != null) {
+        final hoje = DateTime.now();
+        final inicio = DateTime(hoje.year, hoje.month, hoje.day).subtract(Duration(days: dias));
+        q = q.gte('criado_em', inicio.toUtc().toIso8601String());
+      }
+
+      var buscaAmpla = false;
+      final termo = _busca.trim().toLowerCase();
+      if (termo.isNotEmpty) {
+        final vids = _veicMap.entries
+            .where((e) => (e.value['plate'] ?? '').toString().toLowerCase().contains(termo))
+            .map((e) => e.key)
+            .toList();
+        final mids = _motMap.entries
+            .where((e) => (e.value['name'] ?? '').toString().toLowerCase().contains(termo))
+            .map((e) => e.key)
+            .toList();
+        if (vids.isEmpty && mids.isEmpty) {
+          if (!mounted) return;
+          setState(() {
+            _registros = [];
+            _total = 0;
+            _temMais = false;
+            _buscaAmpla = false;
+            _carregando = false;
+            _carregandoMais = false;
+            _erroCarregamento = null;
+          });
+          return;
+        }
+        buscaAmpla = vids.length > _maxIdsBusca || mids.length > _maxIdsBusca;
+        final filtros = [
+          if (vids.isNotEmpty) 'veiculo_id.in.(${vids.take(_maxIdsBusca).join(',')})',
+          if (mids.isNotEmpty) 'motorista_id.in.(${mids.take(_maxIdsBusca).join(',')})',
+        ];
+        q = q.or(filtros.join(','));
+      }
+
+      final res = await q
+          .order('criado_em', ascending: false)
+          .order('id')
+          .range(offset, offset + _pageSize - 1)
+          .count(CountOption.exact);
+      final pagina = res.data.map((e) => Map<String, dynamic>.from(e)).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _registros = reset ? pagina : [..._registros, ...pagina];
+        _total = res.count;
+        _temMais = _registros.length < res.count;
+        _buscaAmpla = buscaAmpla;
+        _carregando = false;
+        _carregandoMais = false;
+        _erroCarregamento = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _carregando = false;
+          _carregandoMais = false;
+          _erroCarregamento = 'Erro ao carregar checklists: ${e.toString()}';
+        });
+      }
+    }
   }
 
   int _itensOk(Map<String, dynamic> r) {
@@ -541,7 +630,7 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
 
   @override
   Widget build(BuildContext context) {
-    final lista = _filtrados;
+    final lista = _registros;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -568,7 +657,7 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                 TextField(
                   controller: _buscaController,
                   style: const TextStyle(color: Colors.white, fontSize: 13),
-                  onChanged: (v) => setState(() => _busca = v),
+                  onChanged: _onBusca,
                   decoration: InputDecoration(
                     hintText: 'Buscar por placa ou motorista...',
                     hintStyle: const TextStyle(
@@ -581,7 +670,7 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                                 color: AppColors.textSecondary, size: 16),
                             onPressed: () {
                               _buscaController.clear();
-                              setState(() => _busca = '');
+                              _onBusca('');
                             },
                           )
                         : null,
@@ -604,22 +693,39 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                // Chips de tipo
-                Row(
+                // Chips de tipo e de período
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _filterChip('Todos', 'todos'),
-                    const SizedBox(width: 8),
-                    _filterChip('Saída', 'saida'),
-                    const SizedBox(width: 8),
-                    _filterChip('Retorno', 'retorno'),
-                    const Spacer(),
-                    Text(
-                      '${lista.length} registro${lista.length != 1 ? 's' : ''}',
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11),
-                    ),
+                    _filterChip('Todos', _filtroTipo == 'todos', () => _setFiltro(tipo: 'todos')),
+                    _filterChip('Saída', _filtroTipo == 'saida', () => _setFiltro(tipo: 'saida')),
+                    _filterChip('Retorno', _filtroTipo == 'retorno', () => _setFiltro(tipo: 'retorno')),
+                    Container(width: 1, height: 18, color: AppColors.border),
+                    for (final p in _kPeriodos.keys)
+                      _filterChip(p, _periodo == p, () => _setFiltro(periodo: p)),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    _total == null
+                        ? ''
+                        : '${lista.length} de $_total registro${_total != 1 ? 's' : ''}',
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 11),
+                  ),
+                ),
+                if (_buscaAmpla)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Muitos veículos/motoristas correspondem à busca — digite mais letras para refinar.',
+                      style: TextStyle(color: AppColors.warning, fontSize: 11),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -687,16 +793,19 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
                         onRefresh: _carregar,
                         child: ListView.builder(
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-                          itemCount: lista.length + (_registros.length >= 500 ? 1 : 0),
+                          itemCount: lista.length + (_temMais ? 1 : 0),
                           itemBuilder: (_, i) {
-                            if (i == lista.length && _registros.length >= 500) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Text(
-                                  'Exibindo até 500 registros. Use filtros para refinar.',
-                                  style: TextStyle(
-                                      color: AppColors.textSecondary, fontSize: 12),
-                                  textAlign: TextAlign.center,
+                            if (i == lista.length) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Center(
+                                  child: _carregandoMais
+                                      ? const CircularProgressIndicator()
+                                      : OutlinedButton.icon(
+                                          onPressed: () => _carregarPagina(),
+                                          icon: const Icon(Icons.expand_more),
+                                          label: Text('Carregar mais (${(_total ?? 0) - lista.length} restantes)'),
+                                        ),
                                 ),
                               );
                             }
@@ -710,10 +819,9 @@ class _HistoricoChecklistPageState extends State<HistoricoChecklistPage> {
     );
   }
 
-  Widget _filterChip(String label, String value) {
-    final selected = _filtroTipo == value;
+  Widget _filterChip(String label, bool selected, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () => setState(() => _filtroTipo = value),
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding:

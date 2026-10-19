@@ -10,6 +10,7 @@ import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/image_validation.dart';
 import '../../core/widgets/signed_network_image.dart';
 import '../../core/guards/permission_guard.dart';
+import '../../core/utils/fetch_all.dart';
 
 class MultasPage extends StatelessWidget {
   const MultasPage({super.key});
@@ -67,7 +68,9 @@ class _MultasPageState extends State<_MultasView> {
       }
       // Queries separadas — sem FK join
       final results = await Future.wait([
-        multaQ.order('created_at', ascending: false).limit(300),
+        // Paginado: o limite fixo de 300 deixava totais e lista incompletos.
+        fetchAllRows((from, to) =>
+            multaQ.order('created_at', ascending: false).order('id').range(from, to)),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);

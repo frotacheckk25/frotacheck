@@ -9,6 +9,7 @@ import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/signed_storage_url.dart';
 import '../../core/utils/image_validation.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/utils/fetch_all.dart';
 
 class DocumentosPage extends StatefulWidget {
   const DocumentosPage({super.key});
@@ -53,7 +54,10 @@ class _DocumentosPageState extends State<DocumentosPage> {
       }
       // Queries separadas — sem FK join
       final results = await Future.wait([
-        docQ.order('data_vencimento', ascending: true).limit(300),
+        // Paginado: com frota grande (~3 docs/veículo) o limite fixo de 300
+        // escondia os documentos com vencimento mais distante.
+        fetchAllRows((from, to) =>
+            docQ.order('data_vencimento', ascending: true).order('id').range(from, to)),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);

@@ -652,13 +652,17 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
     super.dispose();
   }
 
+  // 1280 px mantém o comprovante legível; sem limite a foto da câmera saía
+  // com 1–3 MB (6–15x maior), pesando no storage e no 4G do motorista.
   Future<XFile?> _pickImage() async {
     try {
-      final img = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+      final img = await picker.pickImage(
+          source: ImageSource.camera, imageQuality: 70, maxWidth: 1280, maxHeight: 1280);
       if (img != null) return img;
     } catch (_) {}
     try {
-      return await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      return await picker.pickImage(
+          source: ImageSource.gallery, imageQuality: 70, maxWidth: 1280, maxHeight: 1280);
     } catch (_) {
       return null;
     }

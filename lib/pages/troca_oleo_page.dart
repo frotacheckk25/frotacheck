@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/snackbar_utils.dart';
+import '../core/utils/fetch_all.dart';
 
 class TrocaOleoPage extends StatefulWidget {
   const TrocaOleoPage({super.key});
@@ -104,7 +105,9 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
 
       final results = await Future.wait([
         veicQ.order('plate'),
-        oilQ.order('created_at', ascending: false).limit(100),
+        // Paginado: com 500 veículos o limite fixo de 100 cortava as trocas.
+        fetchAllRows((from, to) =>
+            oilQ.order('created_at', ascending: false).order('id').range(from, to)),
       ]);
 
       if (!mounted) return;

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/snackbar_utils.dart';
+import '../core/utils/fetch_all.dart';
 
 class OcorrenciasPage extends StatefulWidget {
   const OcorrenciasPage({super.key});
@@ -90,7 +91,9 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        ocorrQ.order('created_at', ascending: false).limit(100),
+        // Paginado: o limite fixo de 100 escondia ocorrências em frota grande.
+        fetchAllRows((from, to) =>
+            ocorrQ.order('created_at', ascending: false).order('id').range(from, to)),
         veicQ.order('plate'),
         drivQ.order('name'),
       ]);
