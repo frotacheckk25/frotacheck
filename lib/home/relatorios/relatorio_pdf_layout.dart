@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../core/utils/formato_br.dart';
 
 // Visual layout for the "Relatório Executivo de Frota" PDF, modeled on the
 // reference design supplied by the client. Deliberately avoids embedding any
@@ -28,7 +29,27 @@ PdfColor _tint(PdfColor base, double towardsWhite) {
   return PdfColor(mix(base.red), mix(base.green), mix(base.blue));
 }
 
-String _fmtR(double v) => 'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+/// A fonte padrão do PDF (Helvetica) só cobre Latin-1: acentos do português
+/// saem certos, mas travessão, aspas curvas, emoji etc. viravam um quadrado.
+/// Troca os mais comuns por equivalentes e descarta o resto.
+String pdfTextoSeguro(String s) {
+  const trocas = {
+    '—': '-', '–': '-', '‒': '-', '‐': '-', '“': '"', '”': '"', '„': '"',
+    '‘': "'", '’': "'", '‚': "'", '…': '...', '•': '-', ' ': ' ',
+  };
+  final b = StringBuffer();
+  for (final r in s.runes) {
+    final ch = String.fromCharCode(r);
+    if (trocas.containsKey(ch)) {
+      b.write(trocas[ch]);
+    } else if (r <= 0xFF) {
+      b.write(ch);
+    }
+  }
+  return b.toString();
+}
+
+String _fmtR(double v) => moedaBr(v);
 
 String _fmtDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
@@ -268,6 +289,7 @@ pw.Widget _logoMark({double boxSize = 24, double fontSize = 13}) {
         width: boxSize,
         height: boxSize,
         decoration: pw.BoxDecoration(
+          color: _primary, // fundo sólido: leitores sem suporte a degradê (pdf.js/Firefox)
           gradient: pw.LinearGradient(colors: [_primary, _secondary]),
           borderRadius: pw.BorderRadius.circular(boxSize * 0.3),
         ),
@@ -421,6 +443,7 @@ pw.Widget _footerBanner(pw.ImageProvider footerImage, int pageNumber, int pagesC
             width: double.infinity,
             padding: const pw.EdgeInsets.symmetric(horizontal: 16),
             decoration: pw.BoxDecoration(
+              color: _c(0xFF0B1E45), // fundo sólido: leitores sem suporte a degradê
               gradient: pw.LinearGradient(colors: [_c(0xFF0B1E45), _c(0xFF15295E)]),
             ),
             child: pw.Row(
@@ -462,6 +485,9 @@ pw.Widget _totalGeralCard(double totalGeral) {
     height: 102,
     padding: const pw.EdgeInsets.all(10),
     decoration: pw.BoxDecoration(
+      // Fundo sólido sob o degradê: sem ele, leitores que não desenham
+      // degradê (pdf.js/Firefox) mostravam texto branco em fundo branco.
+      color: _primary,
       gradient: pw.LinearGradient(
           colors: [_primary, _c(0xFF123B85)],
           begin: pw.Alignment.topLeft,
@@ -850,13 +876,14 @@ Future<Uint8List> buildRelatorioPdfBytes({
     }
   }
 
+  companyName = pdfTextoSeguro(companyName);
   final veiculosItems = topVeiculos
       .take(5)
-      .map((e) => MapEntry(e['plate'].toString(), e['value'] as double))
+      .map((e) => MapEntry(pdfTextoSeguro(e['plate'].toString()), e['value'] as double))
       .toList();
   final motoristasItems = topMotoristas
       .take(5)
-      .map((e) => MapEntry(e['name'].toString(), e['value'] as double))
+      .map((e) => MapEntry(pdfTextoSeguro(e['name'].toString()), e['value'] as double))
       .toList();
 
   final doc = pw.Document();
@@ -899,7 +926,7 @@ Future<Uint8List> buildRelatorioPdfBytes({
               color: _info,
               rows: [
                 _kpiRow('Total gasto em combustível', _fmtR(totalGastoFuel)),
-                _kpiRow('Total de litros abastecidos', '${totalLitros.toStringAsFixed(1)} L'),
+                _kpiRow('Total de litros abastecidos', '${numeroBr(totalLitros, casas: 1)} L'),
                 _kpiRow('Número de abastecimentos', '$qtdAbastecimentos'),
                 _kpiRow('Preço médio por litro', _fmtR(precoMedioLitro)),
               ],

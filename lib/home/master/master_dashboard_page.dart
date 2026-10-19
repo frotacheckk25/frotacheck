@@ -26,6 +26,7 @@ import '../distribuicao/distribuicao_app_page.dart';
 import '../fiscal/documentos_fiscais_page.dart';
 import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
+import '../../core/utils/formato_br.dart';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 enum _Sec {
@@ -2240,7 +2241,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                               ])),
                               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                                 Text(
-                                  valor != null ? 'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}' : 'Sem plano',
+                                  valor != null ? moedaBr(valor) : 'Sem plano',
                                   style: TextStyle(
                                     color: valor != null ? const Color(0xFF22C55E) : const Color(0xFF64748B),
                                     fontSize: 12, fontWeight: FontWeight.w700,

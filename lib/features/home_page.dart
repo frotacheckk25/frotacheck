@@ -38,6 +38,7 @@ import '../core/enums/app_permission.dart';
 import '../core/utils/notification_sound.dart';
 import '../core/utils/snackbar_utils.dart';
 import '../home/admin/admin_usuarios_page.dart';
+import '../core/utils/formato_br.dart';
 
 // Utilities extracted for testing and reuse
 String getProfileDisplayName({
@@ -323,18 +324,7 @@ class _HomePageState extends State<HomePage> {
     return '${delta > 0 ? '+' : ''}$delta% vs mês anterior';
   }
 
-  String _fmt(double v) {
-    final s = v.toStringAsFixed(2).replaceAll('.', ',');
-    final parts = s.split(',');
-    final intPart = parts[0];
-    final dec = parts[1];
-    final buf = StringBuffer();
-    for (var i = 0; i < intPart.length; i++) {
-      if (i > 0 && (intPart.length - i) % 3 == 0) buf.write('.');
-      buf.write(intPart[i]);
-    }
-    return '${buf.toString()},$dec';
-  }
+  String _fmt(double v) => numeroBr(v);
 
   String _getInitials(String name) {
     final parts = name.trim().split(' ');
@@ -702,8 +692,8 @@ class _HomePageState extends State<HomePage> {
         _safeSelect('vehicles'), // 0
         _safeSelect('drivers'), // 1
         _fuelingsInRange(dateStart, dateEnd), // 2
-        _safeSelectFiltered('manutencoes', dateStart, dateEnd), // 3
-        _safeSelectFiltered('multas', dateStart, dateEnd), // 4
+        _selectPorDataDoFato('manutencoes', dateStart, dateEnd), // 3
+        _selectPorDataDoFato('multas', dateStart, dateEnd), // 4
         _safeSelect('pneus'), // 5
         _safeSelectFiltered('occurrences', dateStart, dateEnd), // 6
         // 'ocorrencias' (PT) nunca existiu como tabela — sempre 404.
@@ -957,6 +947,29 @@ class _HomePageState extends State<HomePage> {
             .select()
             .gte(dateCol, _inicioDiaUtc(dateStart))
             .lt(dateCol, _inicioDiaSeguinteUtc(dateEnd));
+        if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
+        return q.order('id').range(from, to);
+      });
+    } catch (e) {
+      debugPrint('Falha ao carregar $table do período: $e');
+      return [];
+    }
+  }
+
+  /// Linhas cuja data do fato (coluna `data`: dia do serviço/infração) cai no
+  /// período; sem `data` preenchida, vale a data de cadastro. Filtrar só por
+  /// created_at jogava no mês atual tudo que o cliente lançasse de histórico.
+  Future<List<Map<String, dynamic>>> _selectPorDataDoFato(
+    String table,
+    String dateStart,
+    String dateEnd,
+  ) async {
+    try {
+      final filtro = 'and(data.gte.$dateStart,data.lte.$dateEnd),'
+          'and(data.is.null,created_at.gte.${_inicioDiaUtc(dateStart)},'
+          'created_at.lt.${_inicioDiaSeguinteUtc(dateEnd)})';
+      return await fetchAllRows((from, to) {
+        var q = supabase.from(table).select().or(filtro);
         if (_empresaId != null) q = q.eq('empresa_id', _empresaId!);
         return q.order('id').range(from, to);
       });

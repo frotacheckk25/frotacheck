@@ -5,6 +5,7 @@ import '../core/auth/app_auth_provider.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/snackbar_utils.dart';
 import '../core/utils/fetch_all.dart';
+import '../core/utils/formato_br.dart';
 
 class TrocaOleoPage extends StatefulWidget {
   const TrocaOleoPage({super.key});
@@ -1000,8 +1001,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
   }
 
   String _fmtValor(dynamic v) {
-    final d = (v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
-    return d.toStringAsFixed(2).replaceAll('.', ',');
+    return numeroBr(paraDouble(v));
   }
 
   Widget _badge(String text, Color color) {

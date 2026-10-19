@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/image_validation.dart';
 import '../../core/utils/fetch_all.dart';
+import '../../core/utils/formato_br.dart';
 
 class AbastecimentosPage extends StatefulWidget {
   const AbastecimentosPage({super.key});
@@ -231,8 +232,7 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
   }
 
   String _fmtValue(dynamic v) {
-    final d = (v is num) ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
-    return 'R\$ ${d.toStringAsFixed(2).replaceAll('.', ',')}';
+    return moedaBr(paraDouble(v));
   }
 
   double _totalGasto() => fuelings.fold(0.0, (sum, f) {

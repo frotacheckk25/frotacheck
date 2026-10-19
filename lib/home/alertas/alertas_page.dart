@@ -6,6 +6,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../pages/detalhe_ocorrencia_page.dart';
+import '../../core/utils/formato_br.dart';
 
 // Fontes de alerta sintético
 const _srcAlert = 'alert';
@@ -205,7 +206,7 @@ class _AlertasPageState extends State<AlertasPage> {
         '_ref_id': m['id']?.toString(),
         'title': 'Multa Aberta — $placa',
         'subtitle':
-            '${m['tipo'] ?? 'Infração'} · R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
+            '${m['tipo'] ?? 'Infração'} · ${moedaBr(valor)}',
         'tipo': 'warning',
         'status': 'ativo',
         'created_at': m['data'] ?? m['created_at'],

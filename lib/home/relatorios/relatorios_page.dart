@@ -10,6 +10,7 @@ import 'package:frotacheck/core/utils/fetch_all.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
 import 'package:printing/printing.dart';
 import 'relatorio_pdf_layout.dart';
+import '../../core/utils/formato_br.dart';
 
 class RelatoriosPage extends StatefulWidget {
   const RelatoriosPage({super.key});
@@ -76,8 +77,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
     return n[m.clamp(1, 12)];
   }
 
-  String _fmtR(double v) =>
-      'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+  String _fmtR(double v) => moedaBr(v);
 
   String _fmtChartVal(double v) {
     if (v == 0) return '';
@@ -156,13 +156,18 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
         fetchAllRows((from, to) {
           var q = supabase.from('multas').select('id, valor, status, data');
           if (eid != null) q = q.eq('empresa_id', eid);
-          if (inicioData != null) q = q.gte('data', inicioData);
+          if (inicioData != null) {
+            q = q.or('data.gte.$inicioData,and(data.is.null,created_at.gte.$inicioUtc)');
+          }
           return q.order('id').range(from, to);
         }),
         fetchAllRows((from, to) {
-          var q = supabase.from('manutencoes').select('id, cost, valor, created_at');
+          // Pela data do serviço (`data`); sem ela, pela data de cadastro.
+          var q = supabase.from('manutencoes').select('id, cost, valor, data, created_at');
           if (eid != null) q = q.eq('empresa_id', eid);
-          if (inicioUtc != null) q = q.gte('created_at', inicioUtc);
+          if (inicioData != null) {
+            q = q.or('data.gte.$inicioData,and(data.is.null,created_at.gte.$inicioUtc)');
+          }
           return q.order('id').range(from, to);
         }),
       ]);
@@ -510,7 +515,7 @@ class _RelatoriosPageState extends State<RelatoriosPage> {
                         AppColors.info, Icons.attach_money),
                     const SizedBox(width: 10),
                     _kpi('Total Litros',
-                        '${totalLitros.toStringAsFixed(1)} L',
+                        '${numeroBr(totalLitros, casas: 1)} L',
                         AppColors.success, Icons.local_gas_station),
                   ]),
                   const SizedBox(height: 10),
