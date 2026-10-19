@@ -87,10 +87,12 @@ function chamadorAutorizado(req: Request): boolean {
   const header = req.headers.get("Authorization") ?? "";
   const token = header.replace(/^Bearer\s+/i, "").trim();
   if (!token) return false;
+  // trim(): ao copiar a senha de uma célula do painel vem junto um "\n"
+  // invisível, e a comparação exata falhava (401) mesmo com a senha certa.
   const aceitos = [
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
     Deno.env.get("PUSH_TRIGGER_SECRET"),
-  ].filter((v): v is string => !!v);
+  ].map((v) => v?.trim()).filter((v): v is string => !!v);
   return aceitos.includes(token);
 }
 

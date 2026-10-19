@@ -412,3 +412,9 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# A função confere o PUSH_TRIGGER_SECRET por conta própria (o gatilho do banco
+# envia uma senha aleatória, que não é JWT): o portão do Supabase não pode
+# exigir JWT, senão recusa a chamada antes de chegar na função.
+[functions.send-push-notification]
+verify_jwt = false
