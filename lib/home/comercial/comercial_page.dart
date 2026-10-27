@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/fetch_all.dart';
 import '../../core/utils/formato_br.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../fiscal/novo_cte_page.dart';
 
 /// Comercial + Coleta: clientes, cotações de frete e ordens de coleta.
 /// Fluxo: cliente → cotação → (aprovada) coleta programada → coletada → viagem.
@@ -110,7 +111,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
         fetchAllRows((a, b) => porEmpresa('clientes', '*').order('nome').order('id').range(a, b)),
         fetchAllRows((a, b) => porEmpresa('cotacoes', '*, clientes(nome, telefone)')
             .order('created_at', ascending: false).order('id').range(a, b)),
-        fetchAllRows((a, b) => porEmpresa('coletas', '*, clientes(nome)')
+        fetchAllRows((a, b) => porEmpresa('coletas', '*, clientes(nome, documento, endereco, cidade, uf)')
             .order('data_programada').order('id').range(a, b)),
         fetchAllRows((a, b) => porEmpresa('vehicles', 'id, plate, brand, model, odometer').order('plate').order('id').range(a, b)),
         fetchAllRows((a, b) => porEmpresa('drivers', 'id, name').order('name').order('id').range(a, b)),
@@ -315,6 +316,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
   // ── Coletas ──────────────────────────────────────────────────────────────
   Widget _abaColetas(bool podeEditar) {
     final hoje = isoData(DateTime.now());
+    final podeFiscal = context.read<AppAuthProvider>().can(AppPermission.manageFiscalDocs);
     final lista = coletas.where((c) {
       final d = c['data_programada']?.toString() ?? '';
       switch (filtroColeta) {
@@ -387,6 +389,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
                             _botao('Marcar coletada', Icons.inventory, AppColors.success, () => _mudarStatusColeta(c, 'coletada')),
                           if (c['status'] != 'programada' && c['viagem_id'] == null)
                             _botao('Iniciar viagem', Icons.directions, AppColors.secondary, () => _gerarViagem(c)),
+                          if (podeFiscal) _botao('Gerar CT-e', Icons.request_quote, AppColors.neon, () => _gerarCte(c)),
                           if (c['status'] != 'coletada') _botao('Editar', Icons.edit, AppColors.info, () => _abrirColeta(c)),
                           if (c['status'] != 'coletada')
                             _botao('Cancelar', Icons.close, AppColors.danger, () => _mudarStatusColeta(c, 'cancelada')),
@@ -599,6 +602,77 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       _carregar();
     } catch (e) {
       if (mounted) showErrorFrom(context, e, prefix: 'Erro ao iniciar a viagem');
+    }
+  }
+
+  /// Cria (ou reaproveita) o rascunho de CT-e da coleta e abre a emissão já preenchida.
+  /// Remetente = cliente da coleta; o destinatário é completado na tela do CT-e.
+  Future<void> _gerarCte(Map<String, dynamic> c) async {
+    final eid = c['empresa_id']?.toString();
+    if (eid == null) return;
+    final cli = Map<String, dynamic>.from((c['clientes'] as Map?) ?? {});
+    final v = veiculos[c['veiculo_id']?.toString()];
+    try {
+      final existente = await supabase
+          .from('cte_documentos')
+          .select('*')
+          .eq('coleta_id', c['id'])
+          .eq('status', 'rascunho')
+          .limit(1)
+          .maybeSingle();
+      Map<String, dynamic> rascunho;
+      if (existente != null) {
+        rascunho = Map<String, dynamic>.from(existente);
+      } else {
+        final cfg = await supabase.from('company_settings').select('ambiente_fiscal').eq('empresa_id', eid).maybeSingle();
+        if (!mounted) return;
+        final novo = await supabase
+            .from('cte_documentos')
+            .insert(context.read<AppAuthProvider>().inject({
+              'empresa_id': eid,
+              'coleta_id': c['id'],
+              'viagem_id': c['viagem_id'],
+              'veiculo_id': c['veiculo_id'],
+              'motorista_id': c['motorista_id'],
+              'ambiente': cfg?['ambiente_fiscal']?.toString() ?? 'homologacao',
+              'status': 'rascunho',
+              'remetente_nome': cli['nome'],
+              'remetente_doc': cli['documento'],
+              'natureza_carga': c['natureza_carga'],
+              'valor_carga': c['valor_carga'],
+              'valor_frete': c['valor_frete'],
+              'peso_bruto': c['peso_kg'],
+            }))
+            .select('*')
+            .single();
+        rascunho = Map<String, dynamic>.from(novo);
+      }
+      if (!mounted) return;
+      final emitido = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => NovoCtePage(
+            empresaId: eid,
+            viagemId: c['viagem_id']?.toString(),
+            cteDocumentoId: rascunho['id'].toString(),
+            inicial: {
+              ...rascunho,
+              'remetente_logradouro': c['endereco_coleta'],
+              'remetente_municipio': c['cidade'],
+              'remetente_uf': c['uf'],
+              'destinatario_municipio': c['destino_cidade'],
+              'destinatario_uf': c['destino_uf'],
+              'placa': v?['plate'],
+            },
+          ),
+        ),
+      );
+      if (emitido == true && mounted) showSuccess(context, 'CT-e da coleta nº ${c['numero']} emitido.');
+      if (emitido != true && mounted) {
+        showSuccess(context, 'Rascunho do CT-e salvo. Continue depois em Documentos Fiscais.');
+      }
+    } catch (e) {
+      if (mounted) showErrorFrom(context, e, prefix: 'Erro ao gerar o CT-e');
     }
   }
 

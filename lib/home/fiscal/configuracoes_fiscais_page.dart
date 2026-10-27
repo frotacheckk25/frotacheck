@@ -29,6 +29,11 @@ class _ConfiguracoesFiscaisPageState extends State<ConfiguracoesFiscaisPage> {
   bool _loading = true;
   bool _savingEmpresa = false;
   bool _savingEndereco = false;
+  bool _savingSeguro = false;
+  final _seguradoraNomeCtrl = TextEditingController();
+  final _seguradoraCnpjCtrl = TextEditingController();
+  final _apoliceCtrl = TextEditingController();
+  final _averbadoraCtrl = TextEditingController();
   bool _uploadingCert = false;
   late String _empresaId;
 
@@ -69,6 +74,10 @@ class _ConfiguracoesFiscaisPageState extends State<ConfiguracoesFiscaisPage> {
 
   @override
   void dispose() {
+    _seguradoraNomeCtrl.dispose();
+    _seguradoraCnpjCtrl.dispose();
+    _apoliceCtrl.dispose();
+    _averbadoraCtrl.dispose();
     _razaoSocialCtrl.dispose();
     _ieCtrl.dispose();
     _rntrcCtrl.dispose();
@@ -118,6 +127,10 @@ class _ConfiguracoesFiscaisPageState extends State<ConfiguracoesFiscaisPage> {
         _municipioNomeCtrl.text = settings['fiscal_municipio_nome']?.toString() ?? '';
         _cepCtrl.text = settings['fiscal_cep']?.toString() ?? '';
         _foneCtrl.text = settings['fiscal_fone']?.toString() ?? '';
+        _seguradoraNomeCtrl.text = settings['seguradora_nome']?.toString() ?? '';
+        _seguradoraCnpjCtrl.text = settings['seguradora_cnpj']?.toString() ?? '';
+        _apoliceCtrl.text = settings['seguro_apolice']?.toString() ?? '';
+        _averbadoraCtrl.text = settings['averbadora']?.toString() ?? '';
         _regimeTributario = settings['fiscal_regime_tributario']?.toString() ?? 'simples_nacional';
         _ambienteFiscal = settings['ambiente_fiscal']?.toString() ?? 'homologacao';
         _cteHabilitado = settings['cte_habilitado'] == true;
@@ -298,6 +311,8 @@ class _ConfiguracoesFiscaisPageState extends State<ConfiguracoesFiscaisPage> {
                       _dadosFiscaisCard(),
                       const SizedBox(height: 16),
                       _enderecoCard(),
+                      const SizedBox(height: 16),
+                      _seguroCard(),
                       const SizedBox(height: 16),
                       _ambienteCard(),
                       const SizedBox(height: 24),
@@ -492,6 +507,68 @@ class _ConfiguracoesFiscaisPageState extends State<ConfiguracoesFiscaisPage> {
         ),
       ]),
     );
+  }
+
+  Widget _seguroCard() {
+    return _sectionCard(
+      title: 'Seguro da Carga (averbação)',
+      icon: Icons.verified_user_rounded,
+      color: AppColors.warning,
+      child: Column(children: [
+        Row(children: [
+          Expanded(flex: 2, child: _textField(_seguradoraNomeCtrl, 'Seguradora')),
+          const SizedBox(width: 10),
+          Expanded(child: _textField(_seguradoraCnpjCtrl, 'CNPJ da seguradora')),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: _textField(_apoliceCtrl, 'Nº da apólice')),
+          const SizedBox(width: 10),
+          Expanded(child: _textField(_averbadoraCtrl, 'Averbadora (ex.: ATM)')),
+        ]),
+        const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text(
+            'Cada CT-e autorizado precisa ser averbado na seguradora. O FrotaCheck '
+            'avisa os CT-e pendentes em Documentos Fiscais e guarda o número da averbação.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _savingSeguro ? null : _salvarSeguro,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: _savingSeguro
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Salvar Seguro', style: TextStyle(color: Colors.white)),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _salvarSeguro() async {
+    final cnpj = _seguradoraCnpjCtrl.text.replaceAll(RegExp(r'\D'), '');
+    if (cnpj.isNotEmpty && cnpj.length != 14) {
+      showError(context, 'O CNPJ da seguradora deve ter 14 números.');
+      return;
+    }
+    setState(() => _savingSeguro = true);
+    try {
+      await _upsertCompanySettings({
+        'seguradora_nome': _seguradoraNomeCtrl.text.trim(),
+        'seguradora_cnpj': cnpj,
+        'seguro_apolice': _apoliceCtrl.text.trim(),
+        'averbadora': _averbadoraCtrl.text.trim(),
+      });
+      if (mounted) showSuccess(context, 'Dados do seguro salvos!');
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _savingSeguro = false);
+    }
   }
 
   Widget _enderecoCard() {

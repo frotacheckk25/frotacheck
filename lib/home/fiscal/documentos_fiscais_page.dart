@@ -7,6 +7,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import 'ciot_tab.dart';
 import 'configuracoes_fiscais_page.dart';
 import 'novo_cte_page.dart';
 import 'novo_mdfe_page.dart';
@@ -34,11 +35,16 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
 
   List<Map<String, dynamic>> _cteDocs = [];
   List<Map<String, dynamic>> _mdfeDocs = [];
+  final _ciotKey = GlobalKey<CiotTabState>();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // o botão flutuante muda conforme a aba (Emitir CT-e / MDF-e / Registrar CIOT)
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && mounted) setState(() {});
+    });
     _carregar();
   }
 
@@ -361,11 +367,11 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
           tabs: const [Tab(text: 'CT-e'), Tab(text: 'MDF-e'), Tab(text: 'CIOT')],
         ),
       ),
-      floatingActionButton: (permitido && podeGerenciar && _selectedEmpresaId != null && _tabController.index <= 1)
+      floatingActionButton: (permitido && podeGerenciar && _selectedEmpresaId != null)
           ? FloatingActionButton.extended(
-              onPressed: _tabController.index == 0 ? _abrirNovoCte : _abrirNovoMdfe,
+              onPressed: [_abrirNovoCte, _abrirNovoMdfe, () => _ciotKey.currentState?.abrirFormulario()][_tabController.index],
               icon: const Icon(Icons.add),
-              label: Text(_tabController.index == 0 ? 'Emitir CT-e' : 'Emitir MDF-e'),
+              label: Text(const ['Emitir CT-e', 'Emitir MDF-e', 'Registrar CIOT'][_tabController.index]),
               backgroundColor: AppColors.primary,
             )
           : null,
@@ -387,9 +393,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
                         children: [
                           _cteList(),
                           _mdfeList(),
-                          const Center(
-                            child: Text('CIOT — em breve', style: TextStyle(color: AppColors.textSecondary)),
-                          ),
+                          CiotTab(key: _ciotKey, empresaId: _selectedEmpresaId, podeGerenciar: podeGerenciar),
                         ],
                       ),
                     ),
@@ -446,19 +450,97 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
         child: Text('Nenhum CT-e emitido ainda.', style: TextStyle(color: AppColors.textSecondary)),
       );
     }
+    final semAverbacao = _cteDocs.where((d) => d['status'] == 'autorizado' && d['averbacao_numero'] == null).length;
     return RefreshIndicator(
       onRefresh: _carregarCte,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: _cteDocs.length,
+        itemCount: _cteDocs.length + (semAverbacao > 0 ? 1 : 0),
         separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (context, i) => _cteCard(_cteDocs[i]),
+        itemBuilder: (context, i) {
+          if (semAverbacao > 0 && i == 0) {
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.warning.withValues(alpha: 0.5)),
+              ),
+              child: Text(
+                semAverbacao == 1
+                    ? '1 CT-e autorizado ainda sem averbação do seguro da carga.'
+                    : '$semAverbacao CT-e autorizados ainda sem averbação do seguro da carga.',
+                style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            );
+          }
+          return _cteCard(_cteDocs[i - (semAverbacao > 0 ? 1 : 0)]);
+        },
       ),
     );
   }
 
+  Future<void> _continuarRascunho(Map<String, dynamic> doc) async {
+    if (_selectedEmpresaId == null) return;
+    final criado = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NovoCtePage(
+          empresaId: _selectedEmpresaId!,
+          viagemId: doc['viagem_id']?.toString(),
+          cteDocumentoId: doc['id'].toString(),
+          inicial: doc,
+        ),
+      ),
+    );
+    if (criado == true) _carregarCte();
+  }
+
+  /// Averbação do seguro da carga (RCTR-C): o número vem da averbadora/seguradora.
+  /// Grava pela função registrar_averbacao — a RLS só deixa o app mexer em rascunho.
+  Future<void> _registrarAverbacao(Map<String, dynamic> doc) async {
+    final numero = TextEditingController();
+    final protocolo = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Averbação do CT-e nº ${doc['numero_cte'] ?? '—'}'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Informe o número de averbação recebido da seguradora/averbadora.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          const SizedBox(height: 14),
+          TextField(controller: numero, decoration: const InputDecoration(labelText: 'Número da averbação *')),
+          const SizedBox(height: 10),
+          TextField(controller: protocolo, decoration: const InputDecoration(labelText: 'Protocolo (opcional)')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Registrar')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (numero.text.trim().length < 3) {
+      if (mounted) showError(context, 'Informe o número da averbação.');
+      return;
+    }
+    try {
+      await _supabase.rpc('registrar_averbacao', params: {
+        'p_cte_id': doc['id'],
+        'p_numero': numero.text.trim(),
+        'p_protocolo': protocolo.text.trim(),
+      });
+      if (mounted) showSuccess(context, 'Averbação registrada.');
+      _carregarCte();
+    } catch (e) {
+      if (mounted) showError(context, friendlyError(e));
+    }
+  }
+
   Widget _cteCard(Map<String, dynamic> doc) {
     final status = doc['status']?.toString() ?? 'rascunho';
+    final podeGerenciar = context.read<AppAuthProvider>().can(AppPermission.manageFiscalDocs);
     final (statusColor, statusLabel) = switch (status) {
       'autorizado' => (AppColors.success, 'Autorizado'),
       'rejeitado' => (AppColors.danger, 'Rejeitado'),
@@ -506,8 +588,29 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
               child: Text(doc['motivo_rejeicao']?.toString() ?? '',
                   style: const TextStyle(color: AppColors.danger, fontSize: 11.5)),
             ),
+          if (status == 'autorizado')
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: doc['averbacao_numero'] != null
+                  ? Text('✓ Seguro averbado · nº ${doc['averbacao_numero']}',
+                      style: const TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600))
+                  : const Text('⚠ Pendente de averbação do seguro da carga',
+                      style: TextStyle(color: AppColors.warning, fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 8, children: [
+            if (status == 'rascunho' && podeGerenciar)
+              OutlinedButton.icon(
+                onPressed: () => _continuarRascunho(doc),
+                icon: const Icon(Icons.send_rounded, size: 14, color: AppColors.secondary),
+                label: const Text('Continuar e emitir', style: TextStyle(fontSize: 12, color: AppColors.secondary)),
+              ),
+            if (status == 'autorizado' && doc['averbacao_numero'] == null && podeGerenciar)
+              OutlinedButton.icon(
+                onPressed: () => _registrarAverbacao(doc),
+                icon: const Icon(Icons.verified_user_rounded, size: 14, color: AppColors.warning),
+                label: const Text('Registrar averbação', style: TextStyle(fontSize: 12, color: AppColors.warning)),
+              ),
             if (doc['xml_autorizado_url'] != null)
               OutlinedButton.icon(
                 onPressed: () => _verXml(doc['xml_autorizado_url']),

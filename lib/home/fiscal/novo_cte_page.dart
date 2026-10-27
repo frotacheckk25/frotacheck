@@ -11,7 +11,15 @@ class NovoCtePage extends StatefulWidget {
   final String empresaId;
   final String? viagemId;
 
-  const NovoCtePage({super.key, required this.empresaId, this.viagemId});
+  /// Rascunho já gravado em cte_documentos (criado pela coleta ou pela Nova
+  /// Viagem). A emissão atualiza este registro em vez de criar outro.
+  final String? cteDocumentoId;
+
+  /// Valores para pré-preencher o formulário (chaves iguais às colunas de
+  /// cte_documentos + remetente_/destinatario_ endereço, placa e veiculo_uf).
+  final Map<String, dynamic>? inicial;
+
+  const NovoCtePage({super.key, required this.empresaId, this.viagemId, this.cteDocumentoId, this.inicial});
 
   @override
   State<NovoCtePage> createState() => _NovoCtePageState();
@@ -63,6 +71,27 @@ class _NovoCtePageState extends State<NovoCtePage> {
   final _veiculoUfCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    final i = widget.inicial ?? const {};
+    String t(String k) {
+      final v = i[k];
+      if (v == null) return '';
+      if (v is num) return v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+      return v.toString();
+    }
+
+    final mapa = {
+      _remDocCtrl: 'remetente_doc', _remNomeCtrl: 'remetente_nome', _remLogradouroCtrl: 'remetente_logradouro',
+      _remMunicipioNomeCtrl: 'remetente_municipio', _remUfCtrl: 'remetente_uf',
+      _destDocCtrl: 'destinatario_doc', _destNomeCtrl: 'destinatario_nome', _destMunicipioNomeCtrl: 'destinatario_municipio',
+      _destUfCtrl: 'destinatario_uf', _naturezaCtrl: 'natureza_carga', _valorCargaCtrl: 'valor_carga',
+      _pesoBrutoCtrl: 'peso_bruto', _valorFreteCtrl: 'valor_frete', _placaCtrl: 'placa', _veiculoUfCtrl: 'veiculo_uf',
+    };
+    mapa.forEach((ctrl, chave) => ctrl.text = t(chave));
+  }
+
+  @override
   void dispose() {
     for (final c in [
       _remDocCtrl, _remNomeCtrl, _remLogradouroCtrl, _remNumeroCtrl, _remBairroCtrl,
@@ -102,6 +131,7 @@ class _NovoCtePageState extends State<NovoCtePage> {
       final resposta = await _supabase.functions.invoke('fiscal-cte-emitir', body: {
         'empresa_id': widget.empresaId,
         'viagem_id': widget.viagemId,
+        if (widget.cteDocumentoId != null) 'cte_documento_id': widget.cteDocumentoId,
         'remetente': {
           'documento': _remDocCtrl.text.trim(),
           'nome': _remNomeCtrl.text.trim(),
@@ -172,7 +202,10 @@ class _NovoCtePageState extends State<NovoCtePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Emitir CT-e'), backgroundColor: AppColors.surface),
+      appBar: AppBar(
+        title: Text(widget.cteDocumentoId != null ? 'Emitir CT-e (rascunho)' : 'Emitir CT-e'),
+        backgroundColor: AppColors.surface,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
