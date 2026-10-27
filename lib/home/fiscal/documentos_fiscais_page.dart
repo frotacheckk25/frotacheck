@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formato_br.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'ciot_tab.dart';
 import 'configuracoes_fiscais_page.dart';
@@ -577,7 +578,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
           const SizedBox(height: 8),
           Text('Destinatário: ${doc['destinatario_nome'] ?? '—'}',
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          Text('Frete: R\$ ${doc['valor_frete'] ?? '0,00'}',
+          Text('Frete: ${moedaBr(paraDouble(doc['valor_frete']))}',
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
           if (doc['chave_acesso'] != null)
             Text('Chave: ${doc['chave_acesso']}',
