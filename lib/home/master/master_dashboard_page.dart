@@ -30,6 +30,7 @@ import '../estoque/estoque_page.dart';
 import '../compras/compras_page.dart';
 import '../contabil/contabilidade_page.dart';
 import '../torre/torre_controle_page.dart';
+import '../gerencial/visao_gerencial_page.dart';
 import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
 import '../../core/utils/formato_br.dart';
@@ -38,7 +39,7 @@ import '../../core/utils/formato_br.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, financeiro, estoque, compras, contabilidade, torre, configuracoes,
+  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, financeiro, estoque, compras, contabilidade, torre, gerencial, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -741,6 +742,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               children: [
                 catHeader('PAINEL'),
                 navItem(Icons.dashboard_rounded, 'Painel Geral', _Sec.painel, null),
+                navItem(Icons.insights_rounded, 'Visão gerencial', _Sec.gerencial, () => nav(const VisaoGerencialPage())),
                 catHeader('OPERAÇÃO'),
                 navItem(Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
                 navItem(Icons.directions_car_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),

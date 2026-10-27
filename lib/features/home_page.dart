@@ -27,6 +27,7 @@ import '../home/compras/compras_page.dart';
 import '../home/contabil/contabilidade_page.dart';
 import '../home/torre/rastreamento_viagem.dart';
 import '../home/torre/torre_controle_page.dart';
+import '../home/gerencial/visao_gerencial_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -2060,6 +2061,11 @@ class _HomePageState extends State<HomePage> {
             auth.can(AppPermission.viewAppDistribution) ||
             auth.can(AppPermission.viewFiscalDocs)) ...[
           _menuSectionLabel('Gestão'),
+          if (auth.can(AppPermission.viewReports) && !auth.isMotorista)
+            _buildMenuOption(Icons.insights_rounded, 'Visão gerencial', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const VisaoGerencialPage()));
+              carregarDashboard();
+            }),
           if (auth.can(AppPermission.viewReports))
             _buildMenuOption(Icons.bar_chart, 'Relatórios', () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
@@ -3042,6 +3048,11 @@ class _HomePageState extends State<HomePage> {
                         auth.can(AppPermission.viewAppDistribution) ||
                         auth.can(AppPermission.viewFiscalDocs)) ...[
                       _sidebarSection('GESTÃO'),
+                      if (auth.can(AppPermission.viewReports) && !auth.isMotorista)
+                        _buildSidebarItem(Icons.insights_rounded, 'Visão gerencial', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const VisaoGerencialPage()));
+                          carregarDashboard();
+                        }),
                       if (auth.can(AppPermission.viewReports))
                         _buildSidebarItem(Icons.bar_chart_rounded, 'Relatórios', () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => const RelatoriosPage()));
