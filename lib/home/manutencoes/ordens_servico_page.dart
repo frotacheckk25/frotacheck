@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/fetch_all.dart';
 import '../../core/utils/formato_br.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../financeiro/financeiro_page.dart';
 import 'manutencao_comum.dart';
 
 /// Ordens de serviço de manutenção (preventiva/corretiva) com peças e serviços.
@@ -48,7 +49,7 @@ class _OrdensServicoPageState extends State<OrdensServicoPage> with EmpresaDaTel
         fetchAllRows((a, b) => supabase.from('ordens_servico').select('*').eq('empresa_id', eid)
             .order('data_abertura', ascending: false).order('id').range(a, b)),
         fetchAllRows((a, b) => supabase.from('vehicles').select('id, plate, brand, model, odometer').eq('empresa_id', eid)
-            .order('plate').order('id').range(a, b)),
+            .order('plate', ascending: true).order('id').range(a, b)),
       ]);
       if (!mounted) return;
       setState(() {
@@ -381,6 +382,7 @@ class _OsDetalhePageState extends State<OsDetalhePage> {
   Map<String, dynamic>? os;
   List<Map<String, dynamic>> itens = [];
   bool carregando = true;
+  bool contaLancada = false; // já existe conta a pagar desta OS no Financeiro
 
   @override
   void initState() {
@@ -392,12 +394,18 @@ class _OsDetalhePageState extends State<OsDetalhePage> {
     try {
       final r = await Future.wait([
         supabase.from('ordens_servico').select('*').eq('id', widget.osId).single(),
-        supabase.from('ordem_servico_itens').select('*').eq('os_id', widget.osId).order('created_at'),
+        supabase.from('ordem_servico_itens').select('*').eq('os_id', widget.osId).order('created_at', ascending: true),
       ]);
+      var lancada = false;
+      try {
+        final cp = await supabase.from('contas_pagar').select('id').eq('os_id', widget.osId).neq('status', 'cancelada').limit(1);
+        lancada = (cp as List).isNotEmpty;
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         os = Map<String, dynamic>.from(r[0] as Map);
         itens = List<Map<String, dynamic>>.from(r[1] as List);
+        contaLancada = lancada;
         carregando = false;
       });
     } catch (e) {
@@ -634,10 +642,56 @@ class _OsDetalhePageState extends State<OsDetalhePage> {
             if (o['status'] == 'concluida')
               const Text('✓ Custo lançado nos relatórios de manutenção do veículo.',
                   style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600)),
+            if (o['status'] == 'concluida' && context.read<AppAuthProvider>().can(AppPermission.manageFinance)) ...[
+              const SizedBox(height: 10),
+              if (contaLancada)
+                const Text('✓ Lançada no contas a pagar do Financeiro.', style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600))
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: botaoAcao('Lançar no contas a pagar', Icons.request_page, AppColors.warning, _lancarContaPagar),
+                ),
+            ],
           ]),
         ),
       ),
     );
+  }
+
+  /// Conta a pagar da OS no Financeiro, já preenchida (oficina de fora a pagar).
+  Future<void> _lancarContaPagar() async {
+    final o = os!;
+    try {
+      final r = await Future.wait([
+        supabase.from('fornecedores').select('id, nome, ativo').eq('empresa_id', o['empresa_id']).order('nome', ascending: true),
+        supabase.from('vehicles').select('id, plate').eq('empresa_id', o['empresa_id']).order('plate', ascending: true),
+      ]);
+      if (!mounted) return;
+      final ok = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ContaFormPage(
+            empresaId: o['empresa_id'].toString(),
+            receber: false,
+            inicial: {
+              'descricao': 'OS nº ${o['numero']} · ${o['descricao']}',
+              'categoria': 'manutencao',
+              'vehicle_id': o['vehicle_id'],
+              'os_id': o['id'],
+              'valor': o['valor_total'],
+              'vencimento': isoDia(DateTime.now()),
+              if ((o['oficina'] ?? '').toString().isNotEmpty) 'observacoes': 'Oficina: ${o['oficina']}',
+            },
+            fornecedores: List<Map<String, dynamic>>.from(r[0] as List),
+            clientes: const [],
+            veiculos: List<Map<String, dynamic>>.from(r[1] as List),
+          ),
+        ),
+      );
+      if (ok == true) _carregar();
+    } catch (e) {
+      if (mounted) showErrorFrom(context, e, prefix: 'Não foi possível abrir o lançamento.');
+    }
   }
 
   Widget _linhaTotal(String t, String v, {bool destaque = false}) => Padding(

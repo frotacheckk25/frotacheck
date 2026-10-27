@@ -71,8 +71,8 @@ class CiotTabState extends State<CiotTab> {
     try {
       final r = await Future.wait([
         _supabase.from('ciot_registros').select('*').eq('empresa_id', eid).order('criado_em', ascending: false).limit(300),
-        _supabase.from('vehicles').select('id, plate').eq('empresa_id', eid).order('plate'),
-        _supabase.from('drivers').select('id, name').eq('empresa_id', eid).order('name'),
+        _supabase.from('vehicles').select('id, plate').eq('empresa_id', eid).order('plate', ascending: true),
+        _supabase.from('drivers').select('id, name').eq('empresa_id', eid).order('name', ascending: true),
         _supabase.from('viagens').select('id, origem, destino, data_inicio, status, veiculo_id, motorista_id')
             .eq('empresa_id', eid).order('data_inicio', ascending: false).limit(100),
       ]);

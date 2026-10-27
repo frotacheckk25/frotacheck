@@ -11,6 +11,7 @@ import '../../core/utils/fetch_all.dart';
 import '../../core/utils/formato_br.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../fiscal/novo_cte_page.dart';
+import '../financeiro/financeiro_page.dart';
 
 /// Comercial + Coleta: clientes, cotações de frete e ordens de coleta.
 /// Fluxo: cliente → cotação → (aprovada) coleta programada → coletada → viagem.
@@ -77,6 +78,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
   List<Map<String, dynamic>> coletas = [];
   Map<String, Map<String, dynamic>> veiculos = {};
   Map<String, Map<String, dynamic>> motoristas = {};
+  Set<String> coletasCobradas = {}; // coletas com conta a receber no Financeiro
 
   // Seletor de empresa do MASTER (os outros papéis usam a própria empresa)
   List<Map<String, dynamic>> empresas = [];
@@ -109,7 +111,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       // MASTER (sem empresa própria) escolhe a empresa no seletor do topo
       final auth = context.read<AppAuthProvider>();
       if (auth.effectiveEmpresaId == null && empresas.isEmpty) {
-        empresas = List<Map<String, dynamic>>.from(await supabase.from('empresas').select('id, nome').order('nome'));
+        empresas = List<Map<String, dynamic>>.from(await supabase.from('empresas').select('id, nome').order('nome', ascending: true));
         empresaMaster ??= empresas.isNotEmpty ? empresas.first['id'].toString() : null;
       }
       final eid = empresaAtual;
@@ -127,14 +129,23 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       }
 
       final resultados = await Future.wait([
-        fetchAllRows((a, b) => porEmpresa('clientes', '*').order('nome').order('id').range(a, b)),
+        fetchAllRows((a, b) => porEmpresa('clientes', '*').order('nome', ascending: true).order('id').range(a, b)),
         fetchAllRows((a, b) => porEmpresa('cotacoes', '*, clientes(nome, telefone)')
             .order('created_at', ascending: false).order('id').range(a, b)),
         fetchAllRows((a, b) => porEmpresa('coletas', '*, clientes(nome, documento, endereco, cidade, uf)')
-            .order('data_programada').order('id').range(a, b)),
-        fetchAllRows((a, b) => porEmpresa('vehicles', 'id, plate, brand, model, odometer').order('plate').order('id').range(a, b)),
-        fetchAllRows((a, b) => porEmpresa('drivers', 'id, name').order('name').order('id').range(a, b)),
+            .order('data_programada', ascending: true).order('id').range(a, b)),
+        fetchAllRows((a, b) => porEmpresa('vehicles', 'id, plate, brand, model, odometer').order('plate', ascending: true).order('id').range(a, b)),
+        fetchAllRows((a, b) => porEmpresa('drivers', 'id, name').order('name', ascending: true).order('id').range(a, b)),
       ]);
+      // coletas que já têm cobrança no Financeiro (só para quem acessa o Financeiro)
+      var cobradas = <String>{};
+      if (auth.can(AppPermission.viewFinance)) {
+        try {
+          final cr = await fetchAllRows((a, b) => supabase.from('contas_receber').select('coleta_id').eq('empresa_id', eid)
+              .not('coleta_id', 'is', null).neq('status', 'cancelada').order('id').range(a, b));
+          cobradas = {for (final x in cr) x['coleta_id'].toString()};
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         clientes = resultados[0];
@@ -142,6 +153,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
         coletas = resultados[2];
         veiculos = {for (final v in resultados[3]) v['id'].toString(): v};
         motoristas = {for (final m in resultados[4]) m['id'].toString(): m};
+        coletasCobradas = cobradas;
         carregando = false;
       });
     } catch (e) {
@@ -336,6 +348,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
   Widget _abaColetas(bool podeEditar) {
     final hoje = isoData(DateTime.now());
     final podeFiscal = context.read<AppAuthProvider>().can(AppPermission.manageFiscalDocs);
+    final podeFinanceiro = context.read<AppAuthProvider>().can(AppPermission.manageFinance);
     final lista = coletas.where((c) {
       final d = c['data_programada']?.toString() ?? '';
       switch (filtroColeta) {
@@ -409,6 +422,9 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
                           if (c['status'] != 'programada' && c['viagem_id'] == null)
                             _botao('Iniciar viagem', Icons.directions, AppColors.secondary, () => _gerarViagem(c)),
                           if (podeFiscal) _botao('Gerar CT-e', Icons.request_quote, AppColors.neon, () => _gerarCte(c)),
+                          if (podeFinanceiro && c['status'] == 'coletada' && !coletasCobradas.contains(c['id'].toString()))
+                            _botao('Gerar cobrança', Icons.request_page, AppColors.success, () => _gerarCobranca(c)),
+                          if (coletasCobradas.contains(c['id'].toString())) _chip('Cobrança gerada', AppColors.success),
                           if (c['status'] != 'coletada') _botao('Editar', Icons.edit, AppColors.info, () => _abrirColeta(c)),
                           if (c['status'] != 'coletada')
                             _botao('Cancelar', Icons.close, AppColors.danger, () => _mudarStatusColeta(c, 'cancelada')),
@@ -696,6 +712,32 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
     } catch (e) {
       if (mounted) showErrorFrom(context, e, prefix: 'Erro ao gerar o CT-e');
     }
+  }
+
+  /// Cobrança do frete no Financeiro (conta a receber) já preenchida com a coleta.
+  Future<void> _gerarCobranca(Map<String, dynamic> c) async {
+    final destino = (c['destino_cidade'] ?? '').toString().isEmpty ? '' : ' → ${c['destino_cidade']}/${c['destino_uf'] ?? ''}';
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ContaFormPage(
+          empresaId: c['empresa_id'].toString(),
+          receber: true,
+          inicial: {
+            'descricao': 'Frete coleta nº ${c['numero']} · ${c['cidade']}/${c['uf']}$destino',
+            'cliente_id': c['cliente_id'],
+            'coleta_id': c['id'],
+            'cotacao_id': c['cotacao_id'],
+            'valor': c['valor_frete'],
+            'vencimento': isoData(DateTime.now().add(const Duration(days: 30))),
+          },
+          fornecedores: const [],
+          clientes: clientes,
+          veiculos: const [],
+        ),
+      ),
+    );
+    if (ok == true) _carregar();
   }
 
   Future<void> _whatsapp(String telefone, String texto) async {

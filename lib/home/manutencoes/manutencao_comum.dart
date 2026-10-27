@@ -127,7 +127,7 @@ mixin EmpresaDaTela<T extends StatefulWidget> on State<T> {
   Future<void> prepararEmpresa() async {
     if (context.read<AppAuthProvider>().effectiveEmpresaId != null || empresasMaster.isNotEmpty) return;
     empresasMaster = List<Map<String, dynamic>>.from(
-        await Supabase.instance.client.from('empresas').select('id, nome').order('nome'));
+        await Supabase.instance.client.from('empresas').select('id, nome').order('nome', ascending: true));
     empresaMaster ??= empresasMaster.isNotEmpty ? empresasMaster.first['id'].toString() : null;
   }
 

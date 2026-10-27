@@ -36,7 +36,7 @@ class _PneuDetalhePageState extends State<PneuDetalhePage> {
       final p = Map<String, dynamic>.from(await supabase.from('pneus').select('*').eq('id', widget.pneuId).single());
       final r = await Future.wait([
         supabase.from('pneu_movimentacoes').select('*').eq('pneu_id', widget.pneuId).order('created_at', ascending: false),
-        supabase.from('vehicles').select('id, plate, brand, model, odometer').eq('empresa_id', p['empresa_id']).order('plate'),
+        supabase.from('vehicles').select('id, plate, brand, model, odometer').eq('empresa_id', p['empresa_id']).order('plate', ascending: true),
       ]);
       if (!mounted) return;
       setState(() {

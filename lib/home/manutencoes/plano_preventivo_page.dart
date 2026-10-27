@@ -45,9 +45,9 @@ class _PlanoPreventivoPageState extends State<PlanoPreventivoPage> with EmpresaD
       final eid = empresaAtual;
       if (eid == null) throw Exception('sem empresa');
       final r = await Future.wait([
-        fetchAllRows((a, b) => supabase.from('plano_preventivo').select('*').eq('empresa_id', eid).order('nome').order('id').range(a, b)),
+        fetchAllRows((a, b) => supabase.from('plano_preventivo').select('*').eq('empresa_id', eid).order('nome', ascending: true).order('id').range(a, b)),
         fetchAllRows((a, b) => supabase.from('vehicles').select('id, plate, brand, model, odometer').eq('empresa_id', eid)
-            .order('plate').order('id').range(a, b)),
+            .order('plate', ascending: true).order('id').range(a, b)),
       ]);
       if (!mounted) return;
       setState(() {

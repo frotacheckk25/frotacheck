@@ -21,6 +21,7 @@ import '../home/relatorios/relatorios_page.dart';
 import '../home/distribuicao/distribuicao_app_page.dart';
 import '../home/fiscal/documentos_fiscais_page.dart';
 import '../home/comercial/comercial_page.dart';
+import '../home/financeiro/financeiro_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -2010,6 +2011,15 @@ class _HomePageState extends State<HomePage> {
           }),
         ],
 
+        // ── Financeiro ───────────────────────────────────────────────────
+        if (auth.can(AppPermission.viewFinance)) ...[
+          _menuSectionLabel('Financeiro'),
+          _buildMenuOption(Icons.account_balance_wallet_rounded, 'Financeiro', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceiroPage()));
+            carregarDashboard();
+          }),
+        ],
+
         // ── Gestão ───────────────────────────────────────────────────────
         if (auth.can(AppPermission.viewReports) ||
             auth.can(AppPermission.viewAlerts) ||
@@ -2954,6 +2964,16 @@ class _HomePageState extends State<HomePage> {
                       _sidebarSection('COMERCIAL'),
                       _buildSidebarItem(Icons.handshake_rounded, 'Comercial e Coleta', () async {
                         await Navigator.push(context, MaterialPageRoute(builder: (_) => const ComercialPage()));
+                        carregarDashboard();
+                      }),
+                      const SizedBox(height: 6),
+                    ],
+
+                    // ─ Financeiro ─────────────────────────────────────────
+                    if (auth.can(AppPermission.viewFinance)) ...[
+                      _sidebarSection('FINANCEIRO'),
+                      _buildSidebarItem(Icons.account_balance_wallet_rounded, 'Financeiro', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceiroPage()));
                         carregarDashboard();
                       }),
                       const SizedBox(height: 6),
