@@ -6,6 +6,9 @@ import '../../core/enums/app_permission.dart';
 import '../../core/guards/permission_guard.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/formato_br.dart';
+import 'pneu_comum.dart';
+import 'pneu_detalhe_page.dart';
 
 class PneusPage extends StatelessWidget {
   const PneusPage({super.key});
@@ -31,6 +34,19 @@ class _PneusPageState extends State<_PneusView> {
   List<Map<String, dynamic>> pneus = [];
   Map<String, Map<String, dynamic>> veiculosMap = {};
   bool carregando = true;
+  String filtroSituacao = 'ativos'; // ativos = tudo menos descartados
+
+  List<Map<String, dynamic>> get pneusFiltrados => pneus.where((p) {
+        final s = p['situacao']?.toString() ?? 'em_uso';
+        return filtroSituacao == 'ativos' ? s != 'descartado' : s == filtroSituacao;
+      }).toList();
+
+  int _contaSituacao(String s) => pneus.where((p) => (p['situacao']?.toString() ?? 'em_uso') == s).length;
+
+  Future<void> _abrirDetalhe(Map<String, dynamic> p) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => PneuDetalhePage(pneuId: p['id'].toString())));
+    _carregarDados();
+  }
 
   @override
   void initState() {
@@ -58,14 +74,15 @@ class _PneusPageState extends State<_PneusView> {
       }
 
       var pneusQ = supabase.from('pneus').select(
-          'id, vehicle_id, status, marca, modelo, posicao, km_instalacao, data_instalacao, observacoes, empresa_id, created_at');
+          'id, vehicle_id, status, marca, modelo, posicao, km_instalacao, data_instalacao, observacoes, empresa_id, created_at, '
+          'numero_fogo, medida, sulco_mm, recapagens, situacao, km_acumulado, valor, cost');
       if (auth.isMotorista) {
         pneusQ = pneusQ.eq('vehicle_id', vehicleId ?? '');
       } else if (eid != null) {
         pneusQ = pneusQ.eq('empresa_id', eid);
       }
 
-      var veicQ = supabase.from('vehicles').select('id, plate, brand, model');
+      var veicQ = supabase.from('vehicles').select('id, plate, brand, model, odometer');
       if (auth.isMotorista) {
         veicQ = veicQ.eq('driver_id', auth.driverId ?? '');
       } else if (eid != null) {
@@ -340,6 +357,23 @@ class _PneusPageState extends State<_PneusView> {
                         _kpi('Trocar', '${_count('troca')}', Icons.cancel, AppColors.danger),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(children: [
+                        for (final f in [
+                          ('ativos', 'Ativos (${pneus.length - _contaSituacao('descartado')})'),
+                          ('em_uso', 'Em uso (${_contaSituacao('em_uso')})'),
+                          ('estoque', 'Estoque (${_contaSituacao('estoque')})'),
+                          ('recapagem', 'Na recapagem (${_contaSituacao('recapagem')})'),
+                          ('descartado', 'Descartados (${_contaSituacao('descartado')})'),
+                        ])
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(label: Text(f.$2), selected: filtroSituacao == f.$1, onSelected: (_) => setState(() => filtroSituacao = f.$1)),
+                          ),
+                      ]),
+                    ),
                     const SizedBox(height: 14),
 
                     const Text('Pneus Cadastrados',
@@ -380,10 +414,17 @@ class _PneusPageState extends State<_PneusView> {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, i) {
-                      final p = pneus[i];
+                      final p = pneusFiltrados[i];
                       final status = p['status']?.toString();
                       final cor = _statusColor(status);
-                      final veiculo = _veiculoLabel(p);
+                      final situacao = p['situacao']?.toString() ?? 'em_uso';
+                      final st = situacoesPneu[situacao] ?? ('-', AppColors.muted);
+                      final veiculo = situacao == 'em_uso' ? _veiculoLabel(p) : st.$1;
+                      final fogo = p['numero_fogo']?.toString();
+                      final medida = p['medida']?.toString() ?? '';
+                      final sulco = p['sulco_mm'] as num?;
+                      final recap = (p['recapagens'] as num?)?.toInt() ?? 0;
+                      final alerta = alertaSulco(sulco);
                       final marca = p['marca']?.toString() ?? '-';
                       final modelo = p['modelo']?.toString() ?? '';
                       final posicao = p['posicao']?.toString() ?? '-';
@@ -424,13 +465,13 @@ class _PneusPageState extends State<_PneusView> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(veiculo,
+                                        Text(fogo != null ? 'Fogo nº $fogo · $veiculo' : veiculo,
                                             style: const TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 14)),
                                         Text(
-                                          '$marca${modelo.isNotEmpty ? ' · $modelo' : ''} — $posicao',
+                                          '$marca${modelo.isNotEmpty ? ' · $modelo' : ''}${medida.isNotEmpty ? ' · $medida' : ''}${situacao == 'em_uso' ? ' — $posicao' : ''}',
                                           style: const TextStyle(
                                               color: AppColors.textSecondary, fontSize: 12),
                                         ),
@@ -455,7 +496,10 @@ class _PneusPageState extends State<_PneusView> {
                                 spacing: 8,
                                 runSpacing: 4,
                                 children: [
-                                  if (kmInst != null) _badge('KM: $kmInst', AppColors.secondary),
+                                  _badge(st.$1, st.$2),
+                                  if (sulco != null) _badge('Sulco ${numeroBr(sulco, casas: 1)} mm', alerta?.$2 ?? AppColors.success),
+                                  if (recap > 0) _badge('$recap recapage${recap == 1 ? 'm' : 'ns'}', AppColors.warning),
+                                  if (kmInst != null && situacao == 'em_uso') _badge('KM: $kmInst', AppColors.secondary),
                                   if (dataInst != '-')
                                     _badge('Inst: $dataInst', AppColors.textSecondary),
                                   if (obs.isNotEmpty) _badge(obs, AppColors.textSecondary),
@@ -466,6 +510,17 @@ class _PneusPageState extends State<_PneusView> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
+                                    TextButton.icon(
+                                      onPressed: () => _abrirDetalhe(p),
+                                      icon: const Icon(Icons.timeline, size: 14, color: AppColors.secondary),
+                                      label: const Text('Movimentar / histórico', style: TextStyle(color: AppColors.secondary, fontSize: 12)),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
                                     TextButton.icon(
                                       onPressed: () => _editarStatusPneu(p),
                                       icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.secondary),
@@ -492,7 +547,7 @@ class _PneusPageState extends State<_PneusView> {
                         ),
                       );
                     },
-                    childCount: pneus.length,
+                    childCount: pneusFiltrados.length,
                   ),
                 ),
               ),
@@ -569,16 +624,10 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
   final modeloController = TextEditingController();
   final kmController = TextEditingController();
   final observacoesController = TextEditingController();
-
-  static const posicoes = [
-    'Dianteiro Esquerdo',
-    'Dianteiro Direito',
-    'Traseiro Esquerdo',
-    'Traseiro Direito',
-    'Estepe',
-    'Traseiro Interno Esquerdo',
-    'Traseiro Interno Direito',
-  ];
+  final fogoController = TextEditingController();
+  final medidaController = TextEditingController();
+  final sulcoController = TextEditingController();
+  final valorController = TextEditingController();
 
   static const statuses = [
     {'value': 'bom', 'label': 'Bom'},
@@ -598,6 +647,10 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
     modeloController.dispose();
     kmController.dispose();
     observacoesController.dispose();
+    fogoController.dispose();
+    medidaController.dispose();
+    sulcoController.dispose();
+    valorController.dispose();
     super.dispose();
   }
 
@@ -617,7 +670,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
           (res as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
         carregandoVeiculos = false;
-        if (veiculos.length == 1) veiculoSelecionado = veiculos.first['id']?.toString();
+        if (veiculos.length == 1 && auth.isMotorista) veiculoSelecionado = veiculos.first['id']?.toString();
       });
     } catch (e) {
       if (!mounted) return;
@@ -648,6 +701,11 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
     if (d != null) setState(() => dataInstalacao = d);
   }
 
+  static double? _valorNumero(String s) {
+    final t = s.trim();
+    return double.tryParse(t.contains(',') ? t.replaceAll('.', '').replaceAll(',', '.') : t);
+  }
+
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;
 
@@ -657,11 +715,15 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
       final payload = <String, dynamic>{
         'vehicle_id': veiculoSelecionado,
         'marca': marcaController.text.trim(),
-        'posicao': posicaoSelecionada,
+        if (veiculoSelecionado != null) 'posicao': posicaoSelecionada,
+        if (fogoController.text.trim().isNotEmpty) 'numero_fogo': fogoController.text.trim(),
+        if (medidaController.text.trim().isNotEmpty) 'medida': medidaController.text.trim(),
+        if (sulcoController.text.trim().isNotEmpty) 'sulco_inicial_mm': double.tryParse(sulcoController.text.trim().replaceAll(',', '.')),
+        if (valorController.text.trim().isNotEmpty) 'valor': _valorNumero(valorController.text),
         'status': statusSelecionado ?? 'bom',
         if (modeloController.text.trim().isNotEmpty)
           'modelo': modeloController.text.trim(),
-        if (kmController.text.trim().isNotEmpty)
+        if (kmController.text.trim().isNotEmpty && veiculoSelecionado != null)
           'km_instalacao': int.tryParse(kmController.text.trim()),
         if (dataInstalacao != null)
           'data_instalacao': dataInstalacao!.toIso8601String().split('T')[0],
@@ -738,7 +800,13 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                   isExpanded: true,
                   hint: const Text('Selecione o veículo',
                       style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                  items: veiculos
+                  items: [
+                    if (!context.read<AppAuthProvider>().isMotorista)
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Sem veículo (vai para o estoque)', style: TextStyle(color: Colors.white)),
+                      ),
+                    ...veiculos
                       .map((v) => DropdownMenuItem<String>(
                             value: v['id']?.toString(),
                             child: Text(
@@ -746,9 +814,8 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                               style: const TextStyle(color: Colors.white),
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ))
-                      .toList(),
-                  validator: (v) => v == null ? 'Selecione um veículo' : null,
+                          ))],
+                  validator: (v) => v == null && context.read<AppAuthProvider>().isMotorista ? 'Selecione um veículo' : null,
                   onChanged: (v) => setState(() => veiculoSelecionado = v),
                 ),
               const SizedBox(height: 14),
@@ -773,6 +840,53 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
               ),
               const SizedBox(height: 14),
 
+              // ── Número de fogo, medida, sulco e valor ─────────────────────
+              TextFormField(
+                controller: fogoController,
+                style: const TextStyle(color: Colors.white),
+                textCapitalization: TextCapitalization.characters,
+                decoration: _dec('Número de fogo (marcado no pneu)', Icons.tag),
+              ),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: medidaController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _dec('Medida (ex: 295/80R22.5)', Icons.straighten),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: sulcoController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: _dec('Sulco (mm)', Icons.vertical_align_bottom),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final n = double.tryParse(v.trim().replaceAll(',', '.'));
+                      return n == null || n < 0 || n > 40 ? 'Sulco de 0 a 40 mm' : null;
+                    },
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              if (!context.read<AppAuthProvider>().isMotorista) ...[
+                TextFormField(
+                  controller: valorController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: _dec('Valor de compra (R\$)', Icons.payments_outlined),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return null;
+                    final n = _valorNumero(v);
+                    return n == null || n < 0 ? 'Valor inválido' : null;
+                  },
+                ),
+                const SizedBox(height: 14),
+              ],
+
               // ── Posição ───────────────────────────────────────────────────
               DropdownButtonFormField<String>(
                 value: posicaoSelecionada,
@@ -782,13 +896,13 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                 isExpanded: true,
                 hint: const Text('Selecione a posição',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                items: posicoes
+                items: posicoesPneu
                     .map((p) => DropdownMenuItem(
                           value: p,
                           child: Text(p, style: const TextStyle(color: Colors.white)),
                         ))
                     .toList(),
-                validator: (v) => v == null ? 'Selecione a posição' : null,
+                validator: (v) => v == null && veiculoSelecionado != null ? 'Selecione a posição' : null,
                 onChanged: (v) => setState(() => posicaoSelecionada = v),
               ),
               const SizedBox(height: 14),
