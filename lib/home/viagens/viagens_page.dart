@@ -7,6 +7,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'geolocation.dart';
+import '../torre/rastreamento_viagem.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/utils/fetch_all.dart';
 
@@ -248,6 +249,7 @@ class _ViagensPageState extends State<ViagensPage> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                const AvisoRastreamento(),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -514,6 +516,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
 
     setState(() => isLoading = true);
     final injetar = context.read<AppAuthProvider>().inject;
+    final auth = context.read<AppAuthProvider>();
     final localizacao = await obterLocalizacao();
     if (!mounted) return;
     try {
@@ -564,6 +567,15 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
             showError(context, 'Viagem criada, mas não foi possível salvar os dados da carga: ${friendlyError(e)}');
           }
         }
+      }
+
+      // o motorista da viagem passa a mandar a posição para a torre de controle
+      if (auth.isMotorista && auth.driverId != null && auth.driverId == motoristaId) {
+        unawaited(RastreamentoViagem.instancia.iniciar(
+          viagemId: viagemInserida['id'].toString(),
+          veiculoId: veiculoId!,
+          rotulo: '${origemCtrl.text.trim()} → ${destinoCtrl.text.trim()}',
+        ));
       }
 
       if (!mounted) return;
@@ -829,6 +841,11 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
     setState(() => isLoading = true);
     final localizacao = await obterLocalizacao();
     if (!mounted) return;
+    // manda as posições guardadas e desliga o rastreamento antes de encerrar
+    if (RastreamentoViagem.instancia.viagemAtual == widget.viagem['id']?.toString()) {
+      await RastreamentoViagem.instancia.parar();
+      if (!mounted) return;
+    }
     try {
       final dataInicio = DateTime.tryParse(widget.viagem['data_inicio']?.toString() ?? '');
       final dataFim = DateTime.now();
@@ -890,6 +907,10 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
     );
     if (conf != true || !mounted) return;
     setState(() => isLoading = true);
+    if (RastreamentoViagem.instancia.viagemAtual == widget.viagem['id']?.toString()) {
+      await RastreamentoViagem.instancia.parar();
+      if (!mounted) return;
+    }
     try {
       await supabase.from('viagens').update({
         'status': 'cancelada',

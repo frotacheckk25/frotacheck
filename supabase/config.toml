@@ -418,3 +418,8 @@ enabled = true
 # exigir JWT, senão recusa a chamada antes de chegar na função.
 [functions.send-push-notification]
 verify_jwt = false
+
+# Chamada pelo sistema do rastreador do caminhão, com o token de integração da
+# empresa (fc_...) — não é JWT, então o portão do Supabase não pode exigir JWT.
+[functions.rastreamento-receber]
+verify_jwt = false

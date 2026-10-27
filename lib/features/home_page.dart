@@ -25,6 +25,8 @@ import '../home/financeiro/financeiro_page.dart';
 import '../home/estoque/estoque_page.dart';
 import '../home/compras/compras_page.dart';
 import '../home/contabil/contabilidade_page.dart';
+import '../home/torre/rastreamento_viagem.dart';
+import '../home/torre/torre_controle_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -671,6 +673,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> carregarDashboard() async {
     if (!mounted) return;
+    // motorista com viagem em andamento manda a posição para a torre de controle
+    final authAtual = context.read<AppAuthProvider>();
+    if (authAtual.isMotorista) unawaited(RastreamentoViagem.instancia.sincronizar(driverId: authAtual.driverId));
     setState(() => carregando = true);
     // Captura empresa do usuário logado (null = MASTER, sem filtro)
     if (mounted) {
@@ -1507,7 +1512,10 @@ class _HomePageState extends State<HomePage> {
         body: SafeArea(
           child: Stack(
             children: [
-              _buildMobileContent(width),
+              Column(children: [
+                const AvisoRastreamento(),
+                Expanded(child: _buildMobileContent(width)),
+              ]),
               if (carregando)
                 Positioned.fill(
                   child: Container(
@@ -2003,6 +2011,11 @@ class _HomePageState extends State<HomePage> {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const ViagensPage()));
             carregarDashboard();
           }),
+          if (!auth.isMotorista && auth.can(AppPermission.viewVehicles))
+            _buildMenuOption(Icons.satellite_alt_rounded, 'Torre de controle', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const TorreControlePage()));
+              carregarDashboard();
+            }),
         ],
 
         // ── Comercial ────────────────────────────────────────────────────
@@ -2976,6 +2989,11 @@ class _HomePageState extends State<HomePage> {
                         await Navigator.push(context, MaterialPageRoute(builder: (_) => const ViagensPage()));
                         carregarDashboard();
                       }),
+                      if (!auth.isMotorista && auth.can(AppPermission.viewVehicles))
+                        _buildSidebarItem(Icons.satellite_alt_rounded, 'Torre de controle', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const TorreControlePage()));
+                          carregarDashboard();
+                        }),
                       const SizedBox(height: 6),
                     ],
 

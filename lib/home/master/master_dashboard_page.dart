@@ -29,6 +29,7 @@ import '../financeiro/financeiro_page.dart';
 import '../estoque/estoque_page.dart';
 import '../compras/compras_page.dart';
 import '../contabil/contabilidade_page.dart';
+import '../torre/torre_controle_page.dart';
 import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
 import '../../core/utils/formato_br.dart';
@@ -37,7 +38,7 @@ import '../../core/utils/formato_br.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, financeiro, estoque, compras, contabilidade, configuracoes,
+  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, financeiro, estoque, compras, contabilidade, torre, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -746,6 +747,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 navItem(Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
                 navItem(Icons.insights, 'Consumo da frota', _Sec.consumo, () => nav(const ConsumoFrotaPage())),
                 navItem(Icons.local_gas_station_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
+                navItem(Icons.satellite_alt_rounded, 'Torre de controle', _Sec.torre, () => nav(const TorreControlePage())),
                 catHeader('QUALIDADE'),
                 navItem(Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),
                 navItem(Icons.dashboard_rounded, 'Checklists', _Sec.checklists, () => nav(const HistoricoChecklistPage())),

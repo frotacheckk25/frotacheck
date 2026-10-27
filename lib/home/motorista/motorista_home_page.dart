@@ -18,6 +18,7 @@ import '../manutencoes/manutencoes_page.dart';
 import '../multas/multas_page.dart';
 import '../pneus/pneus_page.dart';
 import '../veiculos/veiculo_tipo.dart';
+import '../torre/rastreamento_viagem.dart';
 import '../viagens/viagens_page.dart';
 import '../../pages/lista_ocorrencias_page.dart';
 import '../../core/utils/formato_br.dart';
@@ -59,10 +60,21 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
   String? _avatarUrl;
   bool _uploadingAvatar = false;
 
+  Timer? _relogioRastreio;
+
   @override
   void initState() {
     super.initState();
     _carregar();
+    // confere a viagem em andamento (aberta aqui ou pelo gestor) e liga/desliga
+    // o envio da posição para a torre de controle
+    _relogioRastreio = Timer.periodic(const Duration(minutes: 2), (_) => RastreamentoViagem.instancia.sincronizar());
+  }
+
+  @override
+  void dispose() {
+    _relogioRastreio?.cancel();
+    super.dispose();
   }
 
   Future<void> _carregar() async {
@@ -101,6 +113,8 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
         }
       } catch (_) {}
     }
+
+    unawaited(RastreamentoViagem.instancia.sincronizar(driverId: driverId));
 
     try {
       final hoje = DateTime.now();
@@ -503,6 +517,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
             _buildVeiculoBanner(),
+            const AvisoRastreamento(),
             const SizedBox(height: 14),
 
             // Tarefas (scroll horizontal no mobile)
@@ -1117,6 +1132,7 @@ class _MotoristaHomePageState extends State<MotoristaHomePage> {
             ),
             const SizedBox(height: 4),
             _buildVeiculoBanner(),
+            const AvisoRastreamento(),
             const SizedBox(height: 20),
 
             // ── Suas tarefas de hoje ──────────────────────────────────────

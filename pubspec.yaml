@@ -55,6 +55,8 @@ dependencies:
   # pacote do contador: ZIP com os XML e planilhas; leitura do XML do CT-e
   archive: ^4.0.9
   xml: ^6.6.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:
