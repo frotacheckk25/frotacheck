@@ -78,6 +78,11 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
   Map<String, Map<String, dynamic>> veiculos = {};
   Map<String, Map<String, dynamic>> motoristas = {};
 
+  // Seletor de empresa do MASTER (os outros papéis usam a própria empresa)
+  List<Map<String, dynamic>> empresas = [];
+  String? empresaMaster;
+  String? get empresaAtual => context.read<AppAuthProvider>().effectiveEmpresaId ?? empresaMaster;
+
   String buscaCliente = '';
   String filtroCotacao = 'aberta';
   String filtroColeta = 'proximas';
@@ -101,10 +106,24 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       erro = null;
     });
     try {
-      final eid = context.read<AppAuthProvider>().effectiveEmpresaId;
+      // MASTER (sem empresa própria) escolhe a empresa no seletor do topo
+      final auth = context.read<AppAuthProvider>();
+      if (auth.effectiveEmpresaId == null && empresas.isEmpty) {
+        empresas = List<Map<String, dynamic>>.from(await supabase.from('empresas').select('id, nome').order('nome'));
+        empresaMaster ??= empresas.isNotEmpty ? empresas.first['id'].toString() : null;
+      }
+      final eid = empresaAtual;
+      if (eid == null) {
+        if (!mounted) return;
+        setState(() {
+          carregando = false;
+          erro = 'Nenhuma empresa cadastrada.';
+        });
+        return;
+      }
       PostgrestFilterBuilder<List<Map<String, dynamic>>> porEmpresa(String tabela, String colunas) {
         final q = supabase.from(tabela).select(colunas);
-        return eid != null ? q.eq('empresa_id', eid) : q;
+        return q.eq('empresa_id', eid);
       }
 
       final resultados = await Future.wait([
@@ -408,7 +427,8 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
 
   // ── Ações ────────────────────────────────────────────────────────────────
   Future<void> _abrirCliente([Map<String, dynamic>? c]) async {
-    final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => ClienteFormPage(cliente: c)));
+    final ok = await Navigator.push<bool>(
+        context, MaterialPageRoute(builder: (_) => ClienteFormPage(cliente: c, empresaId: empresaAtual!)));
     if (ok == true) _carregar();
   }
 
@@ -419,7 +439,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       return;
     }
     final ok = await Navigator.push<bool>(
-        context, MaterialPageRoute(builder: (_) => CotacaoFormPage(cotacao: q, clientes: clientes)));
+        context, MaterialPageRoute(builder: (_) => CotacaoFormPage(cotacao: q, clientes: clientes, empresaId: empresaAtual!)));
     if (ok == true) _carregar();
   }
 
@@ -433,6 +453,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       context,
       MaterialPageRoute(
         builder: (_) => ColetaFormPage(
+          empresaId: empresaAtual!,
           coleta: c,
           cotacao: daCotacao,
           clientes: clientes,
@@ -582,6 +603,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
       final viagem = await supabase
           .from('viagens')
           .insert(injetar({
+            'empresa_id': c['empresa_id'],
             'veiculo_id': c['veiculo_id'],
             'motorista_id': c['motorista_id'],
             'data_inicio': DateTime.now().toIso8601String(),
@@ -806,6 +828,26 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
                   ]),
                 )
               : Column(children: [
+                  if (auth.effectiveEmpresaId == null && empresas.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: DropdownButtonFormField<String>(
+                        initialValue: empresaMaster,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Empresa (visão master)',
+                          prefixIcon: Icon(Icons.apartment_rounded),
+                        ),
+                        items: [
+                          for (final e in empresas)
+                            DropdownMenuItem(value: e['id'].toString(), child: Text(e['nome'].toString(), overflow: TextOverflow.ellipsis)),
+                        ],
+                        onChanged: (v) {
+                          setState(() => empresaMaster = v);
+                          _carregar();
+                        },
+                      ),
+                    ),
                   _indicadores(),
                   Expanded(
                     child: TabBarView(controller: _tabs, children: [
@@ -922,8 +964,9 @@ abstract class _FormBase<T extends StatefulWidget> extends State<T> {
 
 // ── Cliente ─────────────────────────────────────────────────────────────────
 class ClienteFormPage extends StatefulWidget {
-  const ClienteFormPage({super.key, this.cliente});
+  const ClienteFormPage({super.key, this.cliente, required this.empresaId});
   final Map<String, dynamic>? cliente;
+  final String empresaId;
 
   @override
   State<ClienteFormPage> createState() => _ClienteFormPageState();
@@ -1010,7 +1053,7 @@ class _ClienteFormPageState extends _FormBase<ClienteFormPage> {
           if (editando) {
             await supabase.from('clientes').update(dados).eq('id', widget.cliente!['id']);
           } else {
-            await supabase.from('clientes').insert(context.read<AppAuthProvider>().inject(dados));
+            await supabase.from('clientes').insert({...dados, 'empresa_id': widget.empresaId});
           }
         }, editando ? 'Cliente atualizado.' : 'Cliente cadastrado.');
       }),
@@ -1020,7 +1063,8 @@ class _ClienteFormPageState extends _FormBase<ClienteFormPage> {
 
 // ── Cotação ─────────────────────────────────────────────────────────────────
 class CotacaoFormPage extends StatefulWidget {
-  const CotacaoFormPage({super.key, this.cotacao, required this.clientes});
+  const CotacaoFormPage({super.key, this.cotacao, required this.clientes, required this.empresaId});
+  final String empresaId;
   final Map<String, dynamic>? cotacao;
   final List<Map<String, dynamic>> clientes;
 
@@ -1116,7 +1160,7 @@ class _CotacaoFormPageState extends _FormBase<CotacaoFormPage> {
           if (editando) {
             await supabase.from('cotacoes').update(dados).eq('id', widget.cotacao!['id']);
           } else {
-            await supabase.from('cotacoes').insert(context.read<AppAuthProvider>().inject(dados));
+            await supabase.from('cotacoes').insert({...dados, 'empresa_id': widget.empresaId});
           }
         }, editando ? 'Cotação atualizada.' : 'Cotação criada.');
       }),
@@ -1128,6 +1172,7 @@ class _CotacaoFormPageState extends _FormBase<CotacaoFormPage> {
 class ColetaFormPage extends StatefulWidget {
   const ColetaFormPage({
     super.key,
+    required this.empresaId,
     this.coleta,
     this.cotacao,
     required this.clientes,
@@ -1135,6 +1180,7 @@ class ColetaFormPage extends StatefulWidget {
     required this.motoristas,
   });
 
+  final String empresaId;
   final Map<String, dynamic>? coleta;
   final Map<String, dynamic>? cotacao; // ao aprovar uma cotação, pré-preenche a coleta
   final List<Map<String, dynamic>> clientes;
@@ -1343,7 +1389,7 @@ class _ColetaFormPageState extends _FormBase<ColetaFormPage> {
               }
               final nova = await supabase
                   .from('coletas')
-                  .insert(context.read<AppAuthProvider>().inject({...dados, if (daCotacao) 'cotacao_id': q['id']}))
+                  .insert({...dados, 'empresa_id': widget.empresaId, if (daCotacao) 'cotacao_id': q['id']})
                   .select('id')
                   .single();
               if (daCotacao) {
