@@ -9,6 +9,7 @@ import '../../core/utils/snackbar_utils.dart';
 import '../../core/utils/image_validation.dart';
 import '../../core/utils/fetch_all.dart';
 import '../../core/utils/formato_br.dart';
+import 'consumo_frota_page.dart';
 
 class AbastecimentosPage extends StatefulWidget {
   const AbastecimentosPage({super.key});
@@ -249,6 +250,12 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
         title: const Text('Abastecimentos'),
         backgroundColor: AppColors.surface,
         actions: [
+          if (!auth.isMotorista)
+            TextButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsumoFrotaPage())),
+              icon: const Icon(Icons.insights, color: AppColors.secondary),
+              label: const Text('Consumo da frota (km/l)', style: TextStyle(color: AppColors.secondary)),
+            ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: carregarDados, tooltip: 'Atualizar'),
         ],
       ),
