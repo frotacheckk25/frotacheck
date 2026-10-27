@@ -24,6 +24,7 @@ import '../relatorios/relatorios_page.dart';
 import '../distribuicao/distribuicao_app_page.dart';
 import '../fiscal/documentos_fiscais_page.dart';
 import '../comercial/comercial_page.dart';
+import '../abastecimentos/consumo_frota_page.dart';
 import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
 import '../../core/utils/formato_br.dart';
@@ -32,7 +33,7 @@ import '../../core/utils/formato_br.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  planos, relatorios, distribuicao, documentosFiscais, comercial, configuracoes,
+  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -739,6 +740,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 navItem(Icons.directions_car_rounded, 'Veículos', _Sec.veiculos, () => nav(const VeiculosPage())),
                 navItem(Icons.directions_car_rounded, 'Motoristas', _Sec.motoristas, () => nav(const MotoristasPage())),
                 navItem(Icons.local_gas_station_rounded, 'Abastecimentos', _Sec.abastecimentos, () => nav(const ListaAbastecimentosPage())),
+                navItem(Icons.insights, 'Consumo da frota', _Sec.consumo, () => nav(const ConsumoFrotaPage())),
                 navItem(Icons.local_gas_station_rounded, 'Manutenções', _Sec.manutencoes, () => nav(const ManutencoesPage())),
                 catHeader('QUALIDADE'),
                 navItem(Icons.report_problem_rounded, 'Ocorrências', _Sec.ocorrencias, () => nav(const ListaOcorrenciasPage())),

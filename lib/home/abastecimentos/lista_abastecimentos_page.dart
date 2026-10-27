@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formato_br.dart';
+import 'consumo_frota_page.dart';
 
 class ListaAbastecimentosPage extends StatefulWidget {
   const ListaAbastecimentosPage({super.key});
@@ -151,6 +152,12 @@ class _ListaAbastecimentosPageState extends State<ListaAbastecimentosPage> {
         title: const Text('Histórico de Abastecimentos'),
         backgroundColor: AppColors.surface,
         actions: [
+          if (!context.watch<AppAuthProvider>().isMotorista)
+            TextButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsumoFrotaPage())),
+              icon: const Icon(Icons.insights, color: AppColors.secondary),
+              label: const Text('Consumo da frota (km/l)', style: TextStyle(color: AppColors.secondary)),
+            ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: carregarAbastecimentos),
         ],
       ),

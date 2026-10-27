@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../home/abastecimentos/abastecimentos_page.dart';
+import '../home/abastecimentos/consumo_frota_page.dart';
 import '../home/alertas/alertas_page.dart';
 import '../home/checklists/selecionar_veiculo_checklist.dart';
 import '../home/checklists/historico_checklist_page.dart';
@@ -1947,6 +1948,10 @@ class _HomePageState extends State<HomePage> {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
               carregarDashboard();
             }),
+          if (auth.can(AppPermission.viewFuelings) && !auth.isMotorista)
+            _buildMenuOption(Icons.insights, 'Consumo da frota', () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsumoFrotaPage()));
+            }),
           if (auth.can(AppPermission.viewMaintenance))
             _buildMenuOption(Icons.build, 'Manutenções', () async {
               await Navigator.push(context, MaterialPageRoute(builder: (_) => const ManutencoesPage()));
@@ -2888,6 +2893,10 @@ class _HomePageState extends State<HomePage> {
                         _buildSidebarItem(Icons.local_gas_station_rounded, 'Abastecimentos', () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (_) => const AbastecimentosPage()));
                           carregarDashboard();
+                        }),
+                      if (auth.can(AppPermission.viewFuelings) && !auth.isMotorista)
+                        _buildSidebarItem(Icons.insights, 'Consumo da frota', () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsumoFrotaPage()));
                         }),
                       if (auth.can(AppPermission.viewMaintenance))
                         _buildSidebarItem(Icons.build_rounded, 'Manutenções', () async {
