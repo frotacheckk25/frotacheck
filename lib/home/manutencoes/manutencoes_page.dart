@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
+import '../../core/enums/app_permission.dart';
 import '../../core/theme/app_theme.dart';
+import 'ordens_servico_page.dart';
+import 'plano_preventivo_page.dart';
 
 import '../../../pages/ocorrencias_page.dart';
 import '../../../pages/lista_ocorrencias_page.dart';
@@ -235,6 +238,9 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
   @override
   Widget build(BuildContext context) {
     final trocaLabel = proximaTroca == 1 ? '1 veículo' : '$proximaTroca veículos';
+    final auth = context.watch<AppAuthProvider>();
+    // OS e plano preventivo: só quem administra a oficina (motorista registra ocorrência)
+    final podeGerirOficina = !auth.isMotorista && auth.can(AppPermission.manageMaintenance);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -309,6 +315,30 @@ class _ManutencoesPageState extends State<ManutencoesPage> {
               ),
             ),
             const SizedBox(height: 22),
+            if (podeGerirOficina) ...[
+              _buildCard(
+                context,
+                Icons.build_circle,
+                'Ordens de serviço',
+                'Abra OS preventiva ou corretiva com peças, serviços e custo.',
+                () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdensServicoPage()))
+                      .then((_) => _carregarStats());
+                },
+                const Color(0xFF00B8D4),
+              ),
+              _buildCard(
+                context,
+                Icons.event_repeat,
+                'Plano preventivo',
+                'Óleo, filtros, freios e revisões por km ou data: veja o que está vencido.',
+                () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PlanoPreventivoPage()))
+                      .then((_) => _carregarStats());
+                },
+                const Color(0xFFEF4444),
+              ),
+            ],
             _buildCard(
               context,
               Icons.oil_barrel,
