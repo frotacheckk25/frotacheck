@@ -24,6 +24,7 @@ import '../home/comercial/comercial_page.dart';
 import '../home/financeiro/financeiro_page.dart';
 import '../home/estoque/estoque_page.dart';
 import '../home/compras/compras_page.dart';
+import '../home/contabil/contabilidade_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -2033,6 +2034,10 @@ class _HomePageState extends State<HomePage> {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceiroPage()));
             carregarDashboard();
           }),
+          _buildMenuOption(Icons.calculate_rounded, 'Contabilidade', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const ContabilidadePage()));
+            carregarDashboard();
+          }),
         ],
 
         // ── Gestão ───────────────────────────────────────────────────────
@@ -3003,6 +3008,10 @@ class _HomePageState extends State<HomePage> {
                       _sidebarSection('FINANCEIRO'),
                       _buildSidebarItem(Icons.account_balance_wallet_rounded, 'Financeiro', () async {
                         await Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceiroPage()));
+                        carregarDashboard();
+                      }),
+                      _buildSidebarItem(Icons.calculate_rounded, 'Contabilidade', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ContabilidadePage()));
                         carregarDashboard();
                       }),
                       const SizedBox(height: 6),

@@ -86,6 +86,11 @@ enum AppPermission {
   // e envia o pedido, mas não aprova). O banco confere a mesma regra.
   approvePurchases,
 
+  // Contabilidade: fechar/reabrir o mês e configurar contador e plano de
+  // contas — MASTER e ADMIN_EMPRESA. Ver o fechamento e gerar o pacote do
+  // contador seguem viewFinance/manageFinance. O banco confere a mesma regra.
+  manageAccounting,
+
   // Segurança da própria conta (MFA/TOTP) — MASTER e ADMIN_EMPRESA apenas
   // (F-06 da auditoria de segurança de 2026-07-29): são os papéis com maior
   // raio de impacto se a conta for comprometida, então só eles têm a tela
