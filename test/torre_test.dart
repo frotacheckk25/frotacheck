@@ -59,7 +59,9 @@ void main() {
     expect(deveEnviarPosicao(agora: agora, ultimoEnvio: agora.subtract(const Duration(minutes: 5)), metrosDesdeUltimo: 40), isTrue);
   });
 
-  test('link do Google Maps', () {
+  test('links do Google Maps e do Street View', () {
     expect(linkMapa(-21.89, -45.59).toString(), 'https://www.google.com/maps?q=-21.89,-45.59');
+    expect(linkStreetView(-21.89, -45.59).toString(),
+        'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=-21.89,-45.59');
   });
 }

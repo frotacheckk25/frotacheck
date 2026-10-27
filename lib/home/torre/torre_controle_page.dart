@@ -47,6 +47,17 @@ class _TorreControlePageState extends State<TorreControlePage> with EmpresaDaTel
   String? selecionado;
   List<LatLng> trajeto = [];
 
+  // Criada uma vez só: recriar a camada a cada atualização trocava o buscador
+  // de imagens e cancelava os blocos do mapa no meio (mapa cinza).
+  late final TileLayer _camadaMapa = TileLayer(
+    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    userAgentPackageName: 'br.com.frotacheck',
+    tileBuilder: darkModeTileBuilder,
+    tileProvider: NetworkTileProvider(),
+    evictErrorTileStrategy: EvictErrorTileStrategy.dispose,
+  );
+  static const _margemMapa = EdgeInsets.fromLTRB(80, 100, 80, 60);
+
   @override
   void initState() {
     super.initState();
@@ -83,7 +94,8 @@ class _TorreControlePageState extends State<TorreControlePage> with EmpresaDaTel
 
   Future<void> _carregar({bool silencioso = false}) async {
     if (!mounted) return;
-    if (!silencioso) {
+    // a tela de carregando só aparece na primeira vez (o mapa não é recriado)
+    if (!silencioso && atualizadoEm == null) {
       setState(() {
         carregando = true;
         erro = null;
@@ -162,7 +174,7 @@ class _TorreControlePageState extends State<TorreControlePage> with EmpresaDaTel
     if (pontos.length == 1) {
       mapa.move(pontos.first, 12);
     } else {
-      mapa.fitCamera(CameraFit.coordinates(coordinates: pontos, padding: const EdgeInsets.all(60), maxZoom: 13));
+      mapa.fitCamera(CameraFit.coordinates(coordinates: pontos, padding: _margemMapa, maxZoom: 13));
     }
   }
 
@@ -245,14 +257,19 @@ class _TorreControlePageState extends State<TorreControlePage> with EmpresaDaTel
         child: GestureDetector(onTap: () => _selecionar(vid), child: _pino(_placa(vid), s, selecionado == vid)),
       ));
     }
+    // O mapa já nasce enquadrado nos veículos (sem o pulo de zoom que
+    // cancelava os blocos); se ainda não há posição, começa no Brasil.
+    final pontos = [for (final vid in ultimas.keys) _ponto(vid)!];
+    if (pontos.isNotEmpty) _enquadrado = true;
     return Stack(children: [
       FlutterMap(
         mapController: mapa,
         options: MapOptions(
-          initialCenter: const LatLng(-15.8, -47.9),
-          initialZoom: 4,
+          initialCenter: pontos.length == 1 ? pontos.first : const LatLng(-15.8, -47.9),
+          initialZoom: pontos.length == 1 ? 12 : 4,
+          initialCameraFit: pontos.length > 1 ? CameraFit.coordinates(coordinates: pontos, padding: _margemMapa, maxZoom: 13) : null,
           minZoom: 3,
-          maxZoom: 18,
+          maxZoom: 19,
           interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
           onMapReady: () {
             _mapaPronto = true;
@@ -260,14 +277,10 @@ class _TorreControlePageState extends State<TorreControlePage> with EmpresaDaTel
           },
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'br.com.frotacheck',
-            tileBuilder: darkModeTileBuilder,
-          ),
+          _camadaMapa,
           if (trajeto.length > 1) PolylineLayer(polylines: [Polyline(points: trajeto, strokeWidth: 4, color: AppColors.neon)]),
           MarkerLayer(markers: marcadores),
-          RichAttributionWidget(attributions: [
+          RichAttributionWidget(showFlutterMapAttribution: false, attributions: [
             TextSourceAttribution('OpenStreetMap', onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright'))),
           ]),
         ],
@@ -364,6 +377,9 @@ class _TorreControlePageState extends State<TorreControlePage> with EmpresaDaTel
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             if (p != null) botaoAcao('Abrir no Google Maps', Icons.map, AppColors.info, () => launchUrl(linkMapa(p.latitude, p.longitude), mode: LaunchMode.externalApplication)),
+            if (p != null)
+              botaoAcao('Street View', Icons.streetview, AppColors.secondary, () => launchUrl(linkStreetView(p.latitude, p.longitude), mode: LaunchMode.externalApplication)),
+            if (p != null) botaoAcao('Aproximar', Icons.zoom_in, AppColors.muted, () => mapa.move(p, 17)),
             if (telefone.isNotEmpty) botaoAcao('Ligar', Icons.phone, AppColors.success, () => launchUrl(Uri.parse('tel:$telefone'))),
           ]),
         ]),

@@ -69,3 +69,7 @@ bool deveEnviarPosicao({required DateTime agora, DateTime? ultimoEnvio, double? 
 
 /// Link para abrir o ponto no Google Maps.
 Uri linkMapa(double lat, double lng) => Uri.parse('https://www.google.com/maps?q=$lat,$lng');
+
+/// Link para o Google Street View no ponto (sem chave de API).
+Uri linkStreetView(double lat, double lng) =>
+    Uri.parse('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=$lat,$lng');
