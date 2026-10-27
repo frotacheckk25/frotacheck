@@ -701,10 +701,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
     if (d != null) setState(() => dataInstalacao = d);
   }
 
-  static double? _valorNumero(String s) {
-    final t = s.trim();
-    return double.tryParse(t.contains(',') ? t.replaceAll('.', '').replaceAll(',', '.') : t);
-  }
+  static double? _valorNumero(String s) => lerNumeroBr(s);
 
   Future<void> _salvar() async {
     if (_formKey.currentState?.validate() != true) return;

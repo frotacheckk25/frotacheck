@@ -23,6 +23,7 @@ import '../home/fiscal/documentos_fiscais_page.dart';
 import '../home/comercial/comercial_page.dart';
 import '../home/financeiro/financeiro_page.dart';
 import '../home/estoque/estoque_page.dart';
+import '../home/compras/compras_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -2019,6 +2020,10 @@ class _HomePageState extends State<HomePage> {
             await Navigator.push(context, MaterialPageRoute(builder: (_) => const EstoquePage()));
             carregarDashboard();
           }),
+          _buildMenuOption(Icons.shopping_cart_rounded, 'Compras', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const ComprasPage()));
+            carregarDashboard();
+          }),
         ],
 
         // ── Financeiro ───────────────────────────────────────────────────
@@ -2984,6 +2989,10 @@ class _HomePageState extends State<HomePage> {
                       _sidebarSection('SUPRIMENTOS'),
                       _buildSidebarItem(Icons.inventory_2_rounded, 'Estoque', () async {
                         await Navigator.push(context, MaterialPageRoute(builder: (_) => const EstoquePage()));
+                        carregarDashboard();
+                      }),
+                      _buildSidebarItem(Icons.shopping_cart_rounded, 'Compras', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ComprasPage()));
                         carregarDashboard();
                       }),
                       const SizedBox(height: 6),

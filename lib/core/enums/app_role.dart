@@ -71,6 +71,7 @@ enum AppRole {
           AppPermission.viewCommercial,  AppPermission.manageCommercial,
           AppPermission.viewFinance,     AppPermission.manageFinance,
           AppPermission.viewSupplies,    AppPermission.manageSupplies,
+          AppPermission.approvePurchases,
           AppPermission.manageMfa,
         ];
 
@@ -96,7 +97,7 @@ enum AppRole {
           AppPermission.viewSupplies,    AppPermission.manageSupplies,
           // NÃO tem: manageSettings, viewUsers, manageUsers,
           //          viewAllCompanies, manageCompanies, manageSystem,
-          //          manageFiscalSettings
+          //          manageFiscalSettings, approvePurchases
         ];
 
       // ── MOTORISTA: restrito às próprias operações do dia ─────────────────

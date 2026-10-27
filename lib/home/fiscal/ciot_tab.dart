@@ -333,11 +333,7 @@ class _CiotFormPageState extends State<CiotFormPage> {
       return;
     }
     final numero = _soDigitos(_numero.text);
-    final valor = _valor.text.trim().isEmpty
-        ? null
-        : double.tryParse(_valor.text.trim().contains(',')
-            ? _valor.text.trim().replaceAll('.', '').replaceAll(',', '.')
-            : _valor.text.trim());
+    final valor = lerNumeroBr(_valor.text);
     final dados = {
       'numero_ciot': numero.isEmpty ? null : numero,
       'status': numero.isEmpty ? 'pendente' : (c['status'] == 'pendente' || c['status'] == null ? 'registrado' : c['status']),
@@ -451,7 +447,7 @@ class _CiotFormPageState extends State<CiotFormPage> {
               _campo(_valor, 'Valor do frete contratado (R\$)', teclado: const TextInputType.numberWithOptions(decimal: true),
                   validar: (t) {
                     if (t.isEmpty) return null;
-                    final n = double.tryParse(t.contains(',') ? t.replaceAll('.', '').replaceAll(',', '.') : t);
+                    final n = lerNumeroBr(t);
                     return n == null || n < 0 ? 'Valor inválido' : null;
                   }),
               Row(children: [

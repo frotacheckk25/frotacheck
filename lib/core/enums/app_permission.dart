@@ -82,6 +82,9 @@ enum AppPermission {
   // GESTOR; MOTORISTA não tem.
   viewSupplies,
   manageSupplies,
+  // Aprovar/reprovar pedido de compra — MASTER e ADMIN_EMPRESA (o GESTOR monta
+  // e envia o pedido, mas não aprova). O banco confere a mesma regra.
+  approvePurchases,
 
   // Segurança da própria conta (MFA/TOTP) — MASTER e ADMIN_EMPRESA apenas
   // (F-06 da auditoria de segurança de 2026-07-29): são os papéis com maior

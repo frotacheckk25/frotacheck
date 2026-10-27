@@ -29,3 +29,14 @@ String litrosBr(dynamic v) {
 /// Aceita num, String ou null (valores vindos do banco).
 double paraDouble(dynamic v) =>
     v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '') ?? 0.0;
+
+/// Número digitado no padrão brasileiro: "1.234,56", "1234,56", "1234.56",
+/// "2,5" e também "12.000" (milhar, como o próprio app mostra os números) —
+/// antes "12.000" virava 12. Vazio ou inválido devolve null.
+double? lerNumeroBr(String s) {
+  final t = s.trim();
+  if (t.isEmpty) return null;
+  if (t.contains(',')) return double.tryParse(t.replaceAll('.', '').replaceAll(',', '.'));
+  if (RegExp(r'^-?\d{1,3}(\.\d{3})+$').hasMatch(t)) return double.tryParse(t.replaceAll('.', ''));
+  return double.tryParse(t);
+}

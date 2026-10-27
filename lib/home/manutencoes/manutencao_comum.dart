@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formato_br.dart';
 
 /// Peças comuns das telas de Ordens de Serviço e Plano Preventivo.
 
@@ -15,11 +16,7 @@ String dataBrManut(String? iso) {
 
 String isoDia(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-double? numeroBrDe(String s) {
-  final t = s.trim();
-  if (t.isEmpty) return null;
-  return double.tryParse(t.contains(',') ? t.replaceAll('.', '').replaceAll(',', '.') : t);
-}
+double? numeroBrDe(String s) => lerNumeroBr(s);
 
 const statusOs = {
   'aberta': ('Aberta', AppColors.info),

@@ -22,13 +22,8 @@ const ufs = [
   'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO',
 ];
 
-double? numeroDe(String s) {
-  final t = s.trim();
-  if (t.isEmpty) return null;
-  // aceita "1.234,56", "1234,56" e "1234.56"
-  final normal = t.contains(',') ? t.replaceAll('.', '').replaceAll(',', '.') : t;
-  return double.tryParse(normal);
-}
+// aceita "1.234,56", "1234,56", "1234.56" e "12.000" (milhar)
+double? numeroDe(String s) => lerNumeroBr(s);
 
 String dataBr(String? iso) {
   if (iso == null || iso.isEmpty) return '-';

@@ -27,6 +27,7 @@ import '../comercial/comercial_page.dart';
 import '../abastecimentos/consumo_frota_page.dart';
 import '../financeiro/financeiro_page.dart';
 import '../estoque/estoque_page.dart';
+import '../compras/compras_page.dart';
 import '../../shared/widgets/compartilhar_app_dialog.dart';
 import '../configuracoes/configuracoes_page.dart';
 import '../../core/utils/formato_br.dart';
@@ -35,7 +36,7 @@ import '../../core/utils/formato_br.dart';
 enum _Sec {
   painel, empresas, usuarios, veiculos, motoristas,
   abastecimentos, manutencoes, ocorrencias, checklists,
-  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, financeiro, estoque, configuracoes,
+  planos, relatorios, distribuicao, documentosFiscais, comercial, consumo, financeiro, estoque, compras, configuracoes,
 }
 
 // ─── Data models ─────────────────────────────────────────────────────────────
@@ -757,6 +758,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                 navItem(Icons.handshake_rounded, 'Comercial e Coleta', _Sec.comercial, () => nav(const ComercialPage())),
                 navItem(Icons.account_balance_wallet_rounded, 'Financeiro', _Sec.financeiro, () => nav(const FinanceiroPage())),
                 navItem(Icons.inventory_2_rounded, 'Estoque', _Sec.estoque, () => nav(const EstoquePage())),
+                navItem(Icons.shopping_cart_rounded, 'Compras', _Sec.compras, () => nav(const ComprasPage())),
                 catHeader('SISTEMA'),
                 navItem(Icons.settings_rounded, 'Configurações', _Sec.configuracoes, () => nav(const ConfiguracoesPage())),
               ],

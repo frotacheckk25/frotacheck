@@ -35,7 +35,16 @@ const unidadesMaterial = {
   'balde': 'balde',
 };
 
-String qtdBr(num? q) => q == null ? '-' : numeroBr(q, casas: q % 1 == 0 ? 0 : 3);
+/// Quantidade sem zeros sobrando: "12", "2,5", "1.000,125".
+String qtdBr(num? q) {
+  if (q == null) return '-';
+  if (q % 1 == 0) return numeroBr(q, casas: 0);
+  var s = numeroBr(q, casas: 3);
+  while (s.endsWith('0')) {
+    s = s.substring(0, s.length - 1);
+  }
+  return s.endsWith(',') ? s.substring(0, s.length - 1) : s;
+}
 
 class EstoquePage extends StatefulWidget {
   const EstoquePage({super.key});
