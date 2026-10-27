@@ -635,6 +635,8 @@ class _OsDetalhePageState extends State<OsDetalhePage> {
             ),
             if (editavel)
               Wrap(spacing: 8, runSpacing: 8, children: [
+                if (context.read<AppAuthProvider>().can(AppPermission.manageSupplies))
+                  botaoAcao('Peça do estoque', Icons.inventory_2, AppColors.secondary, _pecaDoEstoque),
                 if (o['status'] == 'aberta') botaoAcao('Iniciar execução', Icons.play_arrow, AppColors.warning, () => _mudarStatus('em_execucao')),
                 botaoAcao('Concluir OS', Icons.check_circle, AppColors.success, () => _mudarStatus('concluida')),
                 botaoAcao('Cancelar OS', Icons.close, AppColors.danger, () => _mudarStatus('cancelada')),
@@ -656,6 +658,85 @@ class _OsDetalhePageState extends State<OsDetalhePage> {
         ),
       ),
     );
+  }
+
+  /// Tira a peça do estoque e já inclui na OS pelo custo médio (função do banco).
+  Future<void> _pecaDoEstoque() async {
+    final o = os!;
+    List<Map<String, dynamic>> mats;
+    try {
+      mats = List<Map<String, dynamic>>.from(await supabase
+          .from('materiais')
+          .select('id, codigo, nome, unidade, estoque_atual, custo_medio')
+          .eq('empresa_id', o['empresa_id'])
+          .eq('ativo', true)
+          .gt('estoque_atual', 0)
+          .order('nome', ascending: true));
+    } catch (e) {
+      if (mounted) showErrorFrom(context, e, prefix: 'Não foi possível carregar o estoque.');
+      return;
+    }
+    if (!mounted) return;
+    if (mats.isEmpty) {
+      showError(context, 'Não há material com saldo no estoque.');
+      return;
+    }
+    String? matId;
+    final qtd = TextEditingController(text: '1');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final sel = mats.where((m) => m['id'].toString() == matId).firstOrNull;
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('Peça do estoque'),
+            content: SizedBox(
+              width: 440,
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                DropdownButtonFormField<String>(
+                  initialValue: matId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Material *'),
+                  items: [
+                    for (final m in mats)
+                      DropdownMenuItem(
+                        value: m['id'].toString(),
+                        child: Text('${m['codigo'] != null ? '${m['codigo']} · ' : ''}${m['nome']} (${numeroBr(m['estoque_atual'] as num, casas: (m['estoque_atual'] as num) % 1 == 0 ? 0 : 3)} ${m['unidade']})',
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (v) => setD(() => matId = v),
+                ),
+                const SizedBox(height: 10),
+                TextField(controller: qtd, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Quantidade *')),
+                if (sel != null) ...[
+                  const SizedBox(height: 8),
+                  Text('Custo médio: ${moedaBr(sel['custo_medio'] as num)} por ${sel['unidade']}', style: const TextStyle(color: AppColors.textSecondary)),
+                ],
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Usar na OS')),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final q = numeroBrDe(qtd.text);
+    if (matId == null || q == null || q <= 0) {
+      showError(context, 'Escolha o material e a quantidade.');
+      return;
+    }
+    try {
+      await supabase.rpc('baixar_estoque_para_os', params: {'p_os': widget.osId, 'p_material': matId, 'p_quantidade': q});
+      if (mounted) showSuccess(context, 'Peça retirada do estoque e incluída na OS.');
+      _carregar();
+    } catch (e) {
+      if (mounted) showErrorFrom(context, e, prefix: 'Não foi possível usar a peça.');
+    }
   }
 
   /// Conta a pagar da OS no Financeiro, já preenchida (oficina de fora a pagar).

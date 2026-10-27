@@ -22,6 +22,7 @@ import '../home/distribuicao/distribuicao_app_page.dart';
 import '../home/fiscal/documentos_fiscais_page.dart';
 import '../home/comercial/comercial_page.dart';
 import '../home/financeiro/financeiro_page.dart';
+import '../home/estoque/estoque_page.dart';
 import '../home/viagens/viagens_page.dart';
 import '../home/veiculos/veiculos_page.dart';
 import '../pages/ocorrencias_page.dart';
@@ -2011,6 +2012,15 @@ class _HomePageState extends State<HomePage> {
           }),
         ],
 
+        // ── Suprimentos ──────────────────────────────────────────────────
+        if (auth.can(AppPermission.viewSupplies)) ...[
+          _menuSectionLabel('Suprimentos'),
+          _buildMenuOption(Icons.inventory_2_rounded, 'Estoque', () async {
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => const EstoquePage()));
+            carregarDashboard();
+          }),
+        ],
+
         // ── Financeiro ───────────────────────────────────────────────────
         if (auth.can(AppPermission.viewFinance)) ...[
           _menuSectionLabel('Financeiro'),
@@ -2964,6 +2974,16 @@ class _HomePageState extends State<HomePage> {
                       _sidebarSection('COMERCIAL'),
                       _buildSidebarItem(Icons.handshake_rounded, 'Comercial e Coleta', () async {
                         await Navigator.push(context, MaterialPageRoute(builder: (_) => const ComercialPage()));
+                        carregarDashboard();
+                      }),
+                      const SizedBox(height: 6),
+                    ],
+
+                    // ─ Suprimentos ───────────────────────────────────────
+                    if (auth.can(AppPermission.viewSupplies)) ...[
+                      _sidebarSection('SUPRIMENTOS'),
+                      _buildSidebarItem(Icons.inventory_2_rounded, 'Estoque', () async {
+                        await Navigator.push(context, MaterialPageRoute(builder: (_) => const EstoquePage()));
                         carregarDashboard();
                       }),
                       const SizedBox(height: 6),

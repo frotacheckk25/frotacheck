@@ -70,6 +70,7 @@ enum AppRole {
           AppPermission.manageFiscalSettings,
           AppPermission.viewCommercial,  AppPermission.manageCommercial,
           AppPermission.viewFinance,     AppPermission.manageFinance,
+          AppPermission.viewSupplies,    AppPermission.manageSupplies,
           AppPermission.manageMfa,
         ];
 
@@ -92,6 +93,7 @@ enum AppRole {
           AppPermission.viewFiscalDocs,  AppPermission.manageFiscalDocs,
           AppPermission.viewCommercial,  AppPermission.manageCommercial,
           AppPermission.viewFinance,     AppPermission.manageFinance,
+          AppPermission.viewSupplies,    AppPermission.manageSupplies,
           // NÃO tem: manageSettings, viewUsers, manageUsers,
           //          viewAllCompanies, manageCompanies, manageSystem,
           //          manageFiscalSettings

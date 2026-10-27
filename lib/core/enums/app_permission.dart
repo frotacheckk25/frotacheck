@@ -78,6 +78,11 @@ enum AppPermission {
   viewFinance,
   manageFinance,
 
+  // Suprimentos (estoque de materiais e compras) — MASTER, ADMIN_EMPRESA e
+  // GESTOR; MOTORISTA não tem.
+  viewSupplies,
+  manageSupplies,
+
   // Segurança da própria conta (MFA/TOTP) — MASTER e ADMIN_EMPRESA apenas
   // (F-06 da auditoria de segurança de 2026-07-29): são os papéis com maior
   // raio de impacto se a conta for comprometida, então só eles têm a tela
