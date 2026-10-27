@@ -12,6 +12,7 @@ import 'features/home_page.dart';
 import 'home/master/master_dashboard_page.dart';
 import 'home/motorista/motorista_home_page.dart';
 import 'core/config/supabase_config.dart';
+import 'core/config/app_links.dart';
 import 'core/theme/app_theme.dart';
 import 'core/auth/app_auth_provider.dart';
 import 'core/enums/app_role.dart';
@@ -37,6 +38,7 @@ void main() {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      uriDeAbertura = Uri.base;
 
       FlutterError.onError = (FlutterErrorDetails details) {
         debugPrint('FlutterError: ${details.exception}');
@@ -63,7 +65,16 @@ void main() {
           );
         }
 
-        await Supabase.initialize(url: url, publishableKey: key);
+        // Fluxo implícito: o link de "esqueci a senha" chega com a sessão no
+        // próprio link e funciona em qualquer aparelho/navegador. No PKCE
+        // (padrão) o link só funcionava no mesmo navegador que pediu a troca —
+        // aberto no celular ou no app do e-mail, caía na tela de login.
+        // O app só usa e-mail e senha, então não há perda com o fluxo implícito.
+        await Supabase.initialize(
+          url: url,
+          publishableKey: key,
+          authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit),
+        );
         supabaseReady = true;
       } catch (e, st) {
         supabaseError = e.toString();

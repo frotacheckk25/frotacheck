@@ -44,6 +44,28 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _carregarCredenciaisSalvas();
+    _avisarLinkInvalido();
+  }
+
+  /// Link de recuperação vencido ou já usado: o Supabase volta para o app com
+  /// "error_code" no endereço. Sem este aviso a pessoa só via a tela de login.
+  void _avisarLinkInvalido() {
+    final uri = uriDeAbertura;
+    if (!kIsWeb || uri == null) return;
+    final params = {...uri.queryParameters, ...Uri.splitQueryString(uri.fragment)};
+    final codigo = params['error_code'] ?? params['error'];
+    if (codigo == null) return;
+    // Aviso fixo na caixa de login (um snackbar sumia antes de a pessoa ler).
+    avisoLink = codigo == 'otp_expired'
+        ? 'Este link de troca de senha venceu ou já foi usado. Clique em "Esqueceu a senha?" para receber outro.'
+        : 'Não foi possível abrir o link de troca de senha. Peça um novo em "Esqueceu a senha?".';
+  }
+
+  String? avisoLink;
+
+  void fecharAvisoLink() {
+    uriDeAbertura = null;
+    setState(() => avisoLink = null);
   }
 
   Future<void> _carregarCredenciaisSalvas() async {
@@ -357,6 +379,30 @@ class _FormCard extends StatelessWidget {
                 style: TextStyle(color: _muted, fontSize: 14),
               ),
               const SizedBox(height: 28),
+              if (state.avisoLink != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 18),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.6)),
+                  ),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Icon(Icons.link_off_rounded, color: Color(0xFFFCA5A5), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(state.avisoLink!,
+                          style: const TextStyle(color: Color(0xFFFECACA), fontSize: 13.5, height: 1.4)),
+                    ),
+                    IconButton(
+                      onPressed: state.fecharAvisoLink,
+                      icon: const Icon(Icons.close, size: 18, color: Color(0xFFFCA5A5)),
+                      tooltip: 'Fechar aviso',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ]),
+                ),
               _LoginForm(state: state),
             ],
           ),
