@@ -48,11 +48,11 @@ class _SelecionarVeiculoChecklistPageState
             .from('vehicles')
             .select('id, plate, model')
             .eq('driver_id', auth.driverId!)
-            .order('plate');
+            .order('plate', ascending: true);
       } else {
         var veiQ = supabase.from('vehicles').select('id, plate, model');
         if (eid != null) veiQ = veiQ.eq('empresa_id', eid);
-        veiculosResult = await veiQ.order('plate');
+        veiculosResult = await veiQ.order('plate', ascending: true);
       }
       var motorQ = supabase.from('drivers').select('id, name');
       if (auth.isMotorista && auth.driverId != null) {
@@ -60,7 +60,7 @@ class _SelecionarVeiculoChecklistPageState
       } else if (eid != null) {
         motorQ = motorQ.eq('empresa_id', eid);
       }
-      final motoristasResult = await motorQ.order('name');
+      final motoristasResult = await motorQ.order('name', ascending: true);
 
       if (!mounted) return;
       setState(() {

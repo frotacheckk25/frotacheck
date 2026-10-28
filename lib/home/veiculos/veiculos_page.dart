@@ -8,6 +8,7 @@ import 'package:frotacheck/core/auth/app_auth_provider.dart';
 import 'package:frotacheck/core/enums/app_permission.dart';
 import 'package:frotacheck/core/guards/permission_guard.dart';
 import 'package:frotacheck/core/theme/app_theme.dart';
+import 'package:frotacheck/core/utils/formato_br.dart';
 import 'package:frotacheck/core/utils/image_validation.dart';
 import 'package:frotacheck/core/utils/signed_storage_url.dart';
 import 'package:frotacheck/core/utils/snackbar_utils.dart';
@@ -88,8 +89,8 @@ class _VeiculosPageState extends State<_VeiculosView> {
         drivQ = drivQ.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        veicQ.order('plate'),
-        drivQ.order('name'),
+        veicQ.order('plate', ascending: true),
+        drivQ.order('name', ascending: true),
       ]);
       if (!mounted) return;
       setState(() {
@@ -160,9 +161,9 @@ class _VeiculosPageState extends State<_VeiculosView> {
       'plate': placaController.text.trim().toUpperCase(),
       'brand': marcaController.text.trim(),
       'model': modeloController.text.trim(),
-      'year': int.tryParse(anoController.text.trim()),
+      'year': lerInteiroBr(anoController.text.trim()),
       'color': corController.text.trim(),
-      'odometer': int.tryParse(kmController.text.trim()) ?? 0,
+      'odometer': lerInteiroBr(kmController.text.trim()) ?? 0,
       'driver_id': motoristaSelecionado,
       'tipo': tipoSelecionado,
     };
@@ -672,7 +673,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
                       keyboardType: TextInputType.number,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Informe o ano';
-                        final ano = int.tryParse(v.trim());
+                        final ano = lerInteiroBr(v.trim());
                         if (ano == null || ano < 1900 || ano > 2100) return 'Ano inválido';
                         return null;
                       },
@@ -688,7 +689,7 @@ class _VeiculosPageState extends State<_VeiculosView> {
                       keyboardType: TextInputType.number,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Informe o Km';
-                        final parsed = int.tryParse(v.trim());
+                        final parsed = lerInteiroBr(v.trim());
                         if (parsed == null) return 'Km inválido — use apenas números';
                         if (parsed < 0) return 'Km não pode ser negativo';
                         if (parsed > Checklist.kmMaximo) return 'Km inválido. Confira o valor digitado.';

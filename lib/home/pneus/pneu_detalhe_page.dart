@@ -187,7 +187,7 @@ class _PneuDetalhePageState extends State<PneuDetalhePage> {
     );
     if (ok != true || !mounted) return;
 
-    final kmN = km.text.trim().isEmpty ? null : int.tryParse(km.text.trim());
+    final kmN = km.text.trim().isEmpty ? null : lerInteiroBr(km.text.trim());
     final sulcoN = numeroBrDe(sulco.text);
     final custoN = numeroBrDe(custo.text);
     String? erro;

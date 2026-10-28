@@ -90,7 +90,7 @@ class _PneusPageState extends State<_PneusView> {
       }
       final results = await Future.wait([
         pneusQ.order('created_at', ascending: false),
-        veicQ.order('plate'),
+        veicQ.order('plate', ascending: true),
       ]);
 
       final rawPneus = List<Map<String, dynamic>>.from(
@@ -663,7 +663,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
       } else if (auth.effectiveEmpresaId != null) {
         q = q.eq('empresa_id', auth.effectiveEmpresaId!);
       }
-      final res = await q.order('plate');
+      final res = await q.order('plate', ascending: true);
       if (!mounted) return;
       setState(() {
         veiculos = List<Map<String, dynamic>>.from(
@@ -715,13 +715,13 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
         if (veiculoSelecionado != null) 'posicao': posicaoSelecionada,
         if (fogoController.text.trim().isNotEmpty) 'numero_fogo': fogoController.text.trim(),
         if (medidaController.text.trim().isNotEmpty) 'medida': medidaController.text.trim(),
-        if (sulcoController.text.trim().isNotEmpty) 'sulco_inicial_mm': double.tryParse(sulcoController.text.trim().replaceAll(',', '.')),
+        if (sulcoController.text.trim().isNotEmpty) 'sulco_inicial_mm': lerNumeroBr(sulcoController.text.trim()),
         if (valorController.text.trim().isNotEmpty) 'valor': _valorNumero(valorController.text),
         'status': statusSelecionado ?? 'bom',
         if (modeloController.text.trim().isNotEmpty)
           'modelo': modeloController.text.trim(),
         if (kmController.text.trim().isNotEmpty && veiculoSelecionado != null)
-          'km_instalacao': int.tryParse(kmController.text.trim()),
+          'km_instalacao': lerInteiroBr(kmController.text.trim()),
         if (dataInstalacao != null)
           'data_instalacao': dataInstalacao!.toIso8601String().split('T')[0],
         if (observacoesController.text.trim().isNotEmpty)
@@ -862,7 +862,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                     decoration: _dec('Sulco (mm)', Icons.vertical_align_bottom),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) return null;
-                      final n = double.tryParse(v.trim().replaceAll(',', '.'));
+                      final n = lerNumeroBr(v.trim());
                       return n == null || n < 0 || n > 40 ? 'Sulco de 0 a 40 mm' : null;
                     },
                   ),
@@ -912,7 +912,7 @@ class _NovoPneuFormState extends State<_NovoPneuForm> {
                 decoration: _dec('KM na Instalação', Icons.speed_outlined),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return null;
-                  final km = int.tryParse(v.trim());
+                  final km = lerInteiroBr(v.trim());
                   if (km == null || km < 0) return 'Informe um KM válido (não negativo)';
                   final atual = veiculos.firstWhere(
                     (veic) => veic['id']?.toString() == veiculoSelecionado,

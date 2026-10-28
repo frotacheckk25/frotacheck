@@ -84,7 +84,7 @@ class _MotoristasPageState extends State<_MotoristasView> {
       final eid = auth.effectiveEmpresaId;
       var q = supabase.from('drivers').select();
       if (eid != null) q = q.eq('empresa_id', eid);
-      final response = await q.order('name');
+      final response = await q.order('name', ascending: true);
       if (!mounted) return;
       setState(() {
         motoristas = List<Map<String, dynamic>>.from(

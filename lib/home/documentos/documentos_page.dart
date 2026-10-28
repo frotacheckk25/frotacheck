@@ -58,8 +58,8 @@ class _DocumentosPageState extends State<DocumentosPage> {
         // escondia os documentos com vencimento mais distante.
         fetchAllRows((from, to) =>
             docQ.order('data_vencimento', ascending: true).order('id').range(from, to)),
-        veicQ.order('plate'),
-        drivQ.order('name'),
+        veicQ.order('plate', ascending: true),
+        drivQ.order('name', ascending: true),
       ]);
 
       final rawDocs = List<Map<String, dynamic>>.from(

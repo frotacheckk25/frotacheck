@@ -106,7 +106,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       }
 
       final results = await Future.wait([
-        veicQ.order('plate'),
+        veicQ.order('plate', ascending: true),
         // Paginado: com 500 veículos o limite fixo de 100 cortava as trocas.
         fetchAllRows((from, to) =>
             oilQ.order('created_at', ascending: false).order('id').range(from, to)),
@@ -168,7 +168,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       return;
     }
 
-    final kmAtual = int.tryParse(kmController.text.trim()) ?? 0;
+    final kmAtual = lerInteiroBr(kmController.text.trim()) ?? 0;
     if (kmAtual < 0 || kmAtual > Checklist.kmMaximo) {
       _snackErro('Informe um KM atual válido. Confira o valor digitado.');
       return;
@@ -177,7 +177,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     setState(() => isSaving = true);
     final injetar = context.read<AppAuthProvider>().inject;
 
-    final intervalo = int.tryParse(selectedInterval) ?? 10000;
+    final intervalo = lerInteiroBr(selectedInterval) ?? 10000;
     final proximoKm = kmAtual + intervalo;
 
     final veiculo = veiculos.firstWhere(
@@ -325,8 +325,8 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
   }
 
   int get _proximoKmPreview {
-    final km = int.tryParse(kmController.text) ?? 0;
-    return km + (int.tryParse(selectedInterval) ?? 10000);
+    final km = lerInteiroBr(kmController.text) ?? 0;
+    return km + (lerInteiroBr(selectedInterval) ?? 10000);
   }
 
   @override
@@ -559,7 +559,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
                 onChanged: (_) => setState(() {}),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Informe o KM atual';
-                  final parsed = int.tryParse(v.trim());
+                  final parsed = lerInteiroBr(v.trim());
                   if (parsed == null) return 'Somente números';
                   // Sem teto, um KM digitado duas vezes (ex.: 236850236900)
                   // estourava o limite do banco e a gravação falhava.
@@ -812,7 +812,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final valor = double.tryParse(valorController.text.trim().replaceAll(',', '.'));
+          final valor = lerNumeroBr(valorController.text.trim());
           final podeResolver = pecaController.text.trim().isNotEmpty && valor != null && valor > 0;
           return AlertDialog(
             backgroundColor: AppColors.surface,
@@ -860,7 +860,7 @@ class _TrocaOleoPageState extends State<TrocaOleoPage> {
     );
     if (ok != true || !mounted) return;
 
-    final valor = double.tryParse(valorController.text.trim().replaceAll(',', '.')) ?? 0;
+    final valor = lerNumeroBr(valorController.text.trim()) ?? 0;
     final peca = pecaController.text.trim();
     try {
       await supabase.from('manutencoes').update({

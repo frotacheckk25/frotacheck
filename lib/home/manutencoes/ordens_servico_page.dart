@@ -252,7 +252,7 @@ class _OsFormPageState extends State<OsFormPage> {
 
   Future<void> _salvar() async {
     if (!(_form.currentState?.validate() ?? false)) return;
-    final kmNum = int.tryParse(km.text.trim());
+    final kmNum = lerInteiroBr(km.text.trim());
     final dados = {
       'vehicle_id': veiculoId,
       'tipo': tipo,
@@ -333,7 +333,7 @@ class _OsFormPageState extends State<OsFormPage> {
                 validator: (v) {
                   final t = (v ?? '').trim();
                   if (t.isEmpty) return null;
-                  final n = int.tryParse(t);
+                  final n = lerInteiroBr(t);
                   return n == null || n < 0 || n > 3000000 ? 'Km inválido (só números)' : null;
                 },
               ),

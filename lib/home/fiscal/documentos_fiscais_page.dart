@@ -62,7 +62,7 @@ class _DocumentosFiscaisPageState extends State<DocumentosFiscaisPage>
 
     try {
       if (_isMaster) {
-        final res = await _supabase.from('empresas').select('id, nome').order('nome');
+        final res = await _supabase.from('empresas').select('id, nome').order('nome', ascending: true);
         _empresas = List<Map<String, dynamic>>.from(res as List);
         if (_selectedEmpresaId == null && _empresas.isNotEmpty) {
           _selectedEmpresaId = _empresas.first['id']?.toString();

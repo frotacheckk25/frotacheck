@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formato_br.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'geolocation.dart';
 import '../torre/rastreamento_viagem.dart';
@@ -100,7 +101,7 @@ class _ViagensPageState extends State<ViagensPage> {
         // ADMIN/GESTOR: veículos por empresa
         try {
           final vs = await supabase.from('vehicles')
-              .select('id, plate, brand, model, odometer').eq('empresa_id', eid).order('plate');
+              .select('id, plate, brand, model, odometer').eq('empresa_id', eid).order('plate', ascending: true);
           for (final v in vs as List) {
             final row = Map<String, dynamic>.from(v as Map);
             vMap[row['id'].toString()] = row;
@@ -111,7 +112,7 @@ class _ViagensPageState extends State<ViagensPage> {
         // não conseguia registrar viagem (os outros módulos listam todos).
         try {
           final ds = await fetchAllRows((from, to) => supabase.from('drivers')
-              .select('id, name').eq('empresa_id', eid).order('name').order('id').range(from, to));
+              .select('id, name').eq('empresa_id', eid).order('name', ascending: true).order('id').range(from, to));
           for (final row in ds) {
             mMap[row['id'].toString()] = row;
           }
@@ -503,7 +504,7 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
       return;
     }
 
-    final kmInicio = double.tryParse(kmInicioCtrl.text.replaceAll(',', '.'));
+    final kmInicio = lerNumeroBr(kmInicioCtrl.text);
     if (kmInicio == null || kmInicio < 0 || kmInicio > Checklist.kmMaximo) {
       showError(context, 'Quilometragem inicial inválida');
       return;
@@ -554,11 +555,11 @@ class _NovaViagemPageState extends State<_NovaViagemPage> {
             'destinatario_doc': _destinatarioDocCtrl.text.trim(),
             'natureza_carga': _naturezaCargaCtrl.text.trim(),
             if (_valorCargaCtrl.text.trim().isNotEmpty)
-              'valor_carga': double.tryParse(_valorCargaCtrl.text.replaceAll(',', '.')),
+              'valor_carga': lerNumeroBr(_valorCargaCtrl.text),
             if (_valorFreteCtrl.text.trim().isNotEmpty)
-              'valor_frete': double.tryParse(_valorFreteCtrl.text.replaceAll(',', '.')),
+              'valor_frete': lerNumeroBr(_valorFreteCtrl.text),
             if (_pesoBrutoCtrl.text.trim().isNotEmpty)
-              'peso_bruto': double.tryParse(_pesoBrutoCtrl.text.replaceAll(',', '.')),
+              'peso_bruto': lerNumeroBr(_pesoBrutoCtrl.text),
           }));
         } catch (e) {
           debugPrint('Erro ao criar rascunho de CT-e: $e');
@@ -826,7 +827,7 @@ class _DetalheViagemPageState extends State<_DetalheViagemPage> {
       showError(context, 'Informe a quilometragem final');
       return;
     }
-    final kmFim = double.tryParse(kmFimCtrl.text.replaceAll(',', '.'));
+    final kmFim = lerNumeroBr(kmFimCtrl.text);
     if (kmFim == null || kmFim < 0 || kmFim > Checklist.kmMaximo) {
       showError(context, 'Quilometragem final inválida');
       return;

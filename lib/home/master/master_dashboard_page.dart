@@ -280,7 +280,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
         // 9: manutencoes (tabela opcional — safeQ retorna [] se não existir)
         _safeQ(_supabase.from('manutencoes').select('id').limit(500)),
         // 10: catálogo de planos
-        _safeQ(_supabase.from('planos').select().order('ordem')),
+        _safeQ(_supabase.from('planos').select().order('ordem', ascending: true)),
         // 11: assinaturas vigentes (fonte real da receita — módulo Planos)
         _safeQ(_supabase.from('assinaturas').select('empresa_id, plano_id, valor_mensal, status, data_inicio')),
       ]);
@@ -2061,7 +2061,7 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
               onPressed: saving ? null : () async {
                 final nome = nomeCtrl.text.trim();
                 final email = emailCtrl.text.trim().toLowerCase();
-                final valorMensal = double.tryParse(valorCtrl.text.trim().replaceAll(',', '.'));
+                final valorMensal = lerNumeroBr(valorCtrl.text.trim());
                 if (nome.isEmpty) { setS(() => error = 'Nome é obrigatório'); return; }
                 if (email.isEmpty) { setS(() => error = 'E-mail do administrador é obrigatório'); return; }
                 if (valorMensal == null || valorMensal < 0) { setS(() => error = 'Valor mensal inválido'); return; }

@@ -73,7 +73,7 @@ class _DistribuicaoAppPageState extends State<DistribuicaoAppPage> {
 
       if (_isMaster) {
         futures.add(
-          _supabase.from('empresas').select('id, nome, status').order('nome').then((res) {
+          _supabase.from('empresas').select('id, nome, status').order('nome', ascending: true).then((res) {
             final list = List<Map<String, dynamic>>.from(res as List);
             _empresas = list;
             _empresasAtivas = list.where((e) => (e['status'] ?? '') == 'ativo').length;

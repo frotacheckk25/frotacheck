@@ -94,8 +94,8 @@ class _OcorrenciasPageState extends State<OcorrenciasPage> {
         // Paginado: o limite fixo de 100 escondia ocorrências em frota grande.
         fetchAllRows((from, to) =>
             ocorrQ.order('created_at', ascending: false).order('id').range(from, to)),
-        veicQ.order('plate'),
-        drivQ.order('name'),
+        veicQ.order('plate', ascending: true),
+        drivQ.order('name', ascending: true),
       ]);
       if (!mounted) return;
       final vList = List<Map<String, dynamic>>.from(

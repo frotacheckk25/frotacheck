@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formato_br.dart';
 import '../../core/utils/plano_financeiro.dart';
 import '../../core/utils/snackbar_utils.dart';
 
@@ -74,9 +75,9 @@ class _PlanosPageState extends State<PlanosPage> {
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
-        _supabase.from('planos').select().order('ordem'),
+        _supabase.from('planos').select().order('ordem', ascending: true),
         _supabase.from('assinaturas').select('*, empresas(nome), planos(id, codigo, nome, valor_mensal, limite_veiculos)'),
-        _supabase.from('empresas').select('id, nome').order('nome'),
+        _supabase.from('empresas').select('id, nome').order('nome', ascending: true),
       ]);
       final planos = List<Map<String, dynamic>>.from((results[0] as List).map((e) => Map<String, dynamic>.from(e as Map)));
       final assinaturas = List<Map<String, dynamic>>.from((results[1] as List).map((e) => Map<String, dynamic>.from(e as Map)));
@@ -626,8 +627,8 @@ class _PlanosPageState extends State<PlanosPage> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Color(0xFF64748B)))),
             ElevatedButton(
               onPressed: saving ? null : () async {
-                final valor = double.tryParse(valorCtrl.text.trim().replaceAll(',', '.'));
-                final vencimento = int.tryParse(vencimentoCtrl.text.trim());
+                final valor = lerNumeroBr(valorCtrl.text.trim());
+                final vencimento = lerInteiroBr(vencimentoCtrl.text.trim());
                 if (valor == null || valor < 0) { setS(() => error = 'Valor mensal inválido'); return; }
                 setS(() { saving = true; error = null; });
                 try {

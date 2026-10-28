@@ -8,6 +8,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/models/checklist_model.dart';
 import '../../core/utils/fetch_all.dart';
+import '../../core/utils/formato_br.dart';
 import '../../core/utils/image_validation.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../core/widgets/signed_network_image.dart';
@@ -126,7 +127,7 @@ class _ChecklistVistoriaPageState extends State<ChecklistVistoriaPage> {
         } else if (eid != null) {
           q = q.eq('empresa_id', eid);
         }
-        return q.order('plate').order('id').range(from, to);
+        return q.order('plate', ascending: true).order('id').range(from, to);
       });
       if (!mounted) return;
       setState(() {
@@ -356,7 +357,7 @@ class _ChecklistVistoriaPageState extends State<ChecklistVistoriaPage> {
 
   Future<void> _registrar() async {
     final rotuloKm = _isSaida ? 'KM de saída' : 'KM final';
-    final km = int.tryParse(_kmController.text.trim());
+    final km = lerInteiroBr(_kmController.text.trim());
     if (km == null || km < 0) {
       return _falha(1, 'Informe o $rotuloKm do veículo (somente números)');
     }
@@ -606,7 +607,7 @@ class _ChecklistVistoriaPageState extends State<ChecklistVistoriaPage> {
   // Card de progresso: círculo X/Y, barra, % e KM/tanque.
   Widget _cardProgresso(double largura) {
     final pct = _totalItens == 0 ? 0.0 : _totalMarcados / _totalItens;
-    final kmDigitado = int.tryParse(_kmController.text.trim());
+    final kmDigitado = lerInteiroBr(_kmController.text.trim());
     final kmExibido = kmDigitado ?? _odometroAtual?.toInt();
     final completo = _totalMarcados == _totalItens;
 
@@ -915,7 +916,7 @@ class _ChecklistVistoriaPageState extends State<ChecklistVistoriaPage> {
   Widget _abaVeiculo() {
     final saida = _ultimaSaida;
     final kmSaidaRef = (saida?['km_inicial'] as num?)?.toInt();
-    final kmDigitado = int.tryParse(_kmController.text.trim());
+    final kmDigitado = lerInteiroBr(_kmController.text.trim());
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

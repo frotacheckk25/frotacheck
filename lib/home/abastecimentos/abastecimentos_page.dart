@@ -126,8 +126,8 @@ class _AbastecimentosPageState extends State<AbastecimentosPage> {
             .order('fuel_date', ascending: false)
             .order('id')
             .range(from, to)),
-        veicQ.order('plate'),
-        drivQ.order('name'),
+        veicQ.order('plate', ascending: true),
+        drivQ.order('name', ascending: true),
       ]);
       if (mounted) {
         final vList = List<Map<String, dynamic>>.from(results[1]);
@@ -719,9 +719,9 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
         'vehicle_id': selectedVehicle,
         'driver_id': selectedDriver,
         'fuel_date': selectedDate.toIso8601String().split('T')[0],
-        'liters': double.tryParse(litrosController.text.replaceAll(',', '.')) ?? 0,
-        'total_value': double.tryParse(valorController.text.replaceAll(',', '.')) ?? 0,
-        'odometer': int.tryParse(odometroController.text) ?? 0,
+        'liters': lerNumeroBr(litrosController.text) ?? 0,
+        'total_value': lerNumeroBr(valorController.text) ?? 0,
+        'odometer': lerInteiroBr(odometroController.text) ?? 0,
       };
 
       if (odometroUrl != null) payload['odometer_photo'] = odometroUrl;
@@ -828,7 +828,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                  decoration: _dec('Litros abastecidos *', Icons.water_drop_outlined),
                  validator: (v) {
                    if (v == null || v.trim().isEmpty) return 'Informe a quantidade de litros';
-                   final parsed = double.tryParse(v.replaceAll(',', '.'));
+                   final parsed = lerNumeroBr(v);
                    if (parsed == null) return 'Valor inválido';
                    if (parsed <= 0) return 'Litros deve ser maior que zero';
                    return null;
@@ -843,12 +843,12 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                  decoration: _dec('Valor total (R\$) *', Icons.attach_money),
                  validator: (v) {
                    if (v == null || v.trim().isEmpty) return 'Informe o valor total';
-                   final parsed = double.tryParse(v.replaceAll(',', '.'));
+                   final parsed = lerNumeroBr(v);
                    if (parsed == null) return 'Valor inválido';
                    if (parsed <= 0) return 'Valor deve ser maior que zero';
                    // Mesma regra do banco (fuelings_valores_validos_ck): pega
                    // erro de digitação tipo "1 litro por R$ 500".
-                   final litros = double.tryParse(litrosController.text.replaceAll(',', '.'));
+                   final litros = lerNumeroBr(litrosController.text);
                    if (litros != null && litros > 0) {
                      final porLitro = parsed / litros;
                      if (porLitro < 0.5 || porLitro > 100) {
@@ -867,7 +867,7 @@ class _AbastecimentoFormState extends State<_AbastecimentoForm> {
                  decoration: _dec('Odômetro (km) *', Icons.speed_outlined),
                  validator: (v) {
                    if (v == null || v.trim().isEmpty) return 'Informe o odômetro';
-                   final parsed = int.tryParse(v);
+                   final parsed = lerInteiroBr(v);
                    if (parsed == null) return 'Valor inválido';
                    if (parsed < 0) return 'Odômetro não pode ser negativo';
                    if (parsed > 3000000) return 'Odômetro inválido. Confira o valor digitado.';

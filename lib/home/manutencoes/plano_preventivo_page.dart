@@ -6,6 +6,7 @@ import '../../core/auth/app_auth_provider.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/fetch_all.dart';
+import '../../core/utils/formato_br.dart';
 import '../../core/utils/snackbar_utils.dart';
 import 'manutencao_comum.dart';
 import 'ordens_servico_page.dart';
@@ -123,7 +124,7 @@ class _PlanoPreventivoPageState extends State<PlanoPreventivoPage> with EmpresaD
       ),
     );
     if (ok != true) return;
-    final kmNum = km.text.trim().isEmpty ? null : int.tryParse(km.text.trim());
+    final kmNum = km.text.trim().isEmpty ? null : lerInteiroBr(km.text.trim());
     if (km.text.trim().isNotEmpty && (kmNum == null || kmNum < 0 || kmNum > 3000000)) {
       if (mounted) showError(context, 'Km inválido (só números).');
       return;
@@ -169,8 +170,8 @@ class _PlanoPreventivoPageState extends State<PlanoPreventivoPage> with EmpresaD
       ),
     );
     if (ok != true) return;
-    final kmN = km.text.trim().isEmpty ? null : int.tryParse(km.text.trim());
-    final diasN = dias.text.trim().isEmpty ? null : int.tryParse(dias.text.trim());
+    final kmN = km.text.trim().isEmpty ? null : lerInteiroBr(km.text.trim());
+    final diasN = dias.text.trim().isEmpty ? null : lerInteiroBr(dias.text.trim());
     if (nome.text.trim().length < 2) {
       if (mounted) showError(context, 'Informe o nome do serviço.');
       return;

@@ -344,7 +344,7 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
     final hoje = isoData(DateTime.now());
     final podeFiscal = context.read<AppAuthProvider>().can(AppPermission.manageFiscalDocs);
     final podeFinanceiro = context.read<AppAuthProvider>().can(AppPermission.manageFinance);
-    final lista = coletas.where((c) {
+    final filtradas = coletas.where((c) {
       final d = c['data_programada']?.toString() ?? '';
       switch (filtroColeta) {
         case 'hoje':
@@ -358,6 +358,8 @@ class _ComercialPageState extends State<ComercialPage> with SingleTickerProvider
           return true;
       }
     }).toList();
+    // Já feitas: a mais recente primeiro; pendentes e hoje seguem a ordem da agenda.
+    final lista = (filtroColeta == 'coletadas' || filtroColeta == 'todas') ? filtradas.reversed.toList() : filtradas;
 
     return Column(children: [
       _filtros(
@@ -1358,7 +1360,7 @@ class _ColetaFormPageState extends _FormBase<ColetaFormPage> {
           Expanded(child: campo(peso, 'Peso (kg)', teclado: const TextInputType.numberWithOptions(decimal: true), validar: validarValor)),
           const SizedBox(width: 12),
           Expanded(child: campo(volumes, 'Volumes', teclado: TextInputType.number,
-              validar: (t) => t.isEmpty || (int.tryParse(t) ?? -1) >= 0 ? null : 'Número inteiro')),
+              validar: (t) => t.isEmpty || (lerInteiroBr(t) ?? -1) >= 0 ? null : 'Número inteiro')),
         ]),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(child: campo(valorCarga, 'Valor da carga (R\$)', teclado: const TextInputType.numberWithOptions(decimal: true), validar: validarValor)),
@@ -1412,7 +1414,7 @@ class _ColetaFormPageState extends _FormBase<ColetaFormPage> {
               'telefone': telefone.text.trim(),
               'natureza_carga': natureza.text.trim(),
               'peso_kg': numeroDe(peso.text),
-              'volumes': int.tryParse(volumes.text.trim()),
+              'volumes': lerInteiroBr(volumes.text.trim()),
               'valor_carga': numeroDe(valorCarga.text),
               'valor_frete': numeroDe(frete.text),
               'veiculo_id': veiculoId,

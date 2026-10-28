@@ -72,8 +72,8 @@ class _MultasPageState extends State<_MultasView> {
         // Paginado: o limite fixo de 300 deixava totais e lista incompletos.
         fetchAllRows((from, to) =>
             multaQ.order('created_at', ascending: false).order('id').range(from, to)),
-        veicQ.order('plate'),
-        drivQ.order('name'),
+        veicQ.order('plate', ascending: true),
+        drivQ.order('name', ascending: true),
       ]);
 
       final rawMultas = List<Map<String, dynamic>>.from(
@@ -715,8 +715,8 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         drivQ2 = drivQ2.eq('empresa_id', eid);
       }
       final results = await Future.wait([
-        veicQ2.order('plate'),
-        drivQ2.order('name'),
+        veicQ2.order('plate', ascending: true),
+        drivQ2.order('name', ascending: true),
       ]);
       if (!mounted) return;
       setState(() {
@@ -820,7 +820,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
         'vehicle_id': selectedVehicle,
         'tipo': selectedTipo,
         'valor':
-            double.tryParse(valorController.text.trim().replaceAll(',', '.')) ??
+            lerNumeroBr(valorController.text.trim()) ??
             0,
         'descricao': descricaoController.text.trim(),
         'status': 'aberta',
@@ -1036,7 +1036,7 @@ class _NovaMultaFormState extends State<_NovaMultaForm> {
                 decoration: _dec('Valor da Multa (R\$) *', Icons.attach_money),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Informe o valor';
-                  final parsed = double.tryParse(v.replaceAll(',', '.'));
+                  final parsed = lerNumeroBr(v);
                   if (parsed == null) return 'Valor inválido';
                   if (parsed <= 0) return 'Valor deve ser maior que zero';
                   return null;

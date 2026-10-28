@@ -160,7 +160,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           final minhaEmpresa = auth.empresaId;
           if (minhaEmpresa != null) empQuery = empQuery.eq('id', minhaEmpresa);
         }
-        final empRes = await empQuery.order('nome');
+        final empRes = await empQuery.order('nome', ascending: true);
         empresas = (empRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -177,7 +177,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
             vQuery = vQuery.eq('empresa_id', minhaEmpresa);
           }
         }
-        final vRes = await vQuery.order('plate');
+        final vRes = await vQuery.order('plate', ascending: true);
         vehicles = (vRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -196,7 +196,7 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
           final minhaEmpresa = auth.empresaId;
           if (minhaEmpresa != null) drQuery = drQuery.eq('empresa_id', minhaEmpresa);
         }
-        final drRes = await drQuery.order('name');
+        final drRes = await drQuery.order('name', ascending: true);
         drivers = (drRes as List)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();

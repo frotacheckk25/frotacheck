@@ -40,3 +40,8 @@ double? lerNumeroBr(String s) {
   if (RegExp(r'^-?\d{1,3}(\.\d{3})+$').hasMatch(t)) return double.tryParse(t.replaceAll('.', ''));
   return double.tryParse(t);
 }
+
+/// Inteiro digitado (km, ano, volumes): "125.000", "125000" e "125 000" viram
+/// 125000 — antes o ponto de milhar fazia o campo recusar o km. Vazio ou
+/// inválido devolve null.
+int? lerInteiroBr(String s) => lerNumeroBr(s.replaceAll(' ', ''))?.round();
