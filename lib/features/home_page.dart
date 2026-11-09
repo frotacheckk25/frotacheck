@@ -3116,17 +3116,40 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Cor de cada seção do menu: o título e os ícones dos itens que vêm logo abaixo usam a mesma cor
+  static const Map<String, Color> _coresSecao = {
+    'PRINCIPAL': Color(0xFF60A5FA),
+    'FROTA': Color(0xFF38BDF8),
+    'OPERAÇÕES': Color(0xFFFB923C),
+    'COMERCIAL': Color(0xFF34D399),
+    'SUPRIMENTOS': Color(0xFFFBBF24),
+    'FINANCEIRO': Color(0xFF4ADE80),
+    'GESTÃO': Color(0xFFA78BFA),
+    'ADMINISTRAÇÃO': Color(0xFFF472B6),
+    'MASTER': Color(0xFFF59E0B),
+  };
+  Color _corSecaoAtual = const Color(0xFF60A5FA);
+
   Widget _sidebarSection(String label) {
+    _corSecaoAtual = _coresSecao[label] ?? const Color(0xFF60A5FA);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 14, 8, 4),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF2D4A6A),
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.8,
-        ),
+      padding: const EdgeInsets.fromLTRB(8, 18, 8, 6),
+      child: Row(
+        children: [
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: _corSecaoAtual, shape: BoxShape.circle, boxShadow: [BoxShadow(color: _corSecaoAtual.withOpacity(0.6), blurRadius: 6)])),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: _corSecaoAtual.withOpacity(0.85),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.6,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, color: _corSecaoAtual.withOpacity(0.14))),
+        ],
       ),
     );
   }
@@ -3137,7 +3160,7 @@ class _HomePageState extends State<HomePage> {
     VoidCallback onTap, {
     bool active = false,
   }) {
-    return _SidebarNavItem(icon: icon, label: label, onTap: onTap, active: active);
+    return _SidebarNavItem(icon: icon, label: label, onTap: onTap, active: active, cor: _corSecaoAtual);
   }
 
   Widget _buildProfileCard() {
@@ -4152,12 +4175,14 @@ class _SidebarNavItem extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
   final bool active;
+  final Color cor;
 
   const _SidebarNavItem({
     required this.icon,
     required this.label,
     required this.onTap,
     this.active = false,
+    this.cor = const Color(0xFF60A5FA),
   });
 
   @override
@@ -4182,12 +4207,13 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
           margin: const EdgeInsets.only(bottom: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           decoration: BoxDecoration(
+            gradient: active ? const LinearGradient(colors: [Color(0xFF1D4ED8), Color(0xFF1E3A5F)]) : null,
             color: active
-                ? const Color(0xFF1E3A5F)
+                ? null
                 : hovered
-                    ? const Color(0xFF111C30)
+                    ? const Color(0xFF16233A)
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
             border: Border.all(
@@ -4228,17 +4254,20 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                       : null,
                 ),
               ),
-              // Icon
-              Icon(
-                widget.icon,
-                size: 17,
-                color: active
-                    ? const Color(0xFF93C5FD)
-                    : hovered
-                        ? Colors.white.withOpacity(0.65)
-                        : const Color(0xFF475569),
+              // Ícone num quadradinho com a cor da seção
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: active ? Colors.white.withOpacity(0.16) : widget.cor.withOpacity(hovered ? 0.22 : 0.13),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: active ? Colors.white.withOpacity(0.25) : widget.cor.withOpacity(0.25)),
+                ),
+                alignment: Alignment.center,
+                child: Icon(widget.icon, size: 17, color: active ? Colors.white : widget.cor),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 11),
               // Label
               Expanded(
                 child: Text(
@@ -4247,10 +4276,10 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                     color: active
                         ? Colors.white
                         : hovered
-                            ? Colors.white.withOpacity(0.72)
-                            : const Color(0xFF64748B),
-                    fontSize: 12.5,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                            ? Colors.white
+                            : const Color(0xFFD5DEEA),
+                    fontSize: 13.5,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                     letterSpacing: active ? 0.1 : 0,
                   ),
                   overflow: TextOverflow.ellipsis,
