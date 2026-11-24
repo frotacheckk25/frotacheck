@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
-import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/utils/driver_account_link.dart';
 import '../../core/utils/fetch_all.dart';
@@ -1848,26 +1847,21 @@ class _MasterDashboardPageState extends State<MasterDashboardPage> {
                   String? userId;
 
                   if (criarConta) {
-                    // ── Criar conta nova via cliente secundário ──────────────
+                    // ── Criar conta nova pela função de servidor (API admin) ──
                     // Senha inicial definida por quem cadastra; a pessoa troca depois
-                    // em Perfil → Alterar senha. Nada depende de e-mail chegar.
-                    final url = await SupabaseConfig.getUrl();
-                    final key = await SupabaseConfig.getPublishableKey();
-                    final tmpClient = SupabaseClient(url, key);
-                    try {
-                      final signUpRes = await tmpClient.auth.signUp(
-                        email: email,
-                        password: senha,
-                      );
-                      userId = signUpRes.user?.id;
-                      // Usuário sem identities = e-mail que já tinha conta.
-                      final jaExiste = signUpRes.user?.identities?.isEmpty ?? false;
-                      if (userId == null || jaExiste) {
-                        setS(() { saving = false; error = 'Já existe uma conta com esse e-mail. Desmarque "Criar conta de acesso" para só vincular.'; });
-                        return;
-                      }
-                    } finally {
-                      await tmpClient.dispose();
+                    // em Perfil → Alterar senha. Não depende do cadastro público.
+                    final res = await _supabase.functions.invoke(
+                      'admin-criar-conta-auth',
+                      body: {'email': email, 'senha': senha},
+                    );
+                    final data = res.data;
+                    userId = (data is Map && data['ok'] == true) ? data['user_id']?.toString() : null;
+                    if (userId == null || userId.isEmpty) {
+                      final msg = (data is Map && data['duplicado'] == true)
+                          ? 'Já existe uma conta com esse e-mail. Desmarque "Criar conta de acesso" para só vincular.'
+                          : ((data is Map ? data['erro'] : null)?.toString() ?? 'Não foi possível criar a conta.');
+                      setS(() { saving = false; error = msg; });
+                      return;
                     }
 
                     // Inserir perfil do usuário (master tem permissão).

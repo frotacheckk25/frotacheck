@@ -8,7 +8,6 @@ import '../../core/config/app_links.dart';
 import '../../core/utils/credential_storage.dart';
 import '../../core/utils/login_lockout.dart';
 import '../../core/utils/snackbar_utils.dart';
-import 'register_page.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _sky = Color(0xFF0ea5e9);
@@ -542,31 +541,9 @@ class _LoginForm extends StatelessWidget {
                     ),
             ),
           ),
-          const SizedBox(height: 28),
-          // Register link
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Não tem uma conta? ',
-                style: TextStyle(color: _muted, fontSize: 14),
-              ),
-              GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterPage()),
-                ),
-                child: const Text(
-                  'Cadastre-se',
-                  style: TextStyle(
-                    color: _sky,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          // Cadastro público removido (24/11/2026): as contas são criadas
+          // pelo administrador da empresa. Isso fecha a porta para criação
+          // automática de contas em massa (cadastro público desligado).
         ],
       ),
     );

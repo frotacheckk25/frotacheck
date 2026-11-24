@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/app_auth_provider.dart';
-import '../../core/config/supabase_config.dart';
 import '../../core/enums/app_permission.dart';
 import '../../core/enums/app_role.dart';
 import '../../core/guards/permission_guard.dart';
@@ -975,21 +974,20 @@ class _AdminUsuariosViewState extends State<_AdminUsuariosView> {
                         String? userId;
 
                         if (criarConta) {
-                          final url = await SupabaseConfig.getUrl();
-                          final key = await SupabaseConfig.getPublishableKey();
-                          final tmpClient = SupabaseClient(url, key);
-                          try {
-                            final signUpRes = await tmpClient.auth.signUp(email: email, password: senha);
-                            userId = signUpRes.user?.id;
-                            // Supabase devolve usuário "fantasma" (sem identities)
-                            // quando o e-mail já tem conta.
-                            final jaExiste = signUpRes.user?.identities?.isEmpty ?? false;
-                            if (userId == null || jaExiste) {
-                              setS(() { saving = false; error = 'Já existe uma conta com esse e-mail. Desmarque "Criar conta de acesso" para só vincular.'; });
-                              return;
-                            }
-                          } finally {
-                            await tmpClient.dispose();
+                          // Cria a conta pela função de servidor (API de admin),
+                          // que não depende do cadastro público estar ligado.
+                          final res = await _supabase.functions.invoke(
+                            'admin-criar-conta-auth',
+                            body: {'email': email, 'senha': senha},
+                          );
+                          final data = res.data;
+                          userId = (data is Map && data['ok'] == true) ? data['user_id']?.toString() : null;
+                          if (userId == null || userId.isEmpty) {
+                            final msg = (data is Map && data['duplicado'] == true)
+                                ? 'Já existe uma conta com esse e-mail. Desmarque "Criar conta de acesso" para só vincular.'
+                                : ((data is Map ? data['erro'] : null)?.toString() ?? 'Não foi possível criar a conta.');
+                            setS(() { saving = false; error = msg; });
+                            return;
                           }
                         }
 
